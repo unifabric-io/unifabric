@@ -1,0 +1,45 @@
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+bin/
+dist/
+build/
+
+# Python
+*/__pycache__
+
+# Dependencies
+vendor/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config files
+.env
+.env.local
+kubeconfig-*.yaml
+
+# Go Test
+coverage.out
+
+# Go artifacts
+*.exe
+*.test
+*.out
+
+# Temp files
+*.tmp
+
+## AI
+.codex
+.codex/
+.agents/
+.github/agents
+.github/prompts
+.specify/*
+!.specify/
+!.specify/memory/
+!.specify/memory/**

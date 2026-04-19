@@ -1,0 +1,401 @@
+global:
+  # -- Override the default image registry used by chart workloads when image-specific registry is empty.
+  registry: ""
+  imagePullSecrets: []
+
+# -- Label keys written back to Kubernetes Nodes for discovered topology dimensions.
+topologyLabels:
+  # -- Label key used to mark nodes that participate in scale-up topology.
+  scaleUp: unifabric.io/scale-up
+
+  # -- Label key used to mark the leaf-level scale-out topology group of a node.
+  scaleOutLeaf: unifabric.io/scale-out-leaf
+
+  # -- Label key used to mark the spine-level scale-out topology group of a node.
+  scaleOutSpine: unifabric.io/scale-out-spine
+
+  # -- Label key used to mark the core-level scale-out topology group of a node.
+  scaleOutCore: unifabric.io/scale-out-core
+
+# -- Controls controller-side scale-out discovery derived from FabricNode topology.
+scaleOutDiscovery:
+  # -- Settings for ScaleOutLeafGroup discovery and Node leaf label reconciliation.
+  leafGroups:
+    # -- Enable ScaleOutLeafGroup discovery and Node leaf label updates.
+    enabled: true
+
+# -- Controls local node topology discovery on each agent node.
+nodeTopologyDiscovery:
+  # -- How often each agent refreshes local RDMA interface and LLDP neighbor state.
+  refreshInterval: "1m"
+  # -- Delay before the first local RDMA and LLDP topology scan, allowing lldpd to learn neighbors.
+  initialScanDelay: "1m"
+  # -- Select RDMA interfaces that belong to scale-out topology. Supports values like cidr=172.17.0.0/16 or interface=eth*,!eth9.
+  scaleOutInterfaceSelector: ""
+  # -- Select RDMA interfaces that belong to storage topology. Configure only when storage RDMA interfaces exist.
+  storageInterfaceSelector: ""
+  # -- Select RDMA interfaces that belong to scale-up topology. Configure only when scale-up RDMA interfaces exist; matched interfaces are excluded from FabricNode scale-out status.
+  scaleUpInterfaceSelector: ""
+
+# -- Controls node-level RDMA metrics exported by the agent.
+nodeMetrics:
+  # -- Enable collection of RDMA device metrics by the agent.
+  enabled: true
+  # -- Metrics port exposed by the node metrics endpoint.
+  port: 8082
+  # -- HTTP path exposed by the node metrics endpoint.
+  path: /metrics
+  # -- ServiceMonitor settings used by Prometheus Operator to scrape node metrics.
+  serviceMonitor:
+    # -- Enable creation of a ServiceMonitor for node metrics.
+    enabled: true
+    # -- Prometheus scrape interval for node metrics.
+    interval: 15s
+    # -- Prometheus scrape timeout for node metrics.
+    scrapeTimeout: 10s
+    # -- Metrics path used by the ServiceMonitor endpoint.
+    path: /metrics
+    # -- Additional labels attached to the ServiceMonitor resource.
+    labels: {}
+  # -- Kubernetes Service settings for exposing node metrics.
+  service:
+    # -- Service type used for the node metrics Service.
+    type: ClusterIP
+    # -- Service port exposed for node metrics scraping.
+    port: 8086
+
+# -- Controls rendering of prebuilt Grafana dashboard resources.
+grafanaDashboard:
+  # -- Enable rendering RDMA topology and metrics dashboards.
+  enabled: true
+  # -- Dashboard resource kind: ConfigMap for Grafana sidecar, or GrafanaDashboard for Grafana Operator.
+  kind: GrafanaDashboard
+  # -- Additional labels attached to rendered dashboard resources.
+  labels: {}
+  # -- Allow GrafanaDashboard resources to be imported across namespaces by Grafana Operator.
+  allowCrossNamespaceImport: true
+  # -- Selector used by Grafana Operator to choose Grafana instances that import dashboards.
+  instanceSelector: {}
+
+controller:
+  enabled: true
+  replicaCount: 1
+  image:
+    # -- Container image registry for the controller.
+    registry: ghcr.io
+    # -- Container image repository for the controller.
+    repository: unifabric-io/unifabric-controller
+    # -- Container image tag for the controller. Defaults to the chart appVersion when empty.
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ports:
+    metrics: 8080
+    health: 8081
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+  config:
+    logLevel: info
+    metrics:
+      bindAddress: ":8080"
+    healthProbe:
+      bindAddress: ":8081"
+    pprof:
+      bindAddress: ""
+    leaderElection:
+      enabled: true
+      namespace: ""
+      id: unifabric-controller
+
+agent:
+  enabled: true
+  image:
+    # -- Container image registry for the agent.
+    registry: ghcr.io
+    # -- Container image repository for the agent.
+    repository: unifabric-io/unifabric-agent
+    # -- Container image tag for the agent. Defaults to the chart appVersion when empty.
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
+  hostNetwork: true
+  hostPID: true
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    privileged: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ports:
+    metrics: 8082
+    health: 8083
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8082
+  config:
+    logLevel: info
+    metrics:
+      bindAddress: ":8082"
+    healthProbe:
+      bindAddress: ":8083"
+    node:
+      name: ""
+      role: gpu
+      defaultRouteProbe: "8.8.8.8:53"
+  lldp:
+    enabled: true
+    image:
+      # -- Container image registry for lldpd.
+      registry: ghcr.io
+      # -- Container image repository for lldpd.
+      repository: unifabric-io/unifabric-agent
+      # -- Container image tag for lldpd. Defaults to the chart appVersion when empty.
+      tag: ""
+      pullPolicy: IfNotPresent
+    managementIPPattern: ""
+    interfaces: ""
+    txInterval: 30
+    extraConfig: ""
+    containerSecurityContext:
+      privileged: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+nvidiaTopograph:
+  # -- Enable the NVIDIA topograph integration rendered by this chart.
+  enable: false
+  # -- Provider settings for the NVIDIA topograph integration.
+  provider:
+    # -- Topograph provider name.
+    name: infiniband-k8s
+  # -- Engine settings for the NVIDIA topograph integration.
+  engine:
+    # -- Topograph engine name.
+    name: k8s
+  # -- Service settings shared by the NVIDIA topograph components.
+  service:
+    # -- Service type used for the topograph Service.
+    type: ClusterIP
+    # -- Service port used by the topograph HTTP endpoint.
+    port: 49021
+  # -- Image pull secrets applied to the NVIDIA topograph workloads.
+  imagePullSecrets: []
+  topograph:
+    replicaCount: 1
+    image:
+      # -- Container image registry for the topograph deployment.
+      registry: ghcr.io
+      # -- Container image repository for the topograph deployment.
+      repository: nvidia/topograph
+      # -- Container image tag for the topograph deployment.
+      tag: v0.3.0
+      pullPolicy: IfNotPresent
+    serviceName: ""
+    serviceAccount:
+      create: true
+      automount: true
+      annotations: {}
+      name: ""
+    verbosity: 3
+    env: {}
+    config:
+      requestAggregationDelay: 15s
+      # -- Optional Secret containing provider API credentials for topograph. By default the Secret must include a credentials.yaml key.
+      credentialsSecret: ""
+      # -- Optional credentials path written to topograph-config.yaml. When credentialsSecret is set and this is empty, the chart uses /etc/topograph/credentials/credentials.yaml.
+      credentialsPath: ""
+    podAnnotations: {}
+    podLabels: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources:
+      limits:
+        cpu: 400m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    volumes: []
+    volumeMounts: []
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: http
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: http
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    ingress:
+      enabled: false
+      className: ""
+      annotations: {}
+      hosts:
+        - host: chart-example.local
+          paths:
+            - path: /
+              pathType: ImplementationSpecific
+      tls: []
+    serviceMonitor:
+      enabled: false
+      namespace: monitoring
+      port: http
+      path: /metrics
+      interval: 15s
+      scheme: http
+  nodeObserver:
+    replicaCount: 1
+    image:
+      # -- Container image registry for the node observer deployment.
+      registry: ghcr.io
+      # -- Container image repository for the node observer deployment.
+      repository: nvidia/topograph
+      # -- Container image tag for the node observer deployment.
+      tag: v0.3.0
+      pullPolicy: IfNotPresent
+    wait:
+      image:
+        # -- Container image registry for the node observer wait init container.
+        registry: docker.io
+        # -- Container image repository for the node observer wait init container.
+        repository: curlimages/curl
+        # -- Container image tag for the node observer wait init container.
+        tag: 8.13.0
+        pullPolicy: IfNotPresent
+    serviceAccount:
+      create: true
+      automount: true
+      annotations: {}
+      name: ""
+    verbosity: 3
+    trigger: {}
+    podAnnotations: {}
+    podLabels: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources:
+      limits:
+        cpu: 400m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+  nodeDataBroker:
+    enable: true
+    image:
+      # -- Container image registry for the node data broker DaemonSet.
+      registry: ghcr.io
+      # -- Container image repository for the node data broker DaemonSet.
+      repository: nvidia/topograph/ib
+      # -- Container image tag for the node data broker DaemonSet.
+      tag: main
+      pullPolicy: IfNotPresent
+    command:
+      - tail
+      - -f
+      - /dev/null
+    initContainer:
+      enable: true
+      image:
+        # -- Container image registry for the node data broker init container.
+        registry: ghcr.io
+        # -- Container image repository for the node data broker init container.
+        repository: nvidia/topograph
+        # -- Container image tag for the node data broker init container.
+        tag: v0.3.0
+        pullPolicy: IfNotPresent
+      extraArgs:
+        - gpu-operator-namespace=gpu-operator
+        - device-plugin-daemonset=nvidia-device-plugin-daemonset
+    serviceAccount:
+      create: true
+      automount: true
+      annotations: {}
+      name: ""
+    verbosity: 3
+    podAnnotations: {}
+    podLabels: {}
+    podSecurityContext: {}
+    securityContext:
+      privileged: true
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    volumeMounts:
+      - name: sys-class
+        mountPath: /sys/class
+    volumes:
+      - name: sys-class
+        hostPath:
+          path: /sys/class
+          type: Directory
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}

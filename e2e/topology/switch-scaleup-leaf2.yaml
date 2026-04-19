@@ -1,0 +1,135 @@
+- header:
+    model: vx
+    nvue-api-version: nvue_v1
+    rev-id: 1.0
+    version: Cumulus Linux 5.15.0
+- set:
+    bridge:
+      domain:
+        br_default:
+          untagged: 1
+          vlan:
+            911,912,913,914: {}
+    interface:
+      eth0:
+        ipv4:
+          dhcp-client:
+            set-hostname: enabled
+            state: enabled
+        type: eth
+        vrf: mgmt
+      swp1-8:
+        type: swp
+      swp1,5:
+        bridge:
+          domain:
+            br_default:
+              access: 911
+      swp2,6:
+        bridge:
+          domain:
+            br_default:
+              access: 912
+      swp3,7:
+        bridge:
+          domain:
+            br_default:
+              access: 913
+      swp4,8:
+        bridge:
+          domain:
+            br_default:
+              access: 914
+      vlan911:
+        ipv4:
+          address:
+            172.31.11.1/24: {}
+        vlan: 911
+      vlan911,912,913,914:
+        type: svi
+      vlan912:
+        ipv4:
+          address:
+            172.31.12.1/24: {}
+        vlan: 912
+      vlan913:
+        ipv4:
+          address:
+            172.31.13.1/24: {}
+        vlan: 913
+      vlan914:
+        ipv4:
+          address:
+            172.31.14.1/24: {}
+        vlan: 914
+    system:
+      aaa:
+        class:
+          nvapply:
+            action: allow
+            command-path:
+              /:
+                permission: all
+          nvshow:
+            action: allow
+            command-path:
+              /:
+                permission: ro
+          sudo:
+            action: allow
+            command-path:
+              /:
+                permission: all
+        role:
+          nvue-admin:
+            class:
+              nvapply: {}
+          nvue-monitor:
+            class:
+              nvshow: {}
+          system-admin:
+            class:
+              nvapply: {}
+              sudo: {}
+        user:
+          cumulus:
+            full-name: cumulus
+            # Password is `Dangerous1#`, the plaintext is secure because it is hidden behind a jump server.
+            hashed-password: '$6$wUQcsrp2Ci8.eyJu$LBO1RVoVwgwfGkNRUU1HP1xClLkb5hC86cV9dgwGBtQKoT9tFaQ36a4ljBq5JzowD846YBZ5zJW.WI53QxRUr1'
+            role: system-admin
+      api:
+        state: enabled
+      config:
+        auto-save:
+          state: enabled
+      control-plane:
+        acl:
+          acl-default-dos:
+            inbound: {}
+          acl-default-whitelist:
+            inbound: {}
+      docker:
+        state: enabled
+        vrf: mgmt
+      hostname: switch-scaleup-leaf2
+      ntp:
+        server:
+          0.cumulusnetworks.pool.ntp.org:
+            association-type: server
+          1.cumulusnetworks.pool.ntp.org:
+            association-type: server
+          2.cumulusnetworks.pool.ntp.org:
+            association-type: server
+          3.cumulusnetworks.pool.ntp.org:
+            association-type: server
+        vrf: mgmt
+      ssh-server:
+        state: enabled
+      wjh:
+        channel:
+          forwarding:
+            trigger:
+              l2: {}
+              l3: {}
+              tunnel: {}
+        state: enabled

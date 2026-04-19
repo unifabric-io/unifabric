@@ -1,0 +1,110 @@
+name: Generate Release Notes
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      github_repository:
+        required: false
+        type: string
+      copilot_model:
+        required: false
+        type: string
+    secrets:
+      COPILOT_GITHUB_TOKEN:
+        required: true        
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to generate release notes for
+        required: true
+        type: string
+      github_repository:
+        description: GitHub repository (optional)
+        required: false
+        type: string
+      copilot_model:
+        description: Copilot model (optional)
+        required: false
+        type: string
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get Ref
+        id: get_ref
+        run: |
+          set -euo pipefail
+
+          tag=""
+          repo=""
+          model=""
+
+          if ${{ github.event_name == 'workflow_dispatch' }}; then
+            tag='${{ github.event.inputs.tag }}'
+            repo='${{ github.event.inputs.github_repository }}'
+            model='${{ github.event.inputs.copilot_model }}'
+          else 
+            tag='${{ inputs.tag }}'
+            repo='${{ inputs.github_repository }}'
+            model='${{ inputs.copilot_model }}'
+          fi
+
+          if [[ -z "${tag}" ]]; then
+            echo "tag is required" >&2
+            exit 2
+          fi
+
+          if [[ -z "${repo}" ]]; then
+            repo='${{ github.repository }}'
+          fi
+
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "repo=${repo}" >> "$GITHUB_OUTPUT"
+          echo "model=${model}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        run: |
+          ERROR_LOG_FILE=/tmp/release-notes.err
+          chmod +x hack/generate_release_notes.sh
+          rc=0
+          ./hack/generate_release_notes.sh \
+            --gh-token ${{ github.token }} \
+            --copilot-token ${{ secrets.COPILOT_GITHUB_TOKEN }} \
+            --repo "${{ steps.get_ref.outputs.repo }}" \
+            --current-tag "${{ steps.get_ref.outputs.tag }}" \
+            --model "${{ steps.get_ref.outputs.model }}" \
+            --output release-notes.md \
+            --error-log-file "$ERROR_LOG_FILE" || rc=$?
+
+          cat "$ERROR_LOG_FILE" >&2
+          rm -f "$ERROR_LOG_FILE" || true
+          exit $rc
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+      - name: Write job summary
+        run: |
+          {
+            echo "## Release Notes Preview"
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"

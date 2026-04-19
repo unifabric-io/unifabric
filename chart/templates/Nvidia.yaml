@@ -1,0 +1,553 @@
+{{/*
+NVIDIA Topograph integration.
+Upstream project: https://github.com/NVIDIA/topograph
+*/}}
+{{- if .Values.nvidiaTopograph.enable }}
+{{- $topograph := .Values.nvidiaTopograph.topograph }}
+{{- $nodeObserver := .Values.nvidiaTopograph.nodeObserver }}
+{{- $nodeDataBroker := .Values.nvidiaTopograph.nodeDataBroker }}
+{{- $imagePullSecrets := default .Values.global.imagePullSecrets .Values.nvidiaTopograph.imagePullSecrets }}
+{{- $topographName := include "unifabric.nvidiaTopograph.topographName" . }}
+{{- $nodeObserverName := include "unifabric.nvidiaTopograph.nodeObserverName" . }}
+{{- $nodeDataBrokerName := include "unifabric.nvidiaTopograph.nodeDataBrokerName" . }}
+{{- $topographCredentialsPath := default "/etc/topograph/credentials/credentials.yaml" $topograph.config.credentialsPath }}
+{{- $topographLabels := dict "root" . "name" "topograph" "component" "nvidia-topograph" }}
+{{- $nodeObserverLabels := dict "root" . "name" "node-observer" "component" "nvidia-node-observer" }}
+{{- $nodeDataBrokerLabels := dict "root" . "name" "node-data-broker" "component" "nvidia-node-data-broker" }}
+{{- if and $nodeDataBroker.enable $nodeDataBroker.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $nodeDataBrokerLabels | nindent 4 }}
+  {{- with $nodeDataBroker.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+automountServiceAccountToken: {{ $nodeDataBroker.serviceAccount.automount }}
+---
+{{- end }}
+{{- if $nodeObserver.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $nodeObserverLabels | nindent 4 }}
+  {{- with $nodeObserver.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+automountServiceAccountToken: {{ $nodeObserver.serviceAccount.automount }}
+---
+{{- end }}
+{{- if $topograph.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.topographServiceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $topographLabels | nindent 4 }}
+  {{- with $topograph.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+automountServiceAccountToken: {{ $topograph.serviceAccount.automount }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $nodeObserverName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $nodeObserverLabels | nindent 4 }}
+data:
+  node-observer-config.yaml: |-
+    generateTopologyUrl: "{{ include "unifabric.nvidiaTopograph.url" . }}/v1/generate"
+    provider:
+      {{- toYaml .Values.nvidiaTopograph.provider | nindent 6 }}
+    engine:
+      {{- toYaml .Values.nvidiaTopograph.engine | nindent 6 }}
+    trigger:
+      {{- include "unifabric.nvidiaTopograph.nodeObserverTrigger" . | nindent 6 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $topographName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $topographLabels | nindent 4 }}
+data:
+  topograph-config.yaml: |-
+    http:
+      port: {{ .Values.nvidiaTopograph.service.port }}
+      ssl: false
+    requestAggregationDelay: {{ $topograph.config.requestAggregationDelay }}
+    {{- if or $topograph.config.credentialsSecret $topograph.config.credentialsPath }}
+    credentialsPath: {{ $topographCredentialsPath }}
+    {{- end }}
+---
+{{- if and $nodeDataBroker.enable $nodeDataBroker.serviceAccount.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" . }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "update"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+    apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: {{ include "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" . }}
+  apiGroup: ""
+---
+{{- end }}
+{{- if $nodeObserver.serviceAccount.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" . }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+    apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: {{ include "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" . }}
+  apiGroup: ""
+---
+{{- end }}
+{{- if $topograph.serviceAccount.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.topographServiceAccountName" . }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "update"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "unifabric.nvidiaTopograph.topographServiceAccountName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "unifabric.nvidiaTopograph.topographServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+    apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: {{ include "unifabric.nvidiaTopograph.topographServiceAccountName" . }}
+  apiGroup: ""
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $topographName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $topographLabels | nindent 4 }}
+spec:
+  type: {{ .Values.nvidiaTopograph.service.type }}
+  ports:
+    - port: {{ .Values.nvidiaTopograph.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "unifabric.nvidiaTopograph.selectorLabels" $topographLabels | nindent 4 }}
+---
+{{- if $nodeDataBroker.enable }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ $nodeDataBrokerName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $nodeDataBrokerLabels | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "unifabric.nvidiaTopograph.selectorLabels" $nodeDataBrokerLabels | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "unifabric.nvidiaTopograph.labels" $nodeDataBrokerLabels | nindent 8 }}
+        {{- with $nodeDataBroker.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $nodeDataBroker.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with $imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" . }}
+      securityContext:
+        {{- toYaml $nodeDataBroker.podSecurityContext | nindent 8 }}
+      {{- if $nodeDataBroker.initContainer.enable }}
+      initContainers:
+        - name: init-node-labels
+          image: {{ include "unifabric.image" (dict "root" . "image" $nodeDataBroker.initContainer.image) | quote }}
+          imagePullPolicy: {{ $nodeDataBroker.initContainer.image.pullPolicy }}
+          command:
+            - /usr/local/bin/node-data-broker-initc
+          args:
+            - --provider={{ .Values.nvidiaTopograph.provider.name }}
+            - -v={{ $nodeDataBroker.verbosity }}
+            {{- range $nodeDataBroker.initContainer.extraArgs }}
+            - --set={{ . }}
+            {{- end }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          {{- with $nodeDataBroker.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }}
+      containers:
+        - name: node-data-broker
+          securityContext:
+            {{- toYaml $nodeDataBroker.securityContext | nindent 12 }}
+          image: {{ include "unifabric.image" (dict "root" . "image" $nodeDataBroker.image) | quote }}
+          imagePullPolicy: {{ $nodeDataBroker.image.pullPolicy }}
+          {{- with $nodeDataBroker.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml $nodeDataBroker.resources | nindent 12 }}
+          {{- with $nodeDataBroker.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with $nodeDataBroker.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        {{- include "unifabric.nvidiaTopograph.nodeDataBrokerNodeSelector" . | nindent 8 }}
+      {{- with $nodeDataBroker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $nodeDataBroker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $nodeObserverName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $nodeObserverLabels | nindent 4 }}
+spec:
+  replicas: {{ $nodeObserver.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "unifabric.nvidiaTopograph.selectorLabels" $nodeObserverLabels | nindent 6 }}
+  template:
+    metadata:
+      {{- with $nodeObserver.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "unifabric.nvidiaTopograph.labels" $nodeObserverLabels | nindent 8 }}
+        {{- with $nodeObserver.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" . }}
+      securityContext:
+        {{- toYaml $nodeObserver.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait
+          image: {{ include "unifabric.image" (dict "root" . "image" $nodeObserver.wait.image) | quote }}
+          imagePullPolicy: {{ $nodeObserver.wait.image.pullPolicy }}
+          command:
+            - sh
+          args:
+            - -c
+            - |
+              until curl -sf "{{ include "unifabric.nvidiaTopograph.url" . }}/healthz" ; do
+                echo "Waiting for topograph to start ..."
+                sleep 2
+              done
+      containers:
+        - name: node-observer
+          securityContext:
+            {{- toYaml $nodeObserver.securityContext | nindent 12 }}
+          image: {{ include "unifabric.image" (dict "root" . "image" $nodeObserver.image) | quote }}
+          imagePullPolicy: {{ $nodeObserver.image.pullPolicy }}
+          command:
+            - /usr/local/bin/node-observer
+          args:
+            - -v={{ $nodeObserver.verbosity }}
+          resources:
+            {{- toYaml $nodeObserver.resources | nindent 12 }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/topograph
+      volumes:
+        - name: config-volume
+          configMap:
+            defaultMode: 420
+            name: {{ $nodeObserverName }}
+      {{- with $nodeObserver.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $nodeObserver.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $nodeObserver.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $topographName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $topographLabels | nindent 4 }}
+spec:
+  replicas: {{ $topograph.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "unifabric.nvidiaTopograph.selectorLabels" $topographLabels | nindent 6 }}
+  template:
+    metadata:
+      {{- with $topograph.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "unifabric.nvidiaTopograph.labels" $topographLabels | nindent 8 }}
+        {{- with $topograph.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "unifabric.nvidiaTopograph.topographServiceAccountName" . }}
+      securityContext:
+        {{- toYaml $topograph.podSecurityContext | nindent 8 }}
+      containers:
+        - name: topograph
+          securityContext:
+            {{- toYaml $topograph.securityContext | nindent 12 }}
+          image: {{ include "unifabric.image" (dict "root" . "image" $topograph.image) | quote }}
+          imagePullPolicy: {{ $topograph.image.pullPolicy }}
+          command:
+            - /usr/local/bin/topograph
+          args:
+            - -v={{ $topograph.verbosity }}
+            - -k8s-topology-key-accelerator={{ .Values.topologyLabels.scaleUp }}
+            - -k8s-topology-key-leaf={{ .Values.topologyLabels.scaleOutLeaf }}
+            - -k8s-topology-key-spine={{ .Values.topologyLabels.scaleOutSpine }}
+            - -k8s-topology-key-core={{ .Values.topologyLabels.scaleOutCore }}
+          env:
+            - name: NODE_DATA_BROKER_NAME
+              value: {{ $nodeDataBrokerName }}
+            - name: NODE_DATA_BROKER_NAMESPACE
+              value: {{ .Release.Namespace }}
+            {{- range $key, $value := $topograph.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.nvidiaTopograph.service.port }}
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml $topograph.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml $topograph.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml $topograph.resources | nindent 12 }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/topograph
+            {{- if $topograph.config.credentialsSecret }}
+            - name: topograph-credentials
+              mountPath: {{ dir $topographCredentialsPath | quote }}
+              readOnly: true
+            {{- end }}
+            {{- with $topograph.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: config-volume
+          configMap:
+            defaultMode: 420
+            name: {{ $topographName }}
+        {{- if $topograph.config.credentialsSecret }}
+        - name: topograph-credentials
+          secret:
+            secretName: {{ $topograph.config.credentialsSecret | quote }}
+        {{- end }}
+        {{- with $topograph.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $topograph.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $topograph.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $topograph.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- if $topograph.ingress.enabled }}
+---
+{{- $svcPort := .Values.nvidiaTopograph.service.port -}}
+{{- if and $topograph.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey $topograph.ingress.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set $topograph.ingress.annotations "kubernetes.io/ingress.class" $topograph.ingress.className }}
+  {{- end }}
+{{- end }}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1beta1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $topographName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $topographLabels | nindent 4 }}
+  {{- with $topograph.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if and $topograph.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ $topograph.ingress.className }}
+  {{- end }}
+  {{- if $topograph.ingress.tls }}
+  tls:
+    {{- range $topograph.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range $topograph.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $topographName }}
+                port:
+                  number: {{ $svcPort }}
+              {{- else }}
+              serviceName: {{ $topographName }}
+              servicePort: {{ $svcPort }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- if $topograph.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $topographName }}
+  namespace: {{ $topograph.serviceMonitor.namespace }}
+  labels:
+    {{- include "unifabric.nvidiaTopograph.labels" $topographLabels | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "unifabric.nvidiaTopograph.selectorLabels" $topographLabels | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: {{ $topograph.serviceMonitor.port }}
+      path: {{ $topograph.serviceMonitor.path }}
+      interval: {{ $topograph.serviceMonitor.interval }}
+      scheme: {{ $topograph.serviceMonitor.scheme }}
+{{- end }}
+{{- end }}

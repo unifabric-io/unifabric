@@ -1,0 +1,106 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: scaleoutleafgroups.unifabric.io
+spec:
+  group: unifabric.io
+  names:
+    categories:
+    - scaleoutleafgroup
+    kind: ScaleOutLeafGroup
+    listKind: ScaleOutLeafGroupList
+    plural: scaleoutleafgroups
+    shortNames:
+    - slg
+    singular: scaleoutleafgroup
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.healthyNodes
+      name: healthyNodes
+      type: integer
+    - jsonPath: .status.totalNodes
+      name: totalNodes
+      type: integer
+    - jsonPath: .status.healthy
+      name: Healthy
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ScaleOutGroupSpec defines the desired state of ScaleoutGroup
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ScaleoutNeighborGroupSpec defines the desired state of ScaleoutNeighborGroup(empty
+              for now)
+            type: object
+          status:
+            description: |-
+              ScaleoutGroupStatus defines the observed state of ScaleoutGroup, If different
+              nodes share the same set of switch neighbors, then these nodes and switches belong to the same ScaleoutGroup.
+            properties:
+              healthy:
+                type: boolean
+              healthyNodes:
+                type: integer
+              nodes:
+                items:
+                  properties:
+                    healthy:
+                      type: boolean
+                    name:
+                      type: string
+                  required:
+                  - healthy
+                  - name
+                  type: object
+                type: array
+              switches:
+                items:
+                  properties:
+                    mgmtIP:
+                      type: string
+                    name:
+                      type: string
+                  required:
+                  - mgmtIP
+                  - name
+                  type: object
+                type: array
+              totalNodes:
+                type: integer
+            required:
+            - healthy
+            - healthyNodes
+            - nodes
+            - switches
+            - totalNodes
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
