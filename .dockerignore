@@ -1,0 +1,48 @@
+# VCS
+.git
+.gitignore
+
+# Local tooling
+.codex
+.codex/
+.vscode/
+.idea/
+
+# Python
+*/__pycache__
+
+# Build artifacts
+bin/
+build/
+dist/
+coverage.out
+*.exe
+*.test
+*.out
+
+# Local configuration
+.env
+.env.*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.log
+
+## AI
+AGENTS.md
+.codex
+.codex/
+.agents/
+.github/agents
+.github/prompts
+.specify/*
+!.specify/
+!.specify/memory/
+!.specify/memory/**

@@ -1,0 +1,124 @@
+- header:
+    model: vx
+    nvue-api-version: nvue_v1
+    rev-id: 1.0
+    version: Cumulus Linux 5.15.0
+- set:
+    interface:
+      eth0:
+        ipv4:
+          dhcp-client:
+            set-hostname: enabled
+            state: enabled
+        type: eth
+        vrf: mgmt
+      lo:
+        ipv4:
+          address:
+            10.10.10.101/32: {}
+        type: loopback
+      swp1-4:
+        type: swp
+    router:
+      bgp:
+        autonomous-system: 65199
+        router-id: 10.10.10.101
+        state: enabled
+    system:
+      aaa:
+        class:
+          nvapply:
+            action: allow
+            command-path:
+              /:
+                permission: all
+          nvshow:
+            action: allow
+            command-path:
+              /:
+                permission: ro
+          sudo:
+            action: allow
+            command-path:
+              /:
+                permission: all
+        role:
+          nvue-admin:
+            class:
+              nvapply: {}
+          nvue-monitor:
+            class:
+              nvshow: {}
+          system-admin:
+            class:
+              nvapply: {}
+              sudo: {}
+        user:
+          cumulus:
+            full-name: cumulus
+            # Password is `Dangerous1#`, the plaintext is secure because it is hidden behind a jump server.
+            hashed-password: '$6$wUQcsrp2Ci8.eyJu$LBO1RVoVwgwfGkNRUU1HP1xClLkb5hC86cV9dgwGBtQKoT9tFaQ36a4ljBq5JzowD846YBZ5zJW.WI53QxRUr1'
+            role: system-admin
+      api:
+        state: enabled
+      config:
+        auto-save:
+          state: enabled
+      control-plane:
+        acl:
+          acl-default-dos:
+            inbound: {}
+          acl-default-whitelist:
+            inbound: {}
+      docker:
+        state: enabled
+        vrf: mgmt
+      hostname: switch-gpu-spine1
+      ntp:
+        server:
+          0.cumulusnetworks.pool.ntp.org:
+            association-type: server
+          1.cumulusnetworks.pool.ntp.org:
+            association-type: server
+          2.cumulusnetworks.pool.ntp.org:
+            association-type: server
+          3.cumulusnetworks.pool.ntp.org:
+            association-type: server
+        vrf: mgmt
+      ssh-server:
+        state: enabled
+      wjh:
+        channel:
+          forwarding:
+            trigger:
+              l2: {}
+              l3: {}
+              tunnel: {}
+        state: enabled
+    vrf:
+      default:
+        router:
+          bgp:
+            address-family:
+              ipv4-unicast:
+                network:
+                  10.10.10.3/32: {}
+                  10.10.10.101/32: {}
+                redistribute:
+                  connected:
+                    state: enabled
+                state: enabled
+            neighbor:
+              swp1:
+                remote-as: external
+                type: unnumbered
+              swp2:
+                remote-as: external
+                type: unnumbered
+              swp3:
+                remote-as: external
+                type: unnumbered
+              swp4:
+                remote-as: external
+                type: unnumbered
+            state: enabled

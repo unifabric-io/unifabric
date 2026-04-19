@@ -1,0 +1,160 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth1:
+      addresses:
+        - "172.17.11.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.11.1
+          table: 101
+      routing-policy:
+        - from: 172.17.11.13
+          table: 101
+          priority: 31761
+    eth2:
+      addresses:
+        - "172.17.12.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.12.1
+          table: 102
+      routing-policy:
+        - from: 172.17.12.13
+          table: 102
+          priority: 31762
+    eth3:
+      addresses:
+        - "172.17.13.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.13.1
+          table: 103
+      routing-policy:
+        - from: 172.17.13.13
+          table: 103
+          priority: 31763
+    eth4:
+      addresses:
+        - "172.17.14.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.14.1
+          table: 104
+      routing-policy:
+        - from: 172.17.14.13
+          table: 104
+          priority: 31764
+    eth5:
+      addresses:
+        - "172.17.15.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.15.1
+          table: 105
+      routing-policy:
+        - from: 172.17.15.13
+          table: 105
+          priority: 31765
+    eth6:
+      addresses:
+        - "172.17.16.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.16.1
+          table: 106
+      routing-policy:
+        - from: 172.17.16.13
+          table: 106
+          priority: 31766
+    eth7:
+      addresses:
+        - "172.17.17.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.17.1
+          table: 107
+      routing-policy:
+        - from: 172.17.17.13
+          table: 107
+          priority: 31767
+    eth8:
+      addresses:
+        - "172.17.18.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.17.18.1
+          table: 108
+      routing-policy:
+        - from: 172.17.18.13
+          table: 108
+          priority: 31768
+    eth9:
+      addresses:
+        - "172.20.1.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.20.1.1
+          table: 109
+      routing-policy:
+        - from: 172.20.1.13
+          table: 109
+          priority: 31769
+    eth10:
+      addresses:
+        - "172.31.11.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.31.11.1
+          table: 110
+      routing-policy:
+        - from: 172.31.11.13
+          table: 110
+          priority: 31770
+    eth11:
+      addresses:
+        - "172.31.12.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.31.12.1
+          table: 111
+      routing-policy:
+        - from: 172.31.12.13
+          table: 111
+          priority: 31771
+    eth12:
+      addresses:
+        - "172.31.13.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.31.13.1
+          table: 112
+      routing-policy:
+        - from: 172.31.13.13
+          table: 112
+          priority: 31772
+    eth13:
+      addresses:
+        - "172.31.14.13/24"
+      mtu: 4200
+      routes:
+        - to: 0.0.0.0/0
+          via: 172.31.14.1
+          table: 113
+      routing-policy:
+        - from: 172.31.14.13
+          table: 113
+          priority: 31773

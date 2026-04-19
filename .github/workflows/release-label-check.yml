@@ -1,0 +1,37 @@
+name: PR Release Label Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  check-release-label:
+    name: Check Release Label
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for release label
+        run: |
+          echo "Checking for release/* labels on PR #${{ github.event.pull_request.number }}"
+
+          if echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name' | grep -q '^release/'; then
+            echo ""
+            echo "PR has release/* label"
+            echo ""
+            echo "Release labels found:"
+            echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name' | grep '^release/' | sed 's/^/  - /'
+            exit 0
+          else
+            echo ""
+            echo "PR does not have release/* label"
+            echo ""
+            echo "Please add one of the following labels:"
+            echo "  - release/feature-new"
+            echo "  - release/bug"
+            echo "  - release/fix"
+            echo "  - release/test"
+            echo "  - release/dependencies"
+            exit 1
+          fi
