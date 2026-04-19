@@ -1,0 +1,69 @@
+{{- if .Values.controller.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "unifabric.controllerName" . }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "get", "list", "watch", "update", "patch"]
+  - apiGroups: ["unifabric.io"]
+    resources: ["fabricnodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["unifabric.io"]
+    resources: ["scaleoutleafgroups"]
+    verbs: ["create", "delete", "get", "list", "watch", "patch", "update"]
+  - apiGroups: ["unifabric.io"]
+    resources: ["scaleoutleafgroups/status"]
+    verbs: ["get", "patch", "update"]
+{{- end }}
+---
+{{- if .Values.agent.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "unifabric.agentName" . }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get"]
+  - apiGroups: ["kubeflow.org"]
+    resources: ["mpijobs", "pytorchjobs", "tfjobs", "xgboostjobs"]
+    verbs: ["get"]
+  - apiGroups: ["ray.io"]
+    resources: ["rayjobs"]
+    verbs: ["get"]
+  - apiGroups: ["sparkoperator.k8s.io"]
+    resources: ["sparkapplications"]
+    verbs: ["get"]
+  - apiGroups: ["unifabric.io"]
+    resources: ["fabricnodes"]
+    verbs: ["create", "delete", "get", "list", "watch", "patch", "update"]
+  - apiGroups: ["unifabric.io"]
+    resources: ["fabricnodes/status"]
+    verbs: ["get", "patch", "update"]
+{{- end }}

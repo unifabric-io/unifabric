@@ -1,0 +1,252 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: fabricnodes.unifabric.io
+spec:
+  group: unifabric.io
+  names:
+    categories:
+    - fabricnode
+    kind: FabricNode
+    listKind: FabricNodeList
+    plural: fabricnodes
+    shortNames:
+    - fn
+    singular: fabricnode
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.totalNics
+      name: TotalNics
+      type: integer
+    - jsonPath: .status.rdmaHealthy
+      name: RdmaHealthy
+      type: boolean
+    - description: Node type
+      jsonPath: .status.nodeType
+      name: Type
+      type: string
+    - description: Node IP
+      jsonPath: .status.nodeIP
+      name: NodeIP
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          FabricNode represents a node in the cluster.
+          It includes the node's compute and storage NIC information, and the list of
+          RDMA-enabled pods running on the node.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FabricNodeSpec defines desired state (empty for now)
+            type: object
+          status:
+            description: FabricNodeStatus defines the observed state of FabricNode
+            properties:
+              gpuNics:
+                items:
+                  description: NicInfo represents the network interface card (NIC)
+                    information
+                  properties:
+                    ipv4:
+                      description: IPv4 is the IPv4 address assigned to the NIC, in
+                        CIDR notation, e.g., 172.17.0.1/32.
+                      type: string
+                    ipv6:
+                      description: IPv6 is the IPv6 address assigned to the NIC, in
+                        CIDR notation, e.g., fe80::1/64.
+                      type: string
+                    lldpNeighbor:
+                      description: LLDPNeighbor contains information about the neighbor
+                        device connected to this NIC
+                      properties:
+                        description:
+                          description: Description is the description of the neighbor
+                            device
+                          type: string
+                        hostname:
+                          description: Hostname is the hostname of the neighbor device
+                          type: string
+                        mac:
+                          description: Mac is the MAC address of the neighbor device
+                          type: string
+                        mgmtIP:
+                          description: MgmtIP is the management IP address of the
+                            neighbor device
+                          type: string
+                        port:
+                          description: Port is the port name on the neighbor device,
+                            e.g., Ethernet32
+                          type: string
+                      required:
+                      - description
+                      - hostname
+                      - mac
+                      - mgmtIP
+                      - port
+                      type: object
+                    name:
+                      description: Name is the name of the NIC, e.g., eth0, ib0, etc.
+                      type: string
+                    rdma:
+                      description: RDMA indicates if the NIC is an RDMA-capable interface
+                      type: boolean
+                    rdmaDeviceName:
+                      description: RDMA device name, e.g., mlx5_0
+                      type: string
+                    state:
+                      description: State indicates the current state of the NIC, e.g.,
+                        "up", "down", "unknown"
+                      type: string
+                  required:
+                  - ipv4
+                  - ipv6
+                  - name
+                  - rdma
+                  - rdmaDeviceName
+                  - state
+                  type: object
+                type: array
+              nodeIP:
+                type: string
+              nodeType:
+                type: string
+              rdmaHealthy:
+                type: boolean
+              rdmaPods:
+                items:
+                  description: RdmaPod represents a Pod that uses RDMA
+                  properties:
+                    containerList:
+                      description: ContainerList is the list of container IDs in the
+                        RDMA Pod
+                      items:
+                        type: string
+                      type: array
+                    hostRDMA:
+                      description: |-
+                        HostRDMA indicates whether the RDMA Pod is running in host RDMA mode.
+                        Host RDMA mode typically requires:
+                        - /dev/infiniband to be mounted,
+                        - privileged mode enabled,
+                        - hostNetwork set to true.
+                      type: boolean
+                    name:
+                      description: Name is the name of the RDMA Pod
+                      type: string
+                    namespace:
+                      description: Namespace is the namespace of the RDMA Pod
+                      type: string
+                    topOwner:
+                      description: TopOwner is the top-level owner of the RDMA Pod
+                      properties:
+                        apiVersion:
+                          type: string
+                        kind:
+                          type: string
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      type: object
+                  required:
+                  - name
+                  - namespace
+                  type: object
+                type: array
+              storageNics:
+                items:
+                  description: NicInfo represents the network interface card (NIC)
+                    information
+                  properties:
+                    ipv4:
+                      description: IPv4 is the IPv4 address assigned to the NIC, in
+                        CIDR notation, e.g., 172.17.0.1/32.
+                      type: string
+                    ipv6:
+                      description: IPv6 is the IPv6 address assigned to the NIC, in
+                        CIDR notation, e.g., fe80::1/64.
+                      type: string
+                    lldpNeighbor:
+                      description: LLDPNeighbor contains information about the neighbor
+                        device connected to this NIC
+                      properties:
+                        description:
+                          description: Description is the description of the neighbor
+                            device
+                          type: string
+                        hostname:
+                          description: Hostname is the hostname of the neighbor device
+                          type: string
+                        mac:
+                          description: Mac is the MAC address of the neighbor device
+                          type: string
+                        mgmtIP:
+                          description: MgmtIP is the management IP address of the
+                            neighbor device
+                          type: string
+                        port:
+                          description: Port is the port name on the neighbor device,
+                            e.g., Ethernet32
+                          type: string
+                      required:
+                      - description
+                      - hostname
+                      - mac
+                      - mgmtIP
+                      - port
+                      type: object
+                    name:
+                      description: Name is the name of the NIC, e.g., eth0, ib0, etc.
+                      type: string
+                    rdma:
+                      description: RDMA indicates if the NIC is an RDMA-capable interface
+                      type: boolean
+                    rdmaDeviceName:
+                      description: RDMA device name, e.g., mlx5_0
+                      type: string
+                    state:
+                      description: State indicates the current state of the NIC, e.g.,
+                        "up", "down", "unknown"
+                      type: string
+                  required:
+                  - ipv4
+                  - ipv6
+                  - name
+                  - rdma
+                  - rdmaDeviceName
+                  - state
+                  type: object
+                type: array
+              totalNics:
+                type: integer
+            required:
+            - rdmaHealthy
+            - totalNics
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

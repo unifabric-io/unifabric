@@ -1,0 +1,33 @@
+{{- if .Values.serviceAccount.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "topograph.serviceAccountName" . }}
+rules:
+- apiGroups: [""]
+  resources: [pods]
+  verbs: [get,list]
+- apiGroups: [""]
+  resources: [pods/exec]
+  verbs: [create]
+- apiGroups: [""]
+  resources: [nodes]
+  verbs: [get,list,update]
+- apiGroups: [apps]
+  resources: [daemonsets]
+  verbs: [get,list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "topograph.serviceAccountName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "topograph.serviceAccountName" . }}
+  namespace: {{.Release.Namespace}}
+  apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: {{ include "topograph.serviceAccountName" . }}
+  apiGroup: ""
+{{- end }}

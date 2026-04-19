@@ -1,0 +1,33 @@
+# VCS
+.git
+.gitignore
+
+# Local tooling
+.codex
+.codex/
+.vscode/
+.idea/
+
+# Build artifacts
+bin/
+build/
+dist/
+coverage.out
+*.exe
+*.test
+*.out
+
+# Local configuration
+.env
+.env.*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.log

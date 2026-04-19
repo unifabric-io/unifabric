@@ -1,0 +1,156 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets: []
+  topologyLabels:
+    accelerator: unifabric.io/accelerator
+    leaf: unifabric.io/leaf
+    spine: unifabric.io/spine
+    core: unifabric.io/core
+
+controller:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/unifabric-io/unifabric-controller
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ports:
+    metrics: 8080
+    health: 8081
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+  config:
+    logLevel: info
+    metrics:
+      bindAddress: ":8080"
+    healthProbe:
+      bindAddress: ":8081"
+    pprof:
+      bindAddress: ""
+    leaderElection:
+      enabled: true
+      namespace: ""
+      id: unifabric-controller
+    topology:
+      scaleOutLeafGroups:
+        enabled: true
+        nodeLabelKey: "{{ .Values.global.topologyLabels.leaf }}"
+
+agent:
+  enabled: true
+  image:
+    repository: ghcr.io/unifabric-io/unifabric-agent
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
+  hostNetwork: true
+  hostPID: true
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    privileged: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ports:
+    metrics: 8082
+    health: 8083
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8082
+  config:
+    logLevel: info
+    metrics:
+      bindAddress: ":8082"
+    healthProbe:
+      bindAddress: ":8083"
+    node:
+      name: ""
+      role: gpu
+      defaultRouteProbe: "8.8.8.8:53"
+    discovery:
+      reconcileInterval: "1m"
+      startupDelay: "1m"
+      gpuInterfaceFilter: ""
+      storageInterfaceFilter: ""
+  lldp:
+    enabled: true
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    managementIPPattern: ""
+    interfaces: ""
+    txInterval: 30
+    extraConfig: ""
+    containerSecurityContext:
+      privileged: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+topograph:
+  # The vendored topograph subchart is intentionally scoped to the
+  # Kubernetes InfiniBand example mode. Enable this to deploy the
+  # bundled topograph stack with the built-in IB defaults. Topology
+  # labels are sourced from global.topologyLabels.
+  enabled: false

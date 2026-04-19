@@ -1,0 +1,101 @@
+ROOT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+BIN_DIR ?= $(ROOT_DIR)/bin
+CHART_DIR ?= $(ROOT_DIR)/chart
+CRD_DIR ?= $(CHART_DIR)/crds
+
+GOFLAGS ?=
+GOCACHE ?= /tmp/unifabric-go-build
+COVERAGE_FILE ?= coverage.out
+COVERAGE_HTML ?= coverage.html
+
+CONTROLLER_GEN ?= $(ROOT_DIR)/hack/controller-gen.sh
+
+IMAGE_REGISTRY ?= ghcr.io/unifabric-io
+IMAGE_TAG ?= dev
+CONTROLLER_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-controller:$(IMAGE_TAG)
+AGENT_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-agent:$(IMAGE_TAG)
+
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help:
+	@echo "Available commands:"
+	@echo "  make build              - Build the unifabric controller and agent binaries"
+	@echo "  make image              - Build the unifabric controller and agent images"
+	@echo "  make image-push         - Build and push the unifabric controller and agent images"
+	@echo "  make image-controller   - Build the unifabric controller image"
+	@echo "  make image-agent        - Build the unifabric agent image"
+	@echo "  make test-unit          - Run unit tests with coverage"
+	@echo "  make test-e2e           - Run E2E validation"
+	@echo "  make test-coverage      - Generate HTML coverage report (coverage.html)"
+	@echo "  make check-license      - Check Go source license headers"
+	@echo "  make crd                - Generate Kubernetes API deepcopy code and CRDs"
+	@echo "  make clean              - Remove build artifacts"
+
+.PHONY: all
+all: build
+
+.PHONY: build
+build:
+	mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/controller ./cmd/controller
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/agent ./cmd/agent
+
+.PHONY: build-controller
+build-controller:
+	mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/controller ./cmd/controller
+
+.PHONY: build-agent
+build-agent:
+	mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/agent ./cmd/agent
+
+.PHONY: image
+image: image-controller image-agent
+
+.PHONY: image-controller
+image-controller:
+	docker buildx build -t $(CONTROLLER_IMAGE) -f image/controller/Dockerfile .
+
+.PHONY: image-agent
+image-agent:
+	docker buildx build -t $(AGENT_IMAGE) -f image/agent/Dockerfile .
+
+.PHONY: image-push
+image-push: image-push-controller image-push-agent
+
+.PHONY: image-push-controller
+image-push-controller:
+	docker buildx build --push -t $(CONTROLLER_IMAGE) -f image/controller/Dockerfile .
+
+.PHONY: image-push-agent
+image-push-agent:
+	docker buildx build --push -t $(AGENT_IMAGE) -f image/agent/Dockerfile .
+
+.PHONY: test-unit
+test-unit:
+	GOCACHE=$(GOCACHE) go test $(GOFLAGS) -count=1 -coverprofile=$(COVERAGE_FILE) ./cmd/... ./pkg/...
+
+.PHONY: test-e2e
+test-e2e:
+	helm lint $(CHART_DIR)
+	helm template unifabric $(CHART_DIR) --set topograph.enabled=true > /dev/null
+
+.PHONY: test-coverage
+test-coverage: test-unit
+	go tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML)
+
+.PHONY: check-license
+check-license:
+	@$(ROOT_DIR)/hack/check-license.sh
+
+.PHONY: clean
+clean:
+	rm -rf $(BIN_DIR)
+	rm -f $(COVERAGE_FILE) $(COVERAGE_HTML)
+
+.PHONY: crd
+crd:
+	$(CONTROLLER_GEN) object:headerFile="$(ROOT_DIR)/hack/boilerplate.go.txt" paths="./pkg/api/v1beta1"
+	$(CONTROLLER_GEN) crd paths="./pkg/api/v1beta1" output:dir="$(CRD_DIR)"

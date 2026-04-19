@@ -1,0 +1,41 @@
+{{- if and .Values.controller.enabled .Values.controller.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "unifabric.controllerName" . }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  type: {{ .Values.controller.service.type }}
+  selector:
+    {{- include "unifabric.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+  ports:
+    - name: metrics
+      port: {{ .Values.controller.service.port }}
+      targetPort: metrics
+      protocol: TCP
+{{- end }}
+---
+{{- if and .Values.agent.enabled .Values.agent.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "unifabric.agentName" . }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  type: {{ .Values.agent.service.type }}
+  selector:
+    {{- include "unifabric.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+  ports:
+    - name: metrics
+      port: {{ .Values.agent.service.port }}
+      targetPort: metrics
+      protocol: TCP
+{{- end }}

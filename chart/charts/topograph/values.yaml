@@ -1,0 +1,157 @@
+# Default values for topology-generator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+# This vendored chart is intentionally narrowed to the Kubernetes
+# InfiniBand example mode.
+
+global:
+  provider:
+    # Only the Kubernetes InfiniBand provider mode is supported here.
+    name: infiniband-k8s
+  engine:
+    # Only the Kubernetes engine mode is supported here.
+    name: k8s
+
+  service:
+    type: ClusterIP
+    port: 49021
+
+  topograph:
+    # Override only when the topograph Service name is customized.
+    serviceName: ""
+
+  topologyLabels:
+    accelerator: unifabric.io/accelerator
+    leaf: unifabric.io/leaf
+    spine: unifabric.io/spine
+    core: unifabric.io/core
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/nvidia/topograph
+  tag: v0.3.0
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+verbosity: 3
+
+env: {}
+
+config:
+  requestAggregationDelay: 15s
+
+# Topology labels are sourced from global.topologyLabels.
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  limits:
+    cpu: 400m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+serviceMonitor:
+  enabled: false
+  namespace: monitoring
+  port: http
+  path: /metrics
+  interval: 15s
+  scheme: http
+
+node-observer:
+  topograph:
+    trigger: {}
+
+node-data-broker:
+  image:
+    repository: ghcr.io/nvidia/topograph/ib
+    pullPolicy: IfNotPresent
+    tag: main
+  initc:
+    extraArgs:
+      - gpu-operator-namespace=gpu-operator
+      - device-plugin-daemonset=nvidia-device-plugin-daemonset
+  securityContext:
+    privileged: true
+  nodeSelector: {}
+  volumeMounts:
+    - name: sys-class
+      mountPath: /sys/class
+  volumes:
+    - name: sys-class
+      hostPath:
+        path: /sys/class
+        type: Directory

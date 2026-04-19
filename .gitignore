@@ -1,0 +1,34 @@
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+bin/
+dist/
+build/
+
+# Dependencies
+vendor/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config files
+.env
+.env.local
+
+# Go Test
+coverage.out
+
+# Go artifacts
+*.exe
+*.test
+*.out
+
+# Temp files
+*.tmp
+
+## AI
+.codex/
+.codex

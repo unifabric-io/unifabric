@@ -1,0 +1,37 @@
+name: PR Kind Label Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  check-kind-label:
+    name: Check Kind Label
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for kind label
+        run: |
+          echo "Checking for kind/* labels on PR #${{ github.event.pull_request.number }}"
+
+          if echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name' | grep -q '^kind/'; then
+            echo ""
+            echo "PR has kind/* label"
+            echo ""
+            echo "Kind labels found:"
+            echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name' | grep '^kind/' | sed 's/^/  - /'
+            exit 0
+          else
+            echo ""
+            echo "PR does not have kind/* label"
+            echo ""
+            echo "Please add one of the following labels:"
+            echo "  - kind/feature"
+            echo "  - kind/bug"
+            echo "  - kind/fix"
+            echo "  - kind/test"
+            echo "  - kind/dependencies"
+            exit 1
+          fi

@@ -1,0 +1,82 @@
+name: PR
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    branches:
+      - main
+
+jobs:
+  check:
+    name: Check and Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.set_tag.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check Go license headers
+        run: make check-license
+
+      - name: Check Helm Docs
+        run: |
+          go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+          helm-docs -c chart
+          
+          if [[ -n "$(git status --porcelain chart/README.md)" ]]; then
+            git --no-pager diff chart/README.md
+            echo "Error: chart/README.md is out of sync with the template and values."
+            echo "Please run 'helm-docs' locally and commit the changes."
+            exit 1
+          fi
+          echo "Helm docs are up to date."
+        shell: bash
+
+      - name: Run unit tests
+        run: |
+          make test-unit
+
+      - name: Set image tag
+        id: set_tag
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG="PR${{ github.event.pull_request.number }}-${SHORT_SHA}-$(date -u +"%Y%m%d")"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+        shell: bash
+
+  build-images:
+    name: Build Images
+    runs-on: ubuntu-latest
+    needs: check
+    strategy:
+      matrix:
+        include:
+          - name: unifabric-controller
+            dockerfile: image/controller/Dockerfile
+          - name: unifabric-agent
+            dockerfile: image/agent/Dockerfile
+    
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # Step 2: Set up QEMU
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      # Step 3: Set up Docker
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v4
+
+      # Step 4: Build and load Docker image into local Docker daemon
+      - name: Build and load Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          tags: ${{ matrix.name}}:${{ needs.check.outputs.tag }}
+          push: true

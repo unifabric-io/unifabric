@@ -1,0 +1,52 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "unifabric.controllerName" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+data:
+  controller.yaml: |-
+    {{- include "unifabric.render" (dict "value" .Values.controller.config "context" $) | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.agent.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "unifabric.agentName" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+data:
+  agent.yaml: |-
+    {{- include "unifabric.render" (dict "value" .Values.agent.config "context" $) | nindent 4 }}
+{{- end }}
+---
+{{- if and .Values.agent.enabled .Values.agent.lldp.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "unifabric.agentName" . }}-lldpd
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+data:
+  lldpd.conf: |
+    {{- if .Values.agent.lldp.managementIPPattern }}
+    configure system ip management pattern {{ .Values.agent.lldp.managementIPPattern }}
+    {{- end }}
+    {{- if .Values.agent.lldp.interfaces }}
+    configure system interface pattern {{ .Values.agent.lldp.interfaces }}
+    {{- end }}
+    {{- if .Values.agent.lldp.txInterval }}
+    configure lldp tx-interval {{ .Values.agent.lldp.txInterval }}
+    {{- end }}
+    {{- if .Values.agent.lldp.extraConfig }}
+    {{ .Values.agent.lldp.extraConfig }}
+    {{- end }}
+{{- end }}

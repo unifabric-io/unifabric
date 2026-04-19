@@ -1,0 +1,11 @@
+apiVersion: v2
+name: unifabric
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+description: Agent/controller deployment for Unifabric LLDP and RDMA topology discovery
+dependencies:
+  - name: topograph
+    version: 0.3.0
+    repository: file://charts/topograph
+    condition: topograph.enabled
