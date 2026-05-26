@@ -40,6 +40,11 @@ func NewScaleOutLeafGroupController(
 	cfg *config.ControllerConfig,
 	logger *slog.Logger,
 ) error {
+	if cfg.ScaleOutDiscovery.Switches.Enabled {
+		logger.With("controller", "ScaleOutLeafGroup").Info("skip ScaleOutLeafGroup controller because switch discovery is enabled")
+		return nil
+	}
+
 	r := &Reconciler{
 		cfg:      cfg,
 		client:   mgr.GetClient(),
@@ -270,7 +275,7 @@ func (r *Reconciler) removeNodeFromGroup(ctx context.Context, nodeName string, g
 	return nil
 }
 
-func (r *Reconciler) createNewGroup(ctx context.Context, nodeName string, neighbors []v1beta1.Switch) error {
+func (r *Reconciler) createNewGroup(ctx context.Context, nodeName string, neighbors []v1beta1.ScaleOutSwitch) error {
 	switchNames := getSwitchNames(neighbors)
 	groupName := utils.HashNodesToShortSHA(r.log, switchNames)
 	var newGroup v1beta1.ScaleOutLeafGroup
@@ -314,13 +319,13 @@ func (r *Reconciler) createNewGroup(ctx context.Context, nodeName string, neighb
 	return nil
 }
 
-func (r *Reconciler) getNodeNeighbors(fabricNode *v1beta1.FabricNode) []v1beta1.Switch {
-	var neighbors []v1beta1.Switch
+func (r *Reconciler) getNodeNeighbors(fabricNode *v1beta1.FabricNode) []v1beta1.ScaleOutSwitch {
+	var neighbors []v1beta1.ScaleOutSwitch
 	for _, nic := range fabricNode.Status.ScaleOutNics {
 		if nic.State != "up" || nic.LLDPNeighbor.Hostname == "" {
 			continue
 		}
-		neighbors = append(neighbors, v1beta1.Switch{
+		neighbors = append(neighbors, v1beta1.ScaleOutSwitch{
 			Name:   nic.LLDPNeighbor.Hostname,
 			MgmtIP: nic.LLDPNeighbor.MgmtIP,
 		})
@@ -334,14 +339,14 @@ func (r *Reconciler) getNodeNeighbors(fabricNode *v1beta1.FabricNode) []v1beta1.
 		}
 		switchMap[sw.Name] = sw.MgmtIP
 	}
-	neighbors = make([]v1beta1.Switch, 0, len(switchMap))
+	neighbors = make([]v1beta1.ScaleOutSwitch, 0, len(switchMap))
 	for name, mgmtIP := range switchMap {
-		neighbors = append(neighbors, v1beta1.Switch{
+		neighbors = append(neighbors, v1beta1.ScaleOutSwitch{
 			Name:   name,
 			MgmtIP: mgmtIP,
 		})
 	}
-	slices.SortFunc(neighbors, func(a, b v1beta1.Switch) int {
+	slices.SortFunc(neighbors, func(a, b v1beta1.ScaleOutSwitch) int {
 		if a.Name < b.Name {
 			return -1
 		}
@@ -354,7 +359,7 @@ func (r *Reconciler) getNodeNeighbors(fabricNode *v1beta1.FabricNode) []v1beta1.
 	return neighbors
 }
 
-func (r *Reconciler) handleNodeForGroup(ctx context.Context, nodeName string, neighbors []v1beta1.Switch, groups []v1beta1.ScaleOutLeafGroup) error {
+func (r *Reconciler) handleNodeForGroup(ctx context.Context, nodeName string, neighbors []v1beta1.ScaleOutSwitch, groups []v1beta1.ScaleOutLeafGroup) error {
 	var finalLabelValue, currentNodeGroupName, expectedNodeGroupName string
 	groupMapName := make(map[string]v1beta1.ScaleOutLeafGroup, len(groups))
 	healthyNode := false
@@ -557,7 +562,7 @@ func (r *Reconciler) updateHealthyNode(g *v1beta1.ScaleOutLeafGroup) {
 	g.Status.TotalNodes = len(g.Status.Nodes)
 }
 
-func getSwitchNames(switches []v1beta1.Switch) []string {
+func getSwitchNames(switches []v1beta1.ScaleOutSwitch) []string {
 	var names []string
 	for _, sw := range switches {
 		names = append(names, sw.Name)

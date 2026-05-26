@@ -12,11 +12,11 @@ type ScaleOutLeafGroupSpec struct {
 // ScaleoutGroupStatus defines the observed state of ScaleoutGroup, If different
 // nodes share the same set of switch neighbors, then these nodes and switches belong to the same ScaleoutGroup.
 type ScaleOutLeafGroupStatus struct {
-	HealthyNodes int      `json:"healthyNodes"`
-	TotalNodes   int      `json:"totalNodes"`
-	Healthy      bool     `json:"healthy"`
-	Nodes        []Node   `json:"nodes"`
-	Switches     []Switch `json:"switches"`
+	HealthyNodes int              `json:"healthyNodes"`
+	TotalNodes   int              `json:"totalNodes"`
+	Healthy      bool             `json:"healthy"`
+	Nodes        []Node           `json:"nodes"`
+	Switches     []ScaleOutSwitch `json:"switches"`
 }
 
 type Node struct {
@@ -24,7 +24,7 @@ type Node struct {
 	Healthy bool   `json:"healthy"`
 }
 
-type Switch struct {
+type ScaleOutSwitch struct {
 	Name   string `json:"name"`
 	MgmtIP string `json:"mgmtIP"`
 }

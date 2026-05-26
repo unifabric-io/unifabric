@@ -10,6 +10,7 @@ import (
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
 	"github.com/unifabric-io/unifabric/pkg/config"
 	scaleoutgroup "github.com/unifabric-io/unifabric/pkg/controller/scaleoutgroup"
+	switchtopology "github.com/unifabric-io/unifabric/pkg/controller/switchtopology"
 	"github.com/unifabric-io/unifabric/pkg/logger"
 	"github.com/unifabric-io/unifabric/pkg/types"
 	corev1 "k8s.io/api/core/v1"
@@ -55,7 +56,11 @@ func New(_ context.Context, cfg *config.ControllerConfig, slogger *slog.Logger) 
 		return nil, err
 	}
 
-	if cfg.ScaleOutDiscovery.LeafGroups.Enabled {
+	if cfg.ScaleOutDiscovery.Switches.Enabled {
+		if err := switchtopology.NewSwitchTopologyDiscoveryController(mgr, cfg, slogger); err != nil {
+			return nil, err
+		}
+	} else if cfg.ScaleOutDiscovery.LeafGroups.Enabled {
 		if err := scaleoutgroup.NewScaleOutLeafGroupController(mgr, cfg, slogger); err != nil {
 			return nil, err
 		}

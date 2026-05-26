@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package unifabric.switchagent.v1;
+
+option go_package = "github.com/unifabric-io/unifabric/pkg/switchagent;switchagent";
+
+service SwitchReporter {
+  rpc WatchLLDPNeighbors(WatchLLDPNeighborsRequest) returns (stream LLDPNeighborSnapshot);
+}
+
+message WatchLLDPNeighborsRequest {
+  string expected_switch_name = 1;
+}
+
+message LLDPNeighborSnapshot {
+  string switch_name = 1;
+  repeated LLDPNeighbor lldp_neighbors = 2;
+  uint64 generation = 3;
+}
+
+message LLDPNeighbor {
+  string local_device_name = 1;
+  string local_port = 2;
+  string remote_system_name = 3;
+  string remote_port_id = 4;
+}
