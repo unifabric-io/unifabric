@@ -25,7 +25,7 @@ func IsSriovVfForNetDev(iface string) bool {
 	return err == nil
 }
 
-func ContainsSlice(groupSw, nodeSw []v1beta1.Switch) bool {
+func ContainsSlice(groupSw, nodeSw []v1beta1.ScaleOutSwitch) bool {
 	if len(nodeSw) == 0 {
 		return true
 	}

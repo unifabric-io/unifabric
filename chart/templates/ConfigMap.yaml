@@ -13,6 +13,9 @@ data:
     {{- if hasKey .Values "topologyLabels" }}
     {{- $_ := set $controllerConfig "topologyLabels" .Values.topologyLabels }}
     {{- end }}
+    {{- if hasKey .Values "nodeTopologyDiscovery" }}
+    {{- $_ := set $controllerConfig "nodeTopologyDiscovery" .Values.nodeTopologyDiscovery }}
+    {{- end }}
     {{- if hasKey .Values "scaleOutDiscovery" }}
     {{- $_ := set $controllerConfig "scaleOutDiscovery" .Values.scaleOutDiscovery }}
     {{- end }}
