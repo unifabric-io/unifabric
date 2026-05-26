@@ -68,14 +68,30 @@ Each GPU node has 8 NICs for GPU communication, organized into 2 leaf groups. Ea
 Before running the following command, you must log in to your NVIDIA Air account using
 `nvair login -u user@example.com -p <api-token>`.
 
+For GitHub Actions, configure `NVAIR_USER`, `NVAIR_API_TOKEN`,
+`NVAIR_SSH_PRIVATE_KEY`, and `NVAIR_SSH_PUBLIC_KEY`. The SSH key pair should be
+the contents of `~/.ssh/nvair.unifabric.io` and
+`~/.ssh/nvair.unifabric.io.pub` for the same NVIDIA Air account, so CI does not
+generate a different key during `nvair login`.
+
 For more details, please refer to the [quickstart](../../docs/quickstart.md).
 
-### Create Simulation
+### Create Simulation and Supporting Services
 
 ```bash
-nvair create -d examples/simple/
+IMAGE_REGISTRY="ghcr.io" IMAGE_NAMESPACE="unifabric-io" IMAGE_TAG="YOU_TAG" \
+  bash e2e/topology/setup.sh all --delete-if-exists
 ```
-The command automatically applies all node and switch configurations in one step, eliminating the need for separate configuration commands.
+
+Run individual stages when needed:
+
+```bash
+bash e2e/topology/setup.sh step1-install-topology --delete-if-exists
+bash e2e/topology/setup.sh step2-setup-rdma-rxe --simulation unifable-e2e-topology
+bash e2e/topology/setup.sh step3-install-monitoring-operators --simulation unifable-e2e-topology
+bash e2e/topology/setup.sh step4-install-unifabric
+bash e2e/topology/setup.sh step5-deploy-switch-agent
+```
 
 ### Access Nodes
 

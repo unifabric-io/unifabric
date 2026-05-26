@@ -81,6 +81,11 @@ spec:
             - name: config
               mountPath: /etc/unifabric
               readOnly: true
+            {{- if include "unifabric.switchMTLS.enabled" . }}
+            - name: switch-mtls
+              mountPath: /etc/unifabric/switch-mtls
+              readOnly: true
+            {{- end }}
           command:
             - /usr/bin/unifabric/controller
       volumes:
@@ -90,4 +95,9 @@ spec:
             items:
               - key: controller.yaml
                 path: controller.yaml
+        {{- if include "unifabric.switchMTLS.enabled" . }}
+        - name: switch-mtls
+          secret:
+            secretName: {{ include "unifabric.switchMTLS.controllerSecretName" . }}
+        {{- end }}
 {{- end }}

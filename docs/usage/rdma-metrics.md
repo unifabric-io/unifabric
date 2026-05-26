@@ -1,6 +1,6 @@
 # RDMA Observability Usage Guide
 
-Chinese version: [rdma-metrics.zh.md](./rdma-metrics.zh.md)
+中文版: [rdma-metrics.zh.md](./rdma-metrics.zh.md)
 
 This guide explains how to use Unifabric RDMA observability, including verifying
 Prometheus metrics, checking NIC classification, and viewing Grafana dashboards.

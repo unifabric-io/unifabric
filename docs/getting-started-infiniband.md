@@ -1,6 +1,6 @@
 # InfiniBand Fabric
 
-Chinese version: [getting-started-infiniband.zh.md](./getting-started-infiniband.zh.md)
+中文版: [getting-started-infiniband.zh.md](./getting-started-infiniband.zh.md)
 
 This guide explains how to deploy Unifabric in an InfiniBand NIC cluster. This scenario is for IB networking, such as Mellanox NICs in IB mode with IB switches.
 
