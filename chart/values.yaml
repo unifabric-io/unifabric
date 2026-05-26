@@ -24,6 +24,42 @@ scaleOutDiscovery:
     # -- Enable ScaleOutLeafGroup discovery and Node leaf label updates.
     enabled: true
 
+  # -- Settings for Switch and SwitchGroup based scale-out discovery.
+  switches:
+    # -- Enable switch-driven scale-out discovery and make it the active scale-out path in the controller.
+    enabled: false
+    # -- Controller gRPC dial timeout for one switch-agent connection attempt.
+    dialTimeout: 5s
+    # -- Backoff between switch-agent reconnect attempts.
+    reconnectBackoff: 30s
+    # -- Maximum gRPC message size accepted from a switch-agent snapshot stream.
+    maxRecvMsgSize: 4194304
+    # -- gRPC keepalive interval for controller-to-switch subscriptions.
+    keepaliveTime: 30s
+    # -- Default gRPC port used when a Switch resource does not set spec.grpcPort.
+    defaultGrpcPort: 8090
+    # -- Controller-side local switch ports ignored during topology graph construction.
+    ignoreSwitchPorts:
+      - mgmt*
+      - Management*
+      - oob*
+    mtls:
+      # -- Require pinned mTLS for controller-to-switch subscriptions.
+      enabled: true
+      # -- Auto-generate pinned mTLS materials as Helm-managed Secrets.
+      autoGenerate: true
+      # -- Validity period in days for auto-generated pinned mTLS materials.
+      validityDays: 36500
+      # -- Secret name mounted into the controller with tls.crt, tls.key, and peer.crt.
+      controllerSecretName: switch-controller-mtls-controller
+      # -- Secret name mounted into switch agents with tls.crt, tls.key, and peer.crt.
+      switchAgentSecretName: switch-controller-mtls-agent
+    groupNaming:
+      # -- Node label value format for discovered switch groups: name or hash.
+      labelValueFormat: hash
+      # -- Hash length used when labelValueFormat=hash.
+      hashLength: 7
+
 # -- Controls local node topology discovery on each agent node.
 nodeTopologyDiscovery:
   # -- How often each agent refreshes local RDMA interface and LLDP neighbor state.

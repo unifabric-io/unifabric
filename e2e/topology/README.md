@@ -70,12 +70,21 @@ Before running the following command, you must log in to your NVIDIA Air account
 
 For more details, please refer to the [quickstart](../../docs/quickstart.md).
 
-### Create Simulation
+### Create Simulation and Supporting Services
 
 ```bash
-nvair create -d examples/simple/
+bash e2e/topology/setup.sh all
 ```
-The command automatically applies all node and switch configurations in one step, eliminating the need for separate configuration commands.
+
+Run individual stages when needed:
+
+```bash
+bash e2e/topology/setup.sh step1-install-topology --delete-if-exists
+bash e2e/topology/setup.sh step2-setup-rdma-rxe --simulation unifable-e2e-topology
+bash e2e/topology/setup.sh step3-install-monitoring-operators --simulation unifable-e2e-topology
+bash e2e/topology/setup.sh step4-install-unifabric
+bash e2e/topology/setup.sh step5-deploy-switch-agent
+```
 
 ### Access Nodes
 

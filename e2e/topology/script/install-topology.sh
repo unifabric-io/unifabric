@@ -4,7 +4,7 @@ set -euo pipefail
 
 NVAIR_BIN="${NVAIR_BIN:-nvair}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TOPOLOGY_DIR="${TOPOLOGY_DIR:-${SCRIPT_DIR}}"
+TOPOLOGY_DIR="${TOPOLOGY_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 SIMULATION=""
 KUBECONFIG_FORWARD_OUT="${KUBECONFIG_FORWARD_OUT:-}"
 DELETE_IF_EXISTS="${DELETE_IF_EXISTS:-false}"
@@ -13,11 +13,12 @@ KUBE_API_FORWARD_NAME="${KUBE_API_FORWARD_NAME:-kube-api}"
 KUBESPRAY_REPO_URL="${KUBESPRAY_REPO_URL:-https://github.com/kubernetes-sigs/kubespray.git}"
 KUBESPRAY_REF="${KUBESPRAY_REF:-v2.26.1}"
 KUBESPRAY_DIR="${KUBESPRAY_DIR:-/home/ubuntu/kubespray}"
+SWITCH_ARTIFACT_DIR="${SWITCH_ARTIFACT_DIR:-}"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  bash examples/simple/install.sh [-o <external-kubeconfig-output>] [--bootstrap-node <name>] [--delete-if-exists]
+  bash e2e/topology/script/install-topology.sh [-o <external-kubeconfig-output>] [--bootstrap-node <name>] [--delete-if-exists]
 
 Options:
   -o, --output             External kubeconfig output path (default: ./kubeconfig-<simulation>-external.yaml)
@@ -27,7 +28,7 @@ Options:
 
 Environment:
   NVAIR_BIN                Path to nvair binary (default: nvair)
-  TOPOLOGY_DIR             Topology directory for nvair create (default: examples/simple)
+  TOPOLOGY_DIR             Topology directory for nvair create (default: e2e/topology)
   KUBECONFIG_FORWARD_OUT   External kubeconfig output path (same as --output)
   DELETE_IF_EXISTS         true|false (default: false)
   BOOTSTRAP_NODE           Same as --bootstrap-node
@@ -35,6 +36,7 @@ Environment:
   KUBESPRAY_REPO_URL       Kubespray git repo URL
   KUBESPRAY_REF            Optional git ref/branch/tag to checkout
   KUBESPRAY_DIR            Kubespray directory on bootstrap node (default: /home/ubuntu/kubespray)
+  SWITCH_ARTIFACT_DIR      Local artifact directory for generated switch metadata and manifests
 USAGE
 }
 
@@ -123,6 +125,37 @@ run_remote_bash_stream() {
   fi
 }
 
+primary_ip_of_remote() {
+  local node="$1"
+  local ip_raw
+
+  ip_raw="$(run_remote_bash "${node}" "set -euo pipefail; hostname -I | tr ' ' '\n' | awk 'NF {print; exit}'")"
+  printf '%s\n' "${ip_raw}" | awk 'NF {line=$0} END {print line}'
+}
+
+write_switch_resources_manifest() {
+  local output_path="$1"
+  shift
+
+  : > "${output_path}"
+  local switch_name
+  for switch_name in "$@"; do
+    local mgmt_ip
+    mgmt_ip="${SWITCH_MGMT_IPS[${switch_name}]}"
+    cat >> "${output_path}" <<EOF
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: ${switch_name}
+spec:
+  mgmtIP: ${mgmt_ip}
+  role: ScaleOut
+  grpcPort: 8090
+---
+EOF
+  done
+}
+
 if [[ ! -f "${TOPOLOGY_DIR}/topology.json" ]]; then
   echo "topology.json not found in ${TOPOLOGY_DIR}" >&2
   exit 1
@@ -134,6 +167,11 @@ if [[ -z "${SIMULATION}" ]]; then
   exit 1
 fi
 SIM_ARGS=(-s "${SIMULATION}")
+
+if [[ -z "${SWITCH_ARTIFACT_DIR}" ]]; then
+  SWITCH_ARTIFACT_DIR="${TOPOLOGY_DIR}/.artifacts/${SIMULATION}"
+fi
+SWITCH_RESOURCES_FILE="${SWITCH_ARTIFACT_DIR}/switch-resources.yaml"
 
 if [[ -z "${KUBECONFIG_FORWARD_OUT}" ]]; then
   KUBECONFIG_FORWARD_OUT="./kubeconfig-${SIMULATION}-external.yaml"
@@ -153,7 +191,7 @@ if [[ "${DELETE_IF_EXISTS}" == "true" ]]; then
   CREATE_ARGS=(--delete-if-exists "${CREATE_ARGS[@]}")
 fi
 
-step "PHASE 1/7 — Create Simulation"
+step "PHASE 1/8 — Create Simulation"
 log "Creating simulation from ${TOPOLOGY_DIR} (delete-if-exists=${DELETE_IF_EXISTS})..."
 log "[CMD] ${NVAIR_BIN} create ${CREATE_ARGS[*]}"
 "${NVAIR_BIN}" create "${CREATE_ARGS[@]}"
@@ -171,6 +209,18 @@ if ((${#GPU_NODES[@]} == 0)); then
   exit 1
 fi
 
+log "Discovering scale-out switches..."
+mapfile -t SCALE_OUT_SWITCHES < <(
+  "${NVAIR_BIN}" get nodes "${SIM_ARGS[@]}" \
+    | awk 'NR>1 && $1 ~ /^switch-gpu-(leaf|spine)/ { print $1 }' \
+    | sort -V
+)
+
+if ((${#SCALE_OUT_SWITCHES[@]} == 0)); then
+  echo "No scale-out switches found (expected names like switch-gpu-leaf* or switch-gpu-spine*)." >&2
+  exit 1
+fi
+
 if ! contains_node "${BOOTSTRAP_NODE}" "${GPU_NODES[@]}"; then
   if contains_node "node-gpu-1" "${GPU_NODES[@]}"; then
     BOOTSTRAP_NODE="node-gpu-1"
@@ -182,23 +232,44 @@ if ! contains_node "${BOOTSTRAP_NODE}" "${GPU_NODES[@]}"; then
 fi
 
 log "GPU nodes: ${GPU_NODES[*]}"
+log "Scale-out switches: ${SCALE_OUT_SWITCHES[*]}"
 log "Bootstrap node: ${BOOTSTRAP_NODE}"
 
-step "PHASE 2/7 — Prepare GPU Nodes"
+declare -A SWITCH_MGMT_IPS=()
+
+step "PHASE 2/8 — Collect Scale-Out Switch Metadata"
+mkdir -p "${SWITCH_ARTIFACT_DIR}"
+
+for switch_name in "${SCALE_OUT_SWITCHES[@]}"; do
+  SWITCH_MGMT_IPS["${switch_name}"]="$(primary_ip_of_remote "${switch_name}")"
+  if [[ -z "${SWITCH_MGMT_IPS[${switch_name}]}" ]]; then
+    echo "Failed to detect management IP for ${switch_name}." >&2
+    exit 1
+  fi
+done
+
+write_switch_resources_manifest "${SWITCH_RESOURCES_FILE}" "${SCALE_OUT_SWITCHES[@]}"
+log "Switch artifacts written to ${SWITCH_ARTIFACT_DIR}"
+log "Switch-agent activation is deferred until Helm deploy creates mTLS Secrets."
+
+step "PHASE 3/8 — Prepare GPU Nodes"
 COMMON_PREP_SCRIPT='set -euo pipefail
+sudo mkdir -p /etc/apt/apt.conf.d
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null <<EOF_AUTO_UPGRADES
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF_AUTO_UPGRADES
+sudo tee /etc/apt/apt.conf.d/10periodic >/dev/null <<EOF_APT_PERIODIC
+APT::Periodic::Enable "0";
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::AutocleanInterval "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF_APT_PERIODIC
 if command -v systemctl >/dev/null 2>&1; then
-  if systemctl list-unit-files | grep -q "^unattended-upgrades\.service"; then
-    sudo systemctl stop unattended-upgrades.service || true
-    sudo systemctl disable unattended-upgrades.service || true
-  fi
-  if systemctl list-unit-files | grep -q "^apt-daily-upgrade\.timer"; then
-    sudo systemctl stop apt-daily-upgrade.timer || true
-    sudo systemctl disable apt-daily-upgrade.timer || true
-  fi
-  if systemctl list-unit-files | grep -q "^apt-daily-upgrade\.service"; then
-    sudo systemctl stop apt-daily-upgrade.service || true
-    sudo systemctl disable apt-daily-upgrade.service || true
-  fi
+  sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true
+  sudo systemctl disable --now unattended-upgrades.service || true
+  sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service || true
 fi
 sudo apt-get update -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-apt sudo openssh-server curl
@@ -244,7 +315,7 @@ if [[ ! -f \"\$HOME/.ssh/id_ed25519\" ]]; then
   ssh-keygen -t ed25519 -N '' -f \"\$HOME/.ssh/id_ed25519\" -C \"kubespray@\$(hostname)\"
 fi"
 
-step "PHASE 3/7 — Setup Bootstrap Node: ${BOOTSTRAP_NODE}"
+step "PHASE 4/8 — Setup Bootstrap Node: ${BOOTSTRAP_NODE}"
 log "Setting up Kubespray on bootstrap node ${BOOTSTRAP_NODE}..."
 run_remote_bash_stream "${BOOTSTRAP_NODE}" "${BOOTSTRAP_SETUP_SCRIPT}"
 PUB_RAW="$(run_remote_bash "${BOOTSTRAP_NODE}" "set -euo pipefail; cat \"\$HOME/.ssh/id_ed25519.pub\"")"
@@ -258,7 +329,7 @@ fi
 
 PUB_KEY_B64="$(printf '%s' "${PUB_KEY}" | base64 | tr -d '\n')"
 
-step "PHASE 4/7 — Distribute SSH Keys"
+step "PHASE 5/8 — Distribute SSH Keys"
 log "Distributing bootstrap SSH public key to all GPU nodes..."
 for node in "${GPU_NODES[@]}"; do
   log "Authorizing key on ${node}..."
@@ -272,18 +343,17 @@ grep -qxF \"\${PUB_KEY}\" \"\$HOME/.ssh/authorized_keys\" || echo \"\${PUB_KEY}\
 chmod 600 \"\$HOME/.ssh/authorized_keys\""
 done
 
-step "PHASE 5/7 — Collect Node IPs"
+step "PHASE 6/8 — Collect Node IPs"
 declare -A NODE_IPS=()
 for node in "${GPU_NODES[@]}"; do
-  IP_RAW="$(run_remote_bash "${node}" "set -euo pipefail; hostname -I | tr ' ' '\\n' | awk 'NF {print; exit}'")"
-  NODE_IPS["${node}"]="$(printf '%s\n' "${IP_RAW}" | awk 'NF {line=$0} END {print line}')"
+  NODE_IPS["${node}"]="$(primary_ip_of_remote "${node}")"
   if [[ -z "${NODE_IPS[${node}]}" ]]; then
     echo "Failed to detect management IP for ${node}." >&2
     exit 1
   fi
 done
 
-step "PHASE 6/7 — Deploy Kubernetes"
+step "PHASE 7/8 — Deploy Kubernetes"
 log "Generating Kubespray inventory..."
 HOSTS_FILE="$(mktemp)"
 cat > "${HOSTS_FILE}" <<'YAML_HEAD'
@@ -360,7 +430,7 @@ sudo cp /etc/kubernetes/admin.conf \"\$HOME/.kube/config\"
 sudo chown \"\$(id -u):\$(id -g)\" \"\$HOME/.kube/config\""
 
 
-step "PHASE 7/7 — Expose Kubernetes API"
+step "PHASE 8/8 — Expose Kubernetes API"
 log "Ensuring forward ${KUBE_API_FORWARD_NAME} for Kubernetes API (${BOOTSTRAP_NODE}:6443)..."
 log "[CMD] ${NVAIR_BIN} get forward ${SIM_ARGS[*]}"
 FORWARD_LIST="$("${NVAIR_BIN}" get forward "${SIM_ARGS[@]}")"
@@ -406,8 +476,11 @@ log "[CMD] ${NVAIR_BIN} cp ${SIM_ARGS[*]} ${BOOTSTRAP_NODE}:${REMOTE_EXTERNAL_KU
 log "Done."
 log "Bootstrap node: ${BOOTSTRAP_NODE}"
 log "External kubeconfig file: ${KUBECONFIG_FORWARD_OUT}"
+log "Switch topology artifact dir: ${SWITCH_ARTIFACT_DIR}"
+log "Switch resources manifest: ${SWITCH_RESOURCES_FILE}"
 log "External API server: https://${FORWARD_HOSTPORT}"
 log "Verify cluster with:"
 log "  ${NVAIR_BIN} exec ${BOOTSTRAP_NODE} ${SIM_ARGS[*]} -- kubectl get nodes -o wide"
 log "  export KUBECONFIG=${KUBECONFIG_FORWARD_OUT}"
+log "  export SWITCH_TOPOLOGY_ARTIFACT_DIR=${SWITCH_ARTIFACT_DIR}"
 log "  kubectl get pods -A -o wide"

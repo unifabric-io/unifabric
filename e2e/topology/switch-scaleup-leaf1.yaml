@@ -4,6 +4,22 @@
     rev-id: 1.0
     version: Cumulus Linux 5.15.0
 - set:
+    acl:
+      acl-default-whitelist:
+        rule:
+          '185':
+            action:
+              permit: {}
+            match:
+              ip:
+                connection-state:
+                  established: {}
+                  new: {}
+                protocol: tcp
+                tcp:
+                  dest-port:
+                    '8090': {}
+            remark: permit unifabric switch-agent grpc tcp 8090
     bridge:
       domain:
         br_default:

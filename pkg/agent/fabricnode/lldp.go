@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -49,9 +50,21 @@ func (m *RdmaInterfaceMethod) CheckOrParsePattern(pattern string) error {
 type DetectMethod string
 
 const (
-	LLDPCLI              = "lldpcli"
-	LLDP    DetectMethod = "LLDP"
-	ARP     DetectMethod = "ARP"
+	LLDPCLI                      = "lldpcli"
+	NSENTER                      = "nsenter"
+	LLDP            DetectMethod = "LLDP"
+	ARP             DetectMethod = "ARP"
+	hostMountNSPath              = "/host/proc/1/ns/mnt"
+	hostNetNSPath                = "/host/proc/1/ns/net"
+)
+
+var (
+	commandLookup = exec.LookPath
+	execCommand   = exec.Command
+	pathCheck     = func(path string) error {
+		_, err := os.Lstat(path)
+		return err
+	}
 )
 
 // LLDP JSON parsing structures for lldpcli output
@@ -195,12 +208,50 @@ type LLDPUnknownTLVs struct {
 // We found that in all cases, json0 maintains a stable structure, while in some special scenarios,
 // the JSON format might change, leading to JSON deserialization failures.
 func LldpCliShowNeighbors() ([]byte, error) {
-	cmd := exec.Command(LLDPCLI, "show", "neighbors", "-f", "json0")
-	output, err := cmd.Output()
+	command, args, err := resolveLldpCliInvocation()
 	if err != nil {
+		return nil, err
+	}
+
+	cmd := execCommand(command, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(output))
+		if message != "" {
+			return nil, fmt.Errorf("failed to get lldp info: %w: %s", err, message)
+		}
 		return nil, fmt.Errorf("failed to get lldp info: %w", err)
 	}
 	return output, nil
+}
+
+func resolveLldpCliInvocation() (string, []string, error) {
+	if lldpPath, err := commandLookup(LLDPCLI); err == nil {
+		return lldpPath, []string{"show", "neighbors", "-f", "json0"}, nil
+	}
+
+	nsenterPath, err := commandLookup(NSENTER)
+	if err != nil {
+		return "", nil, fmt.Errorf("lldpcli command not found in PATH and nsenter is unavailable")
+	}
+	if err := pathCheck(hostMountNSPath); err != nil {
+		return "", nil, fmt.Errorf("lldpcli command not found in PATH and host mount namespace %s is unavailable: %w", hostMountNSPath, err)
+	}
+	if err := pathCheck(hostNetNSPath); err != nil {
+		return "", nil, fmt.Errorf("lldpcli command not found in PATH and host net namespace %s is unavailable: %w", hostNetNSPath, err)
+	}
+
+	return nsenterPath, []string{
+		"--mount=" + hostMountNSPath,
+		"--net=" + hostNetNSPath,
+		"/usr/bin/env",
+		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
+		"lldpcli",
+		"show",
+		"neighbors",
+		"-f",
+		"json0",
+	}, nil
 }
 
 // GetLLDPNeighbors executes lldpcli and returns neighbor information for each interface

@@ -1,10 +1,21 @@
-1. ## Purpose
+## Current status
+
+`ScaleOutLeafGroup` is now a legacy scale-out topology output. It still documents the historical leaf-only grouping algorithm, but the target model for scale-out topology is `Switch` + `SwitchGroup`.
+
+Use this document only when:
+
+- the cluster still runs the leaf-only path with `scaleOutDiscovery.leafGroups.enabled=true`
+- switch-driven discovery is not enabled yet
+
+When the SwitchGroup path is enabled, set `scaleOutDiscovery.switches.enabled=true` and `scaleOutDiscovery.leafGroups.enabled=false`. In that mode the Controller should stop writing overlapping `ScaleOutLeafGroup` outputs for the same nodes.
+
+## Purpose
 
 `ScaleOutLeafGroup` is the leaf switch grouping resource for the scale-out dimension. The Controller reads LLDP neighbor information for RDMA NICs from `FabricNode.status.scaleOutNics` and places compute nodes with the same set of leaf switches into the same `ScaleOutLeafGroup`.
 
 The Controller also writes the grouping result back to Kubernetes Nodes as topology labels, allowing schedulers and external systems to make placement decisions based on leaf topology.
 
-1. ## Resource Example
+## Resource Example
 
 `ScaleOutLeafGroup` is a cluster-scoped resource with an empty `spec`. The Controller automatically creates, updates, or deletes this resource based on `FabricNode` status.
 
@@ -37,9 +48,9 @@ status:
 
 The `ScaleOutLeafGroup` resource name is generated as a short hash from the sorted switch names. This gives the same set of leaf switches a stable group name while avoiding overly long Kubernetes resource names.
 
-1. ## Reconcile Flow
+## Reconcile Flow
 
-1. ### Resource Watches
+### Resource Watches
 
 The Controller reconciles `ScaleOutLeafGroup` in `pkg/controller/scaleoutgroup`.
 
@@ -61,7 +72,7 @@ During each Reconcile, the Controller:
 
 If a `FabricNode` is deleted, the Controller removes the corresponding node from any existing group and cleans up the leaf topology label on that Kubernetes Node.
 
-1. ### Leaf Switch Extraction
+### Leaf Switch Extraction
 
 The Controller only consumes `FabricNode.status.scaleOutNics`. `storageNics` is not used for scale-out leaf grouping.
 
@@ -78,7 +89,7 @@ After extraction, the Controller:
 
 The sorted switch set is the topology fingerprint used to place the node into a scale-out group.
 
-1. ### Grouping Algorithm
+### Grouping Algorithm
 
 When a node's leaf switch set changes, the Controller compares that set with existing groups.
 
@@ -108,7 +119,7 @@ Main scenarios:
    - Recalculate `healthy`, `healthyNodes`, and `totalNodes`.
    - Refresh the leaf topology label on the Kubernetes Node.
 
-1. ### Health Calculation
+### Health Calculation
 
 A node's health state within a group is determined by whether its leaf switch set matches exactly:
 
@@ -119,7 +130,18 @@ The group's `status.healthy` is true only when every node in `status.nodes` is h
 
 This preserves visibility for nodes with partially degraded topology while preventing the whole group from being incorrectly marked healthy.
 
-1. ## Optional Configuration
+## Migration guidance
+
+Clusters that move to the SwitchGroup path should migrate in this order.
+
+1. Deploy switch-agent to the managed scale-out switches and make sure each switch has a matching `Switch` resource.
+2. Enable `scaleOutDiscovery.switches.enabled=true` in the Controller configuration.
+3. Disable `scaleOutDiscovery.leafGroups.enabled` so `ScaleOutLeafGroup` no longer owns the scale-out leaf label.
+4. Verify that the replacement outputs are present through `Switch.status`, `SwitchGroup`, and Kubernetes Node labels for leaf, spine, and core.
+
+After that migration, `ScaleOutLeafGroup` remains only as a deprecated legacy resource and should not be treated as the source of truth for scale-out topology.
+
+## Optional Configuration
 
 Configure the leaf topology label key in Helm values.
 
@@ -141,7 +163,7 @@ When a node no longer belongs to any usable group, the Controller cleans up this
 | `topologyLabels.scaleOutLeaf` | `unifabric.io/scale-out-leaf` | Scale-out leaf group label key written back to Kubernetes Nodes |
 | `scaleOutDiscovery.leafGroups.enabled` | `true` | Whether to enable `ScaleOutLeafGroup` discovery and Node leaf label updates |
 
-1. ## Additional Notes
+## Additional Notes
 
 - `ScaleOutLeafGroup` depends on LLDP information in `FabricNode.status.scaleOutNics[*].lldpNeighbor`.
 - Nodes without available leaf neighbors cannot create a new group.

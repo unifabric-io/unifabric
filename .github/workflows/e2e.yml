@@ -144,11 +144,13 @@ jobs:
 
           IMAGE_TAG="${IMAGE_TAG_INPUT:-latest}"
           KUBECONFIG_PATH="${RUNNER_TEMP}/kubeconfig-${SIMULATION_NAME}-external.yaml"
+          SWITCH_ARTIFACT_DIR="${TOPOLOGY_DIR}/.artifacts/${SIMULATION_NAME}"
 
           echo "simulation_name=${SIMULATION_NAME}" >> "${GITHUB_OUTPUT}"
           echo "image_namespace=${IMAGE_NAMESPACE}" >> "${GITHUB_OUTPUT}"
           echo "image_tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "kubeconfig_path=${KUBECONFIG_PATH}" >> "${GITHUB_OUTPUT}"
+          echo "switch_artifact_dir=${SWITCH_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
       - name: Install nvair CLI
         shell: bash
@@ -170,67 +172,60 @@ jobs:
           fi
           nvair login -u "${NVAIR_USER}" -p "${NVAIR_API_TOKEN}"
 
-      - name: Setup Kubernetes cluster on NVIDIA Air
+      - name: Step 1 - Install topology
         shell: bash
         env:
           KUBECONFIG_FORWARD_OUT: ${{ steps.vars.outputs.kubeconfig_path }}
           DELETE_IF_EXISTS: "true"
+          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          IMAGE_NAMESPACE: ${{ steps.vars.outputs.image_namespace }}
+          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
         run: |
           set -euo pipefail
-          bash e2e/topology/install.sh --bootstrap-node "${BOOTSTRAP_NODE}" --delete-if-exists
+          bash e2e/topology/setup.sh step1-install-topology --bootstrap-node "${BOOTSTRAP_NODE}" --delete-if-exists
           if [[ ! -f "${KUBECONFIG_FORWARD_OUT}" ]]; then
             echo "kubeconfig not found: ${KUBECONFIG_FORWARD_OUT}" >&2
             exit 1
           fi
           echo "KUBECONFIG=${KUBECONFIG_FORWARD_OUT}" >> "${GITHUB_ENV}"
 
-      - name: Setup RDMA RXE on GPU nodes
+      - name: Step 2 - Setup RDMA RXE
         shell: bash
         env:
           SIMULATION_NAME: ${{ steps.vars.outputs.simulation_name }}
         run: |
           set -euo pipefail
+          bash e2e/topology/setup.sh step2-setup-rdma-rxe --simulation "${SIMULATION_NAME}"
 
-          mapfile -t GPU_NODES < <(
-            nvair get nodes --simulation "${SIMULATION_NAME}" \
-              | awk 'NR>1 && ($1 ~ /^node-gpu-/ || $1 ~ /^gpu-node-/) { print $1 }' \
-              | sort -V
-          )
-
-          if (( ${#GPU_NODES[@]} == 0 )); then
-            echo "No GPU nodes found for RDMA RXE setup." >&2
-            exit 1
-          fi
-
-          printf -v NODE_LIST '%s,' "${GPU_NODES[@]}"
-          NODE_LIST="${NODE_LIST%,}"
-          bash hack/setup-rdma-rxe.sh --simulation "${SIMULATION_NAME}" "${NODE_LIST}"
-
-      - name: Install monitoring operators
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash hack/install-monitoring-operators.sh
-
-      - name: Expose monitoring UIs
+      - name: Step 3 - Install monitoring operators
         shell: bash
         env:
           SIMULATION_NAME: ${{ steps.vars.outputs.simulation_name }}
         run: |
           set -euo pipefail
-          nvair add forward prometheus -s "${SIMULATION_NAME}" --target-node node-gpu-1 --target-port 30090
-          nvair add forward grafana -s "${SIMULATION_NAME}" --target-node node-gpu-1 --target-port 30300
-          nvair get forwards -s "${SIMULATION_NAME}"
+          bash e2e/topology/setup.sh step3-install-monitoring-operators --simulation "${SIMULATION_NAME}"
 
-      - name: Deploy unifabric
+      - name: Step 4 - Install Unifabric
         shell: bash
         env:
+          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           IMAGE_NAMESPACE: ${{ steps.vars.outputs.image_namespace }}
           IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
         run: |
           set -euo pipefail
+          bash e2e/topology/setup.sh step4-install-unifabric
 
-          bash hack/install-unifabric.sh
+      - name: Step 5 - Deploy switch-agent
+        shell: bash
+        env:
+          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          IMAGE_NAMESPACE: ${{ steps.vars.outputs.image_namespace }}
+          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
+          SWITCH_TOPOLOGY_ARTIFACT_DIR: ${{ steps.vars.outputs.switch_artifact_dir }}
+          SWITCH_AGENT_IMAGE: ${{ env.IMAGE_REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/unifabric-switch-agent:${{ steps.vars.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step5-deploy-switch-agent
 
       - name: Display cluster pods
         shell: bash

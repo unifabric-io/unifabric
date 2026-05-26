@@ -231,9 +231,24 @@
 | nvidiaTopograph.topograph.verbosity | int | `3` |  |
 | nvidiaTopograph.topograph.volumeMounts | list | `[]` |  |
 | nvidiaTopograph.topograph.volumes | list | `[]` |  |
-| scaleOutDiscovery | object | `{"leafGroups":{"enabled":true}}` | Controls controller-side scale-out discovery derived from FabricNode topology. |
+| scaleOutDiscovery | object | `{"leafGroups":{"enabled":true},"switches":{"defaultGrpcPort":8090,"dialTimeout":"5s","enabled":false,"groupNaming":{"hashLength":7,"labelValueFormat":"hash"},"ignoreSwitchPorts":["mgmt*","Management*","oob*"],"keepaliveTime":"30s","maxRecvMsgSize":4194304,"mtls":{"autoGenerate":true,"controllerSecretName":"switch-controller-mtls-controller","enabled":true,"switchAgentSecretName":"switch-controller-mtls-agent","validityDays":36500},"reconnectBackoff":"30s"}}` | Controls controller-side scale-out discovery derived from FabricNode topology. |
 | scaleOutDiscovery.leafGroups | object | `{"enabled":true}` | Settings for ScaleOutLeafGroup discovery and Node leaf label reconciliation. |
 | scaleOutDiscovery.leafGroups.enabled | bool | `true` | Enable ScaleOutLeafGroup discovery and Node leaf label updates. |
+| scaleOutDiscovery.switches | object | `{"defaultGrpcPort":8090,"dialTimeout":"5s","enabled":false,"groupNaming":{"hashLength":7,"labelValueFormat":"hash"},"ignoreSwitchPorts":["mgmt*","Management*","oob*"],"keepaliveTime":"30s","maxRecvMsgSize":4194304,"mtls":{"autoGenerate":true,"controllerSecretName":"switch-controller-mtls-controller","enabled":true,"switchAgentSecretName":"switch-controller-mtls-agent","validityDays":36500},"reconnectBackoff":"30s"}` | Settings for Switch and SwitchGroup based scale-out discovery. |
+| scaleOutDiscovery.switches.defaultGrpcPort | int | `8090` | Default gRPC port used when a Switch resource does not set spec.grpcPort. |
+| scaleOutDiscovery.switches.dialTimeout | string | `"5s"` | Controller gRPC dial timeout for one switch-agent connection attempt. |
+| scaleOutDiscovery.switches.enabled | bool | `false` | Enable switch-driven scale-out discovery and make it the active scale-out path in the controller. |
+| scaleOutDiscovery.switches.groupNaming.hashLength | int | `7` | Hash length used when labelValueFormat=hash. |
+| scaleOutDiscovery.switches.groupNaming.labelValueFormat | string | `"hash"` | Node label value format for discovered switch groups: name or hash. |
+| scaleOutDiscovery.switches.ignoreSwitchPorts | list | `["mgmt*","Management*","oob*"]` | Controller-side local switch ports ignored during topology graph construction. |
+| scaleOutDiscovery.switches.keepaliveTime | string | `"30s"` | gRPC keepalive interval for controller-to-switch subscriptions. |
+| scaleOutDiscovery.switches.maxRecvMsgSize | int | `4194304` | Maximum gRPC message size accepted from a switch-agent snapshot stream. |
+| scaleOutDiscovery.switches.mtls.autoGenerate | bool | `true` | Auto-generate pinned mTLS materials as Helm-managed Secrets. |
+| scaleOutDiscovery.switches.mtls.controllerSecretName | string | `"switch-controller-mtls-controller"` | Secret name mounted into the controller with tls.crt, tls.key, and peer.crt. |
+| scaleOutDiscovery.switches.mtls.enabled | bool | `true` | Require pinned mTLS for controller-to-switch subscriptions. |
+| scaleOutDiscovery.switches.mtls.switchAgentSecretName | string | `"switch-controller-mtls-agent"` | Secret name mounted into switch agents with tls.crt, tls.key, and peer.crt. |
+| scaleOutDiscovery.switches.mtls.validityDays | int | `36500` | Validity period in days for auto-generated pinned mTLS materials. |
+| scaleOutDiscovery.switches.reconnectBackoff | string | `"30s"` | Backoff between switch-agent reconnect attempts. |
 | topologyLabels | object | `{"scaleOutCore":"unifabric.io/scale-out-core","scaleOutLeaf":"unifabric.io/scale-out-leaf","scaleOutSpine":"unifabric.io/scale-out-spine","scaleUp":"unifabric.io/scale-up"}` | Label keys written back to Kubernetes Nodes for discovered topology dimensions. |
 | topologyLabels.scaleOutCore | string | `"unifabric.io/scale-out-core"` | Label key used to mark the core-level scale-out topology group of a node. |
 | topologyLabels.scaleOutLeaf | string | `"unifabric.io/scale-out-leaf"` | Label key used to mark the leaf-level scale-out topology group of a node. |
