@@ -20,10 +20,10 @@ rules:
     resources: ["fabricnodes"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["unifabric.io"]
-    resources: ["scaleoutleafgroups"]
+    resources: ["switches"]
     verbs: ["create", "delete", "get", "list", "watch", "patch", "update"]
   - apiGroups: ["unifabric.io"]
-    resources: ["scaleoutleafgroups/status"]
+    resources: ["switches/status"]
     verbs: ["get", "patch", "update"]
 {{- end }}
 ---

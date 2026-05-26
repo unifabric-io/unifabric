@@ -11,12 +11,14 @@
 ## Usage Guides
 
 - [RDMA 可观测性使用指南](./usage/rdma-metrics.zh.md)：开启并验证 RDMA metrics、Prometheus 抓取和 Grafana dashboard。
+- [switch-agent hostProc LLDP 采集方式](./usage/switch-agent-host-proc.zh.md)：在交换机无法挂载 `lldpd` socket 时，通过宿主机 `/proc` 命名空间采集 LLDP。
+- [switch-agent systemd 安装方式](./usage/switch-agent-systemd.zh.md)：在交换机无法运行 Docker 时，以原生二进制方式运行 switch-agent。
 - [Kueue TAS 工作负载示例](./usage/workload-tas.zh.md)：将 Unifabric scale-out leaf Node label 用于 Kueue Topology Aware Scheduling。
 
 ## Design Docs
 
+- [Scale-Out 网络拓扑发现设计](./design/scaleout-topology.zh.md)：基于 Switch 的 scale-out 拓扑发现与 Node label 写回设计。
 - [FabricNode CRD 设计](./design/fabricnode.md)：节点本地 RDMA 拓扑状态资源设计。
-- [ScaleOutLeafGroup CRD 设计](./design/scaleoutleafgroup.md)：scale-out leaf 分组和 Node label 写回设计。
 - [RDMA 可观测性设计](./design/rdma-metrics.md)：RDMA 指标模型、Pod 归因和采集设计。
 
 ## Development

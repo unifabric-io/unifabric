@@ -1,0 +1,44 @@
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: switch-gpu-leaf1
+spec:
+  mgmtIP: 192.168.200.111
+  role: ScaleOut
+  grpcPort: 8090
+---
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: switch-gpu-leaf2
+spec:
+  mgmtIP: 192.168.200.112
+  role: ScaleOut
+  grpcPort: 8090
+---
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: switch-gpu-leaf3
+spec:
+  mgmtIP: 192.168.200.113
+  role: ScaleOut
+  grpcPort: 8090
+---
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: switch-gpu-leaf4
+spec:
+  mgmtIP: 192.168.200.114
+  role: ScaleOut
+  grpcPort: 8090
+---
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: switch-gpu-spine1
+spec:
+  mgmtIP: 192.168.200.121
+  role: ScaleOut
+  grpcPort: 8090

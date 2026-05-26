@@ -16,12 +16,14 @@ Choose the installation guide that matches the cluster's physical network:
 ## Usage Guides
 
 - [RDMA observability usage guide](./usage/rdma-metrics.md): Enable and verify RDMA metrics, Prometheus scraping, and Grafana dashboards.
+- [switch-agent hostProc LLDP collection](./usage/switch-agent-host-proc.md): Use host `/proc` namespace collection when the switch cannot mount the `lldpd` socket.
+- [switch-agent systemd installation](./usage/switch-agent-systemd.md): Run switch-agent as a native binary when switches cannot run Docker.
 - [Kueue TAS workload example](./usage/workload-tas.md): Use Unifabric scale-out leaf Node labels with Kueue Topology Aware Scheduling.
 
 ## Design Docs
 
 - [FabricNode CRD design](./design/fabricnode.md): Node-local RDMA topology state resource design.
-- [ScaleOutLeafGroup CRD design](./design/scaleoutleafgroup.md): Scale-out leaf grouping and Node label reconciliation design.
+- [Scale-out topology discovery design](./design/scaleout-topology.md): Switch-driven scale-out topology discovery and Node label reconciliation design.
 - [RDMA observability design](./design/rdma-metrics.md): RDMA metric model, Pod attribution, and collection design.
 
 ## Development

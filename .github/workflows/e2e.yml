@@ -81,6 +81,10 @@ on:
         required: true
       NVAIR_API_TOKEN:
         required: true
+      NVAIR_SSH_PRIVATE_KEY:
+        required: true
+      NVAIR_SSH_PUBLIC_KEY:
+        required: true
 
 permissions:
   contents: read
@@ -97,7 +101,6 @@ jobs:
       IMAGE_NAMESPACE_INPUT: ${{ inputs.image_namespace }}
       IMAGE_TAG_INPUT: ${{ inputs.image_tag }}
       CHART_PATH: ${{ inputs.chart_path }}
-      RUN_CLEANUP: ${{ inputs.run_cleanup }}
       E2E_WAIT_TIMEOUT_MINUTES: ${{ inputs.e2e_wait_timeout_minutes }}
 
     steps:
@@ -162,75 +165,69 @@ jobs:
         env:
           NVAIR_USER: ${{ secrets.NVAIR_USER }}
           NVAIR_API_TOKEN: ${{ secrets.NVAIR_API_TOKEN }}
+          NVAIR_SSH_PRIVATE_KEY: ${{ secrets.NVAIR_SSH_PRIVATE_KEY }}
+          NVAIR_SSH_PUBLIC_KEY: ${{ secrets.NVAIR_SSH_PUBLIC_KEY }}
         run: |
           set -euo pipefail
-          if [[ -z "${NVAIR_USER:-}" || -z "${NVAIR_API_TOKEN:-}" ]]; then
-            echo "NVAIR_USER and NVAIR_API_TOKEN must be configured." >&2
+          if [[ -z "${NVAIR_USER:-}" || -z "${NVAIR_API_TOKEN:-}" || -z "${NVAIR_SSH_PRIVATE_KEY:-}" || -z "${NVAIR_SSH_PUBLIC_KEY:-}" ]]; then
+            echo "NVAIR_USER, NVAIR_API_TOKEN, NVAIR_SSH_PRIVATE_KEY, and NVAIR_SSH_PUBLIC_KEY must be configured." >&2
             exit 1
           fi
+
+          install -d -m 700 "${HOME}/.ssh"
+          NVAIR_KEY_PATH="${HOME}/.ssh/nvair.unifabric.io"
+          printf '%s\n' "${NVAIR_SSH_PRIVATE_KEY}" > "${NVAIR_KEY_PATH}"
+          chmod 600 "${NVAIR_KEY_PATH}"
+          printf '%s\n' "${NVAIR_SSH_PUBLIC_KEY}" > "${NVAIR_KEY_PATH}.pub"
+          chmod 644 "${NVAIR_KEY_PATH}.pub"
+
           nvair login -u "${NVAIR_USER}" -p "${NVAIR_API_TOKEN}"
 
-      - name: Setup Kubernetes cluster on NVIDIA Air
+      - name: Step 1 - Install topology
         shell: bash
         env:
           KUBECONFIG_FORWARD_OUT: ${{ steps.vars.outputs.kubeconfig_path }}
-          DELETE_IF_EXISTS: "true"
         run: |
           set -euo pipefail
-          bash e2e/topology/install.sh --bootstrap-node "${BOOTSTRAP_NODE}" --delete-if-exists
+          bash e2e/topology/setup.sh step1-install-topology --bootstrap-node "${BOOTSTRAP_NODE}" --delete-if-exists
           if [[ ! -f "${KUBECONFIG_FORWARD_OUT}" ]]; then
             echo "kubeconfig not found: ${KUBECONFIG_FORWARD_OUT}" >&2
             exit 1
           fi
           echo "KUBECONFIG=${KUBECONFIG_FORWARD_OUT}" >> "${GITHUB_ENV}"
 
-      - name: Setup RDMA RXE on GPU nodes
+      - name: Step 2 - Setup RDMA RXE
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step2-setup-rdma-rxe
+
+      - name: Step 3 - Install monitoring operators
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step3-install-monitoring-operators
+
+      - name: Step 4 - Install Unifabric
         shell: bash
         env:
-          SIMULATION_NAME: ${{ steps.vars.outputs.simulation_name }}
+          CONTROLLER_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          CONTROLLER_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-controller
+          CONTROLLER_TAG: ${{ steps.vars.outputs.image_tag }}
+          AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
+          AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
         run: |
           set -euo pipefail
+          bash e2e/topology/setup.sh step4-install-unifabric
 
-          mapfile -t GPU_NODES < <(
-            nvair get nodes --simulation "${SIMULATION_NAME}" \
-              | awk 'NR>1 && ($1 ~ /^node-gpu-/ || $1 ~ /^gpu-node-/) { print $1 }' \
-              | sort -V
-          )
-
-          if (( ${#GPU_NODES[@]} == 0 )); then
-            echo "No GPU nodes found for RDMA RXE setup." >&2
-            exit 1
-          fi
-
-          printf -v NODE_LIST '%s,' "${GPU_NODES[@]}"
-          NODE_LIST="${NODE_LIST%,}"
-          bash hack/setup-rdma-rxe.sh --simulation "${SIMULATION_NAME}" "${NODE_LIST}"
-
-      - name: Install monitoring operators
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash hack/install-monitoring-operators.sh
-
-      - name: Expose monitoring UIs
+      - name: Step 5 - Deploy switch-agent
         shell: bash
         env:
-          SIMULATION_NAME: ${{ steps.vars.outputs.simulation_name }}
+          SWITCH_AGENT_IMAGE: ${{ env.IMAGE_REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/unifabric-switch-agent:${{ steps.vars.outputs.image_tag }}
         run: |
           set -euo pipefail
-          nvair add forward prometheus -s "${SIMULATION_NAME}" --target-node node-gpu-1 --target-port 30090
-          nvair add forward grafana -s "${SIMULATION_NAME}" --target-node node-gpu-1 --target-port 30300
-          nvair get forwards -s "${SIMULATION_NAME}"
-
-      - name: Deploy unifabric
-        shell: bash
-        env:
-          IMAGE_NAMESPACE: ${{ steps.vars.outputs.image_namespace }}
-          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
-        run: |
-          set -euo pipefail
-
-          bash hack/install-unifabric.sh
+          bash e2e/topology/setup.sh step5-deploy-switch-agent
 
       - name: Display cluster pods
         shell: bash

@@ -42,14 +42,14 @@ kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric
 
 - 参与调度的节点已经写入预期的 `unifabric.io/` 拓扑 label。
 
-`FabricNode` 和 `ScaleOutLeafGroup` CR 只会在 SONiC RoCE 场景中生成。Spectrum-X 和
-InfiniBand 场景通过 NVIDIA topograph 写回 Node label，不会创建或更新这些 CR。
+`FabricNode` 和 `Switch` CR 只会在 SONiC RoCE 场景中生成。Spectrum-X 和 InfiniBand
+场景通过 NVIDIA topograph 写回 Node label，不会创建或更新这些 CR。
 
 ```bash
 kubectl get fabricnodes
 kubectl get fabricnode <node-name> -o yaml
-kubectl get scaleoutleafgroups -o wide
-kubectl get scaleoutleafgroup <group-name> -o yaml
+kubectl get switches -o wide
+kubectl get switch <switch-name> -o yaml
 ```
 
 `FabricNode` 输出示例：
@@ -87,32 +87,35 @@ status:
       description: GPU leaf switch
 ```
 
-`ScaleOutLeafGroup` 输出示例：
+`Switch` 输出示例：
 
 ```yaml
 apiVersion: unifabric.io/v1beta1
-kind: ScaleOutLeafGroup
+kind: Switch
 metadata:
-  name: 6f8a91c2
+  name: gpu-leaf-1
+spec:
+  mgmtIP: 10.10.10.1
+  role: ScaleOut
 status:
+  hostname: gpu-leaf-1
   healthy: true
-  healthyNodes: 2
-  totalNodes: 2
-  nodes:
-  - name: node-gpu-1
-    healthy: true
-  - name: node-gpu-2
-    healthy: true
-  switches:
-  - name: gpu-leaf-1
-    mgmtIP: 10.10.10.1
-  - name: gpu-leaf-2
-    mgmtIP: 10.10.10.2
+  conditions:
+  - type: Connected
+    status: "True"
+    reason: StreamReady
+  lldpNeighborCount: 2
+  lldpNeighbors:
+  - remoteSystemType: KubernetesNode
+    remoteSystemName: node-gpu-1
+  - remoteSystemType: Switch
+    remoteSystemName: gpu-spine-1
 ```
 
 - `FabricNode.status.conditions` 中 `Ready` 和 `LLDPNeighborsReady` 为 `True`。
-- `ScaleOutLeafGroup.status.nodes` 包含预期节点。
-- 节点上出现 `unifabric.io/scale-out-leaf=<group-name>`。
+- `Switch.status.healthy` 为 `true`，且 `Switch.status.lldpNeighbors` 包含预期的节点和交换机邻居。
+- 节点上有当前拓扑层级对应的 `unifabric.io/scale-out-leaf`、
+  `unifabric.io/scale-out-spine`、`unifabric.io/scale-out-core` label。
 
 这些检查通过后，说明拓扑识别结果已经通过 Kubernetes Node label 暴露出来，可继续配置
 后续调度队列。
@@ -232,8 +235,7 @@ spec:
 ```
 
 配置前必须确认所有参与该 `ResourceFlavor` 的节点都实际带有
-`unifabric.io/scale-out-spine` label。在 topograph 场景中，不要通过
-`ScaleOutLeafGroup` 判断这些 label 是否已经生成，应以 Node 上的真实 label 为准。
+`unifabric.io/scale-out-spine` label。调度侧以 Node 上的真实 label 为准。
 
 ### 示例 1：优先调度到同一个 leaf group
 
