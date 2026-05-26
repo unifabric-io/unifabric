@@ -45,6 +45,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default (include "unifabric.agentName" .) .Values.agent.serviceAccount.name -}}
 {{- end -}}
 
+{{- define "unifabric.switchMTLS.enabled" -}}
+{{- if and .Values.scaleOutDiscovery.switches.enabled .Values.scaleOutDiscovery.switches.mtls.enabled -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.switchMTLS.controllerSecretName" -}}
+{{- default (printf "%s-switch-controller-mtls-controller" (include "unifabric.fullname" .)) .Values.scaleOutDiscovery.switches.mtls.controllerSecretName -}}
+{{- end -}}
+
+{{- define "unifabric.switchMTLS.switchAgentSecretName" -}}
+{{- default (printf "%s-switch-controller-mtls-agent" (include "unifabric.fullname" .)) .Values.scaleOutDiscovery.switches.mtls.switchAgentSecretName -}}
+{{- end -}}
+
 {{- define "unifabric.render" -}}
 {{- if typeIs "string" .value -}}
 {{- tpl .value .context -}}

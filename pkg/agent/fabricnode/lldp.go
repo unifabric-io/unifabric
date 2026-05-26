@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -49,9 +50,28 @@ func (m *RdmaInterfaceMethod) CheckOrParsePattern(pattern string) error {
 type DetectMethod string
 
 const (
-	LLDPCLI              = "lldpcli"
-	LLDP    DetectMethod = "LLDP"
-	ARP     DetectMethod = "ARP"
+	LLDPCLI                      = "lldpcli"
+	NSENTER                      = "nsenter"
+	LLDP            DetectMethod = "LLDP"
+	ARP             DetectMethod = "ARP"
+	hostMountNSPath              = "/host/proc/1/ns/mnt"
+	hostNetNSPath                = "/host/proc/1/ns/net"
+)
+
+type LldpCliOptions struct {
+	BinaryPath       string
+	SocketPath       string
+	FallbackToHost   bool
+	UseHostNamespace bool
+}
+
+var (
+	commandLookup = exec.LookPath
+	execCommand   = exec.Command
+	pathCheck     = func(path string) error {
+		_, err := os.Lstat(path)
+		return err
+	}
 )
 
 // LLDP JSON parsing structures for lldpcli output
@@ -191,16 +211,93 @@ type LLDPUnknownTLVs struct {
 	} `json:"unknown-tlv"`
 }
 
-// LldpCliShowNeighbors execute lldpcli show neighbors -f json0, why is json0 rather than json?
+// LldpCliShowNeighbors execute lldpcli -f json0 show neighbors, why is json0 rather than json?
 // We found that in all cases, json0 maintains a stable structure, while in some special scenarios,
 // the JSON format might change, leading to JSON deserialization failures.
 func LldpCliShowNeighbors() ([]byte, error) {
-	cmd := exec.Command(LLDPCLI, "show", "neighbors", "-f", "json0")
-	output, err := cmd.Output()
+	return LldpCliShowNeighborsWithOptions(LldpCliOptions{FallbackToHost: true})
+}
+
+func LldpCliShowNeighborsWithOptions(options LldpCliOptions) ([]byte, error) {
+	command, args, err := resolveLldpCliInvocation(options)
 	if err != nil {
+		return nil, err
+	}
+
+	cmd := execCommand(command, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(output))
+		if message != "" {
+			return nil, fmt.Errorf("failed to get lldp info: %w: %s", err, message)
+		}
 		return nil, fmt.Errorf("failed to get lldp info: %w", err)
 	}
 	return output, nil
+}
+
+func resolveLldpCliInvocation(options LldpCliOptions) (string, []string, error) {
+	if options.UseHostNamespace {
+		return resolveHostNamespaceLldpCliInvocation()
+	}
+
+	if options.BinaryPath != "" {
+		if err := pathCheck(options.BinaryPath); err != nil {
+			if !options.FallbackToHost {
+				return "", nil, fmt.Errorf("lldpcli binary %s is unavailable: %w", options.BinaryPath, err)
+			}
+		} else if options.SocketPath == "" || pathCheck(options.SocketPath) == nil {
+			return options.BinaryPath, lldpCliJSON0Args(options.SocketPath), nil
+		}
+	}
+
+	if lldpPath, err := commandLookup(LLDPCLI); err == nil {
+		if options.SocketPath == "" || pathCheck(options.SocketPath) == nil {
+			return lldpPath, lldpCliJSON0Args(options.SocketPath), nil
+		}
+	}
+
+	if !options.FallbackToHost {
+		if options.SocketPath != "" {
+			return "", nil, fmt.Errorf("lldp socket %s is unavailable", options.SocketPath)
+		}
+		return "", nil, fmt.Errorf("lldpcli command not found in PATH")
+	}
+
+	return resolveHostNamespaceLldpCliInvocation()
+}
+
+func resolveHostNamespaceLldpCliInvocation() (string, []string, error) {
+	nsenterPath, err := commandLookup(NSENTER)
+	if err != nil {
+		return "", nil, fmt.Errorf("lldpcli command not found in PATH and nsenter is unavailable")
+	}
+	if err := pathCheck(hostMountNSPath); err != nil {
+		return "", nil, fmt.Errorf("lldpcli command not found in PATH and host mount namespace %s is unavailable: %w", hostMountNSPath, err)
+	}
+	if err := pathCheck(hostNetNSPath); err != nil {
+		return "", nil, fmt.Errorf("lldpcli command not found in PATH and host net namespace %s is unavailable: %w", hostNetNSPath, err)
+	}
+
+	return nsenterPath, []string{
+		"--mount=" + hostMountNSPath,
+		"--net=" + hostNetNSPath,
+		"/usr/bin/env",
+		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
+		"lldpcli",
+		"-f",
+		"json0",
+		"show",
+		"neighbors",
+	}, nil
+}
+
+func lldpCliJSON0Args(socketPath string) []string {
+	args := []string{"-f", "json0"}
+	if socketPath != "" {
+		args = append(args, "-u", socketPath)
+	}
+	return append(args, "show", "neighbors")
 }
 
 // GetLLDPNeighbors executes lldpcli and returns neighbor information for each interface

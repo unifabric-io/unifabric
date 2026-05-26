@@ -1,0 +1,105 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: switchgroups.unifabric.io
+spec:
+  group: unifabric.io
+  names:
+    categories:
+    - switchgroup
+    kind: SwitchGroup
+    listKind: SwitchGroupList
+    plural: switchgroups
+    shortNames:
+    - sg
+    singular: switchgroup
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.role
+      name: Role
+      type: string
+    - jsonPath: .status.tier
+      name: Tier
+      type: integer
+    - jsonPath: .status.healthy
+      name: Healthy
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          status:
+            properties:
+              healthy:
+                type: boolean
+              nodes:
+                items:
+                  properties:
+                    fabricNodeRef:
+                      properties:
+                        name:
+                          type: string
+                      required:
+                      - name
+                      type: object
+                  required:
+                  - fabricNodeRef
+                  type: object
+                type: array
+              role:
+                enum:
+                - ScaleOut
+                - ScaleUp
+                - Storage
+                type: string
+              switches:
+                items:
+                  properties:
+                    switchRef:
+                      properties:
+                        name:
+                          type: string
+                      required:
+                      - name
+                      type: object
+                  required:
+                  - switchRef
+                  type: object
+                type: array
+              tier:
+                enum:
+                - 1
+                - 2
+                - 3
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

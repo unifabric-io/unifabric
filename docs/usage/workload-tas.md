@@ -1,6 +1,6 @@
 # Topology Aware Scheduling
 
-Chinese version: [workload-tas.zh.md](./workload-tas.zh.md)
+中文版: [workload-tas.zh.md](./workload-tas.zh.md)
 
 Data centers are usually divided into organizational units such as racks and
 blocks. Nodes in the same organizational unit usually have shorter network

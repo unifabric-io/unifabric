@@ -45,7 +45,7 @@ func TestReconcile_FullSyncCleansEmptyGroups(t *testing.T) {
 		},
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Nodes:    []v1beta1.Node{}, // Empty nodes.
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}},
 		},
 	}
 
@@ -102,7 +102,7 @@ func TestReconcile_FullSyncCleansEmptyGroups(t *testing.T) {
 		HealthyNodes: 1,
 		Healthy:      true,
 		Nodes:        []v1beta1.Node{{Name: "node1", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch2", MgmtIP: "192.168.1.2"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch2", MgmtIP: "192.168.1.2"}},
 	}
 	if !reflect.DeepEqual(newGroup.Status, expectedStatus) {
 		t.Errorf("Expected group status %v, got %v", expectedStatus, newGroup.Status)
@@ -115,7 +115,7 @@ func TestReconcile_NewNodeJoin(t *testing.T) {
 	_ = v1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
 	switchNames := getSwitchNames(switches)
 	groupName := utils.HashNodesToShortSHA(log, switchNames)
 
@@ -125,7 +125,7 @@ func TestReconcile_NewNodeJoin(t *testing.T) {
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Healthy:  true,
 			Nodes:    []v1beta1.Node{{Name: "node1", Healthy: true}},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 		},
 	}
 
@@ -173,7 +173,7 @@ func TestReconcile_NewNodeJoin(t *testing.T) {
 		HealthyNodes: 2,
 		Healthy:      true,
 		Nodes:        []v1beta1.Node{{Name: "node1", Healthy: true}, {Name: "node2", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 	}
 	if !reflect.DeepEqual(updatedGroup.Status, expectedStatus) {
 		t.Errorf("Expected status %v, got %v", expectedStatus, updatedGroup.Status)
@@ -196,7 +196,7 @@ func TestReconcile_NewNodeJoinWithCreateGroup(t *testing.T) {
 	_ = v1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
 	switchNames := getSwitchNames(switches)
 	groupName1 := utils.HashNodesToShortSHA(log, switchNames)
 	// Create an existing group.
@@ -204,7 +204,7 @@ func TestReconcile_NewNodeJoinWithCreateGroup(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: groupName1},
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Nodes:    []v1beta1.Node{{Name: "node1", Healthy: true}},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 		},
 	}
 
@@ -241,7 +241,7 @@ func TestReconcile_NewNodeJoinWithCreateGroup(t *testing.T) {
 	}
 
 	// Verify that a new group is created.
-	switches2 := []v1beta1.Switch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}}
+	switches2 := []v1beta1.ScaleOutSwitch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}}
 	switchNames2 := getSwitchNames(switches2)
 	groupName2 := utils.HashNodesToShortSHA(log, switchNames2)
 	updatedGroup := &v1beta1.ScaleOutLeafGroup{}
@@ -255,7 +255,7 @@ func TestReconcile_NewNodeJoinWithCreateGroup(t *testing.T) {
 		HealthyNodes: 1,
 		Healthy:      true,
 		Nodes:        []v1beta1.Node{{Name: "node2", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}},
 	}
 
 	if !reflect.DeepEqual(updatedGroup.Status, expectedStatus) {
@@ -292,14 +292,14 @@ func TestReconcile_NewNodeWithNoNeighbors(t *testing.T) {
 
 	k8sNode1 := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
 
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
 	switchNames := getSwitchNames(switches)
 	groupName := utils.HashNodesToShortSHA(log, switchNames)
 	group := &v1beta1.ScaleOutLeafGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: groupName},
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Nodes:    []v1beta1.Node{{Name: "node2", Healthy: true}},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 		},
 	}
 
@@ -346,7 +346,7 @@ func TestReconcile_NewNodeIncompleteNeighborsWithUnhealthyNode(t *testing.T) {
 	}
 
 	k8sNode1 := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
 	switchNames := getSwitchNames(switches)
 	groupName := utils.HashNodesToShortSHA(log, switchNames)
 	group := &v1beta1.ScaleOutLeafGroup{
@@ -354,7 +354,7 @@ func TestReconcile_NewNodeIncompleteNeighborsWithUnhealthyNode(t *testing.T) {
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Healthy:  true,
 			Nodes:    []v1beta1.Node{{Name: "node2", Healthy: true}},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 		},
 	}
 
@@ -389,7 +389,7 @@ func TestReconcile_NewNodeIncompleteNeighborsWithUnhealthyNode(t *testing.T) {
 		HealthyNodes: 1,
 		Healthy:      false,
 		Nodes:        []v1beta1.Node{{Name: "node1", Healthy: false}, {Name: "node2", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 	}
 	if !reflect.DeepEqual(g.Status, expectedGroupStatus) {
 		t.Errorf("Expected group status to be %v, got %v", expectedGroupStatus, g.Status)
@@ -415,7 +415,7 @@ func TestReconcile_FabricNodeDeletionRemovesFromGroup(t *testing.T) {
 	_ = corev1.AddToScheme(scheme)
 
 	// Create a group with only one node.
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}}
 	switchNames := getSwitchNames(switches)
 	groupName := utils.HashNodesToShortSHA(log, switchNames)
 	singleNodeGroup := &v1beta1.ScaleOutLeafGroup{
@@ -423,7 +423,7 @@ func TestReconcile_FabricNodeDeletionRemovesFromGroup(t *testing.T) {
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Healthy:  true,
 			Nodes:    []v1beta1.Node{{Name: "node1", Healthy: true}},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}},
 		},
 	}
 
@@ -484,7 +484,7 @@ func TestReconcile_PartialNeighborLossMarksUnhealthy(t *testing.T) {
 	_ = v1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
 	switchNames := getSwitchNames(switches)
 	groupName := utils.HashNodesToShortSHA(log, switchNames)
 	existingGroup := &v1beta1.ScaleOutLeafGroup{
@@ -492,7 +492,7 @@ func TestReconcile_PartialNeighborLossMarksUnhealthy(t *testing.T) {
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Healthy:  true,
 			Nodes:    []v1beta1.Node{{Name: "node1", Healthy: true}, {Name: "node2", Healthy: true}},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 		},
 	}
 
@@ -546,7 +546,7 @@ func TestReconcile_PartialNeighborLossMarksUnhealthy(t *testing.T) {
 		HealthyNodes: 1,
 		Healthy:      false,
 		Nodes:        []v1beta1.Node{{Name: "node1", Healthy: false}, {Name: "node2", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 	}
 	if !reflect.DeepEqual(updatedGroup.Status, expectedGroupStatus) {
 		t.Errorf("Expected group status to be %v, got %v", expectedGroupStatus, updatedGroup.Status)
@@ -570,7 +570,7 @@ func TestReconcile_NodeChangesRDMAZone(t *testing.T) {
 	_ = v1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
 	switchNames := getSwitchNames(switches)
 	groupName1 := utils.HashNodesToShortSHA(log, switchNames)
 	group1 := &v1beta1.ScaleOutLeafGroup{
@@ -580,11 +580,11 @@ func TestReconcile_NodeChangesRDMAZone(t *testing.T) {
 			Nodes: []v1beta1.Node{{Name: "node1", Healthy: true},
 				{Name: "node2", Healthy: true},
 			},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 		},
 	}
 
-	switches2 := []v1beta1.Switch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}}
+	switches2 := []v1beta1.ScaleOutSwitch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}}
 	switchNames2 := getSwitchNames(switches2)
 	groupName2 := utils.HashNodesToShortSHA(log, switchNames2)
 	group2 := &v1beta1.ScaleOutLeafGroup{
@@ -592,7 +592,7 @@ func TestReconcile_NodeChangesRDMAZone(t *testing.T) {
 		Status: v1beta1.ScaleOutLeafGroupStatus{
 			Healthy:  true,
 			Nodes:    []v1beta1.Node{{Name: "node3", Healthy: true}},
-			Switches: []v1beta1.Switch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}},
 		},
 	}
 
@@ -644,7 +644,7 @@ func TestReconcile_NodeChangesRDMAZone(t *testing.T) {
 		HealthyNodes: 1,
 		Healthy:      true,
 		Nodes:        []v1beta1.Node{{Name: "node1", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 	}
 	if !reflect.DeepEqual(oldGroup.Status, expectedOldGroupStatus) {
 		t.Errorf("Expected old group status to be %v, got %v", expectedOldGroupStatus, oldGroup.Status)
@@ -660,7 +660,7 @@ func TestReconcile_NodeChangesRDMAZone(t *testing.T) {
 		HealthyNodes: 2,
 		Healthy:      true,
 		Nodes:        []v1beta1.Node{{Name: "node2", Healthy: true}, {Name: "node3", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch3", MgmtIP: "192.168.1.3"}, {Name: "switch4", MgmtIP: "192.168.1.4"}},
 	}
 	if !reflect.DeepEqual(newGroup.Status, expectedNewGroupStatus) {
 		t.Errorf("Expected new group status to be %v, got %v", expectedNewGroupStatus, newGroup.Status)
@@ -684,7 +684,7 @@ func TestReconcile_DeleteUnhealthyNode(t *testing.T) {
 	_ = v1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	switches := []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
+	switches := []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}}
 	switchNames := getSwitchNames(switches)
 	groupName1 := utils.HashNodesToShortSHA(log, switchNames)
 	group1 := &v1beta1.ScaleOutLeafGroup{
@@ -697,7 +697,7 @@ func TestReconcile_DeleteUnhealthyNode(t *testing.T) {
 				{Name: "node2", Healthy: true},
 				{Name: "node3", Healthy: false},
 			},
-			Switches: []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+			Switches: []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 		},
 	}
 
@@ -735,7 +735,7 @@ func TestReconcile_DeleteUnhealthyNode(t *testing.T) {
 		HealthyNodes: 2,
 		Healthy:      true,
 		Nodes:        []v1beta1.Node{{Name: "node1", Healthy: true}, {Name: "node2", Healthy: true}},
-		Switches:     []v1beta1.Switch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
+		Switches:     []v1beta1.ScaleOutSwitch{{Name: "switch1", MgmtIP: "192.168.1.1"}, {Name: "switch2", MgmtIP: "192.168.1.2"}},
 	}
 	if !reflect.DeepEqual(group.Status, expectedOldGroupStatus) {
 		t.Errorf("Expected group status to be %v, got %v", expectedOldGroupStatus, group.Status)

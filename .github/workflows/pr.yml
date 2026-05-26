@@ -71,6 +71,8 @@ jobs:
             dockerfile: image/controller/Dockerfile
           - name: unifabric-agent
             dockerfile: image/agent/Dockerfile
+          - name: unifabric-switch-agent
+            dockerfile: image/switch-agent/Dockerfile
     
     steps:
       # Step 1: Checkout the repository

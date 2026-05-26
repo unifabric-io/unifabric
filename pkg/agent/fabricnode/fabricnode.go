@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os/exec"
 	"reflect"
 	"strings"
 	"sync"
@@ -74,7 +73,7 @@ func NewFabricNodeController(
 ) (Interface, error) {
 	// Check if lldpcli command exists
 	if err := checkLldpcliExists(); err != nil {
-		return nil, fmt.Errorf("lldpcli command not found: %w", err)
+		return nil, fmt.Errorf("lldpcli unavailable: %w", err)
 	}
 
 	refreshInterval, err := time.ParseDuration(cfg.NodeTopologyDiscovery.RefreshInterval)
@@ -624,11 +623,8 @@ func (r *fabricNodeReconciler) getLLDPInfo(logger *slog.Logger) (map[string]v1be
 
 // checkLldpcliExists checks if lldpcli command is available in the system
 func checkLldpcliExists() error {
-	_, err := exec.LookPath(LLDPCLI)
-	if err != nil {
-		return fmt.Errorf("lldpcli command not found in PATH, please install lldpd package")
-	}
-	return nil
+	_, _, err := resolveLldpCliInvocation(LldpCliOptions{FallbackToHost: true})
+	return err
 }
 
 func (r *fabricNodeReconciler) updateNodeRole(status *v1beta1.FabricNodeStatus) bool {

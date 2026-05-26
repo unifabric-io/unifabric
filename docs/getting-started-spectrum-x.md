@@ -1,6 +1,6 @@
 # Spectrum-X Fabric
 
-Chinese version: [getting-started-spectrum-x.zh.md](./getting-started-spectrum-x.zh.md)
+中文版: [getting-started-spectrum-x.zh.md](./getting-started-spectrum-x.zh.md)
 
 This guide explains how to deploy Unifabric in a Spectrum-X switch cluster. This scenario gets fabric topology through the NetQ API.
 
