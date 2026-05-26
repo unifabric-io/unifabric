@@ -9,13 +9,14 @@ Key features:
 - Improve GPU utilization
 - Reduce cross-node latency
 - RoCE and InfiniBand hybrid topology discovery (InfiniBand case integrates with [NVIDIA/topograph](https://github.com/NVIDIA/topograph))
-- Kubernetes CRD topology resource
+- Kubernetes CRD topology resources
 - Rich RDMA metrics for Pods, Nodes, and switches
 
 ## Core Concepts
 
 - FabricNode: Records per-node RDMA information, LLDP neighbors, node IP, node type, and RDMA Pod status.
-- ScaleOutLeafGroup: Represents a group of nodes that share the same set of leaf switches.
+- Switch: Records switch dial targets and observed LLDP neighbor snapshots used by switch-driven scale-out topology discovery.
+- SwitchTopologyDiscovery: Computes scale-out leaf, spine, and core domains from FabricNode and Switch data, then writes Node topology labels.
 - Node RDMA observability: Exposes Node RDMA metrics for monitoring device, port, and workload traffic.
 
 ## Next Steps

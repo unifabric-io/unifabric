@@ -1,6 +1,6 @@
 # Topology Aware Scheduling
 
-Chinese version: [workload-tas.zh.md](./workload-tas.zh.md)
+中文版: [workload-tas.zh.md](./workload-tas.zh.md)
 
 Data centers are usually divided into organizational units such as racks and
 blocks. Nodes in the same organizational unit usually have shorter network
@@ -53,15 +53,15 @@ Check:
 - Nodes participating in scheduling have the expected `unifabric.io/` topology
   labels.
 
-`FabricNode` and `ScaleOutLeafGroup` CRs are generated only in the SONiC RoCE
-scenario. Spectrum-X and InfiniBand scenarios write Node labels through NVIDIA
-topograph and do not create or update these CRs.
+`FabricNode` and `Switch` CRs are generated only in the SONiC RoCE scenario.
+Spectrum-X and InfiniBand scenarios write Node labels through NVIDIA topograph
+and do not create or update these CRs.
 
 ```bash
 kubectl get fabricnodes
 kubectl get fabricnode <node-name> -o yaml
-kubectl get scaleoutleafgroups -o wide
-kubectl get scaleoutleafgroup <group-name> -o yaml
+kubectl get switches -o wide
+kubectl get switch <switch-name> -o yaml
 ```
 
 `FabricNode` output example:
@@ -99,32 +99,37 @@ status:
       description: GPU leaf switch
 ```
 
-`ScaleOutLeafGroup` output example:
+`Switch` output example:
 
 ```yaml
 apiVersion: unifabric.io/v1beta1
-kind: ScaleOutLeafGroup
+kind: Switch
 metadata:
-  name: 6f8a91c2
+  name: gpu-leaf-1
+spec:
+  mgmtIP: 10.10.10.1
+  role: ScaleOut
 status:
+  hostname: gpu-leaf-1
   healthy: true
-  healthyNodes: 2
-  totalNodes: 2
-  nodes:
-  - name: node-gpu-1
-    healthy: true
-  - name: node-gpu-2
-    healthy: true
-  switches:
-  - name: gpu-leaf-1
-    mgmtIP: 10.10.10.1
-  - name: gpu-leaf-2
-    mgmtIP: 10.10.10.2
+  conditions:
+  - type: Connected
+    status: "True"
+    reason: StreamReady
+  lldpNeighborCount: 2
+  lldpNeighbors:
+  - remoteSystemType: KubernetesNode
+    remoteSystemName: node-gpu-1
+  - remoteSystemType: Switch
+    remoteSystemName: gpu-spine-1
 ```
 
 - `Ready` and `LLDPNeighborsReady` in `FabricNode.status.conditions` are `True`.
-- `ScaleOutLeafGroup.status.nodes` contains the expected nodes.
-- Nodes have `unifabric.io/scale-out-leaf=<group-name>`.
+- `Switch.status.healthy` is `true` and `Switch.status.lldpNeighbors` contains
+  the expected node and switch peers.
+- Nodes have the expected `unifabric.io/scale-out-leaf`,
+  `unifabric.io/scale-out-spine`, and `unifabric.io/scale-out-core` labels for
+  the discovered topology layers.
 
 Once these checks pass, the topology discovery result is exposed through
 Kubernetes Node labels and you can continue configuring scheduling queues.
@@ -247,9 +252,8 @@ spec:
 ```
 
 Before configuring this, confirm that all nodes participating in this
-`ResourceFlavor` actually have the `unifabric.io/scale-out-spine` label. In
-topograph scenarios, do not use `ScaleOutLeafGroup` to determine whether these
-labels have been generated. Use the actual labels on Nodes.
+`ResourceFlavor` actually have the `unifabric.io/scale-out-spine` label. Use
+the actual labels on Nodes as the scheduler-facing source of truth.
 
 ### Example 1: Prefer the Same Leaf Group
 

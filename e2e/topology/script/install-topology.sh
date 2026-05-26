@@ -4,30 +4,31 @@ set -euo pipefail
 
 NVAIR_BIN="${NVAIR_BIN:-nvair}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TOPOLOGY_DIR="${TOPOLOGY_DIR:-${SCRIPT_DIR}}"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+TOPOLOGY_DIR="${TOPOLOGY_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 SIMULATION=""
 KUBECONFIG_FORWARD_OUT="${KUBECONFIG_FORWARD_OUT:-}"
 DELETE_IF_EXISTS="${DELETE_IF_EXISTS:-false}"
 BOOTSTRAP_NODE="${BOOTSTRAP_NODE:-gpu-node-1}"
 KUBE_API_FORWARD_NAME="${KUBE_API_FORWARD_NAME:-kube-api}"
 KUBESPRAY_REPO_URL="${KUBESPRAY_REPO_URL:-https://github.com/kubernetes-sigs/kubespray.git}"
-KUBESPRAY_REF="${KUBESPRAY_REF:-v2.26.1}"
+KUBESPRAY_REF="${KUBESPRAY_REF:-v2.31.0}"
 KUBESPRAY_DIR="${KUBESPRAY_DIR:-/home/ubuntu/kubespray}"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  bash examples/simple/install.sh [-o <external-kubeconfig-output>] [--bootstrap-node <name>] [--delete-if-exists]
+  bash e2e/topology/script/install-topology.sh [-o <external-kubeconfig-output>] [--bootstrap-node <name>] [--delete-if-exists]
 
 Options:
-  -o, --output             External kubeconfig output path (default: ./kubeconfig-<simulation>-external.yaml)
+  -o, --output             External kubeconfig output path (default: ./.tmp/kubeconfig-<simulation>-external.yaml)
   -b, --bootstrap-node     Preferred bootstrap node for Kubespray (default: gpu-node-1)
   --delete-if-exists       Delete same-name simulation before create (default: false)
   -h, --help               Show this help
 
 Environment:
   NVAIR_BIN                Path to nvair binary (default: nvair)
-  TOPOLOGY_DIR             Topology directory for nvair create (default: examples/simple)
+  TOPOLOGY_DIR             Topology directory for nvair create (default: e2e/topology)
   KUBECONFIG_FORWARD_OUT   External kubeconfig output path (same as --output)
   DELETE_IF_EXISTS         true|false (default: false)
   BOOTSTRAP_NODE           Same as --bootstrap-node
@@ -109,18 +110,26 @@ contains_node() {
 run_remote_bash() {
   local node="$1"
   local script="$2"
-  "${NVAIR_BIN}" exec "${node}" "${SIM_ARGS[@]}" -- bash -lc "${script}"
+  "${NVAIR_BIN}" exec "${node}" "${SIM_ARGS[@]}" -- bash -c "${script}"
 }
 
 run_remote_bash_stream() {
   local node="$1"
   local script="$2"
   if [[ -t 0 && -t 1 ]]; then
-    "${NVAIR_BIN}" exec "${node}" "${SIM_ARGS[@]}" -it -- bash -lc "${script}"
+    "${NVAIR_BIN}" exec "${node}" "${SIM_ARGS[@]}" -it -- bash -c "${script}"
   else
     log "No TTY detected; falling back to buffered output for ${node}."
     run_remote_bash "${node}" "${script}"
   fi
+}
+
+primary_ip_of_remote() {
+  local node="$1"
+  local ip_raw
+
+  ip_raw="$(run_remote_bash "${node}" "set -euo pipefail; hostname -I | tr ' ' '\n' | awk 'NF {print; exit}'")"
+  printf '%s\n' "${ip_raw}" | awk 'NF {line=$0} END {print line}'
 }
 
 if [[ ! -f "${TOPOLOGY_DIR}/topology.json" ]]; then
@@ -136,8 +145,9 @@ fi
 SIM_ARGS=(-s "${SIMULATION}")
 
 if [[ -z "${KUBECONFIG_FORWARD_OUT}" ]]; then
-  KUBECONFIG_FORWARD_OUT="./kubeconfig-${SIMULATION}-external.yaml"
+  KUBECONFIG_FORWARD_OUT="${REPO_ROOT}/.tmp/kubeconfig-${SIMULATION}-external.yaml"
 fi
+mkdir -p "$(dirname "${KUBECONFIG_FORWARD_OUT}")"
 
 DELETE_IF_EXISTS="$(printf '%s' "${DELETE_IF_EXISTS}" | tr '[:upper:]' '[:lower:]')"
 case "${DELETE_IF_EXISTS}" in
@@ -171,6 +181,18 @@ if ((${#GPU_NODES[@]} == 0)); then
   exit 1
 fi
 
+log "Discovering scale-out switches..."
+mapfile -t SCALE_OUT_SWITCHES < <(
+  "${NVAIR_BIN}" get nodes "${SIM_ARGS[@]}" \
+    | awk 'NR>1 && $1 ~ /^switch-gpu-(leaf|spine)/ { print $1 }' \
+    | sort -V
+)
+
+if ((${#SCALE_OUT_SWITCHES[@]} == 0)); then
+  echo "No scale-out switches found (expected names like switch-gpu-leaf* or switch-gpu-spine*)." >&2
+  exit 1
+fi
+
 if ! contains_node "${BOOTSTRAP_NODE}" "${GPU_NODES[@]}"; then
   if contains_node "node-gpu-1" "${GPU_NODES[@]}"; then
     BOOTSTRAP_NODE="node-gpu-1"
@@ -182,24 +204,27 @@ if ! contains_node "${BOOTSTRAP_NODE}" "${GPU_NODES[@]}"; then
 fi
 
 log "GPU nodes: ${GPU_NODES[*]}"
+log "Scale-out switches: ${SCALE_OUT_SWITCHES[*]}"
 log "Bootstrap node: ${BOOTSTRAP_NODE}"
 
 step "PHASE 2/7 — Prepare GPU Nodes"
 COMMON_PREP_SCRIPT='set -euo pipefail
+sudo mkdir -p /etc/apt/apt.conf.d
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null <<EOF_AUTO_UPGRADES
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF_AUTO_UPGRADES
+sudo tee /etc/apt/apt.conf.d/10periodic >/dev/null <<EOF_APT_PERIODIC
+APT::Periodic::Enable "0";
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::AutocleanInterval "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF_APT_PERIODIC
 if command -v systemctl >/dev/null 2>&1; then
-  for unit in \
-    unattended-upgrades.service \
-    apt-daily.service \
-    apt-daily.timer \
-    apt-daily-upgrade.service \
-    apt-daily-upgrade.timer
-  do
-    if systemctl list-unit-files | grep -q "^${unit}"; then
-      sudo systemctl stop "${unit}" || true
-      sudo systemctl disable "${unit}" || true
-      sudo systemctl mask "${unit}" || true
-    fi
-  done
+  sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true
+  sudo systemctl disable --now unattended-upgrades.service || true
+  sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service || true
 fi
 sudo apt-get update -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-apt sudo openssh-server curl
@@ -276,8 +301,7 @@ done
 step "PHASE 5/7 — Collect Node IPs"
 declare -A NODE_IPS=()
 for node in "${GPU_NODES[@]}"; do
-  IP_RAW="$(run_remote_bash "${node}" "set -euo pipefail; hostname -I | tr ' ' '\\n' | awk 'NF {print; exit}'")"
-  NODE_IPS["${node}"]="$(printf '%s\n' "${IP_RAW}" | awk 'NF {line=$0} END {print line}')"
+  NODE_IPS["${node}"]="$(primary_ip_of_remote "${node}")"
   if [[ -z "${NODE_IPS[${node}]}" ]]; then
     echo "Failed to detect management IP for ${node}." >&2
     exit 1
@@ -343,7 +367,7 @@ run_remote_bash "${BOOTSTRAP_NODE}" "set -euo pipefail
 KUBESPRAY_DIR=$(printf '%q' "${KUBESPRAY_DIR}")
 cat > \"\${KUBESPRAY_DIR}/inventory/nvair/group_vars/k8s_cluster/nvair.yml\" <<'EOF_OVERRIDES'
 container_manager: containerd
-kube_network_plugin: calico
+kube_network_plugin: flannel
 EOF_OVERRIDES"
 
 log "Running Kubespray cluster deployment from ${BOOTSTRAP_NODE}..."

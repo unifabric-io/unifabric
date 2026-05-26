@@ -1,6 +1,6 @@
 # InfiniBand Fabric
 
-Chinese version: [getting-started-infiniband.zh.md](./getting-started-infiniband.zh.md)
+中文版: [getting-started-infiniband.zh.md](./getting-started-infiniband.zh.md)
 
 This guide explains how to deploy Unifabric in an InfiniBand NIC cluster. This scenario is for IB networking, such as Mellanox NICs in IB mode with IB switches.
 
@@ -11,7 +11,7 @@ After deployment, the cluster should achieve two goals:
 - Nodes are labeled with topology labels consumed by schedulers, including `unifabric.io/scale-up`, `unifabric.io/scale-out-leaf`, `unifabric.io/scale-out-spine`, and `unifabric.io/scale-out-core`.
 - Node RDMA state is observable through Unifabric Agent metrics, including RDMA device, port, priority, and Pod attribution metrics.
 
-> This scenario does not create `FabricNode` CRs and does not create or update `ScaleOutLeafGroup` CRs.
+> This scenario does not create `FabricNode` or `Switch` CRs for Unifabric switch-driven discovery.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ kubectl get nodes -o wide
 
 ## Install Unifabric
 
-The following command uses the latest release. The example leaves RDMA interface selectors empty, so all RDMA NICs are observed by metrics; it also disables Unifabric's own leaf group path so Unifabric Agent / Controller do not write topology labels through LLDP/FabricNode. InfiniBand topology labels are written by NVIDIA topograph.
+The following command uses the latest release. The example leaves RDMA interface selectors empty, so all RDMA NICs are observed by metrics. InfiniBand topology labels are written by NVIDIA topograph.
 
 ```bash
 LATEST_TAG=$(curl -fsSL https://api.github.com/repos/unifabric-io/unifabric/releases/latest | grep '"tag_name":' | cut -d '"' -f4)
@@ -46,7 +46,6 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --set nvidiaTopograph.provider.name=infiniband-k8s \
   --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="" \
   --set-string nodeTopologyDiscovery.storageInterfaceSelector="" \
-  --set scaleOutDiscovery.leafGroups.enabled=false \
   --set nodeMetrics.enabled=true \
   --set nodeMetrics.serviceMonitor.enabled=true \
   --set grafanaDashboard.enabled=true \
@@ -60,7 +59,6 @@ Parameters:
 | `nvidiaTopograph.enable` | Enables NVIDIA topograph. Must be `true` for InfiniBand IB networking. |
 | `nvidiaTopograph.provider.name` | Set to `infiniband-k8s`, which discovers topology with `ibnetdiscover`. |
 
-| `scaleOutDiscovery.leafGroups.enabled` | Disables Unifabric `ScaleOutLeafGroup` and leaf Node label write-back. |
 | `nodeMetrics.enabled` | Enables Agent metrics for node RDMA observability. |
 | `nodeTopologyDiscovery.scaleUpInterfaceSelector` | Selects specific RDMA NICs for observation and labels them with `kind=scaleOut` in RDMA metrics. Supports `interface=ib*,mlx*` or `cidr=172.17.0.0/16`. Defaults to all RDMA NICs. |
 | `nodeTopologyDiscovery.storageInterfaceSelector` | Selects storage RDMA NICs and labels them with `kind=storage` in RDMA metrics. Supports `interface=ib*,mlx*` or `cidr=172.17.0.0/16`. Defaults to empty. |

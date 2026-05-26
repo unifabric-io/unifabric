@@ -103,8 +103,8 @@ kubectl -n unifabric-system get grafanadashboard -l app.kubernetes.io/component=
    ```
 
    Spectrum-X 和 InfiniBand 场景使用 NVIDIA topograph 写回 Node label，不依赖
-   `FabricNode` / `ScaleOutLeafGroup`；这两个场景优先检查 Agent metrics 端点和
-   `/sys/class/infiniband`。
+   Unifabric `FabricNode` 或 `Switch` 拓扑资源；这两个场景优先检查 Agent metrics
+   端点和 `/sys/class/infiniband`。
 
 4. 确认 Agent Pod metrics 端点能直接返回 Unifabric 指标：
 

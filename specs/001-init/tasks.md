@@ -2,7 +2,7 @@
 
 **Input**: `specs/001-init/spec.md`  
 **Status**: Completed  
-**Scope**: Initial project functionality only: FabricNode, ScaleOutLeafGroup, and RDMA metrics.
+**Scope**: Initial project functionality only: FabricNode, switch-driven scale-out topology discovery, and RDMA metrics.
 
 ## Phase 1: FabricNode
 
@@ -13,14 +13,14 @@
 - [x] T005 [US1] Populate LLDP neighbor, RDMA device, link state, IP address, node type, and node IP status fields.
 - [x] T006 [US1] Track RDMA-enabled Pods and top-level owner metadata for metrics attribution.
 
-## Phase 2: ScaleOutLeafGroup
+## Phase 2: Switch-Driven Scale-Out Topology
 
-- [x] T007 [US2] Define the `ScaleOutLeafGroup` API resource for scale-out leaf topology grouping.
-- [x] T008 [US2] Generate and include CRD output for `ScaleOutLeafGroup`.
-- [x] T009 [US2] Implement grouping based on `FabricNode.status.scaleOutNics[*].lldpNeighbor`.
-- [x] T010 [US2] Exclude storage nodes from scale-out leaf grouping.
-- [x] T011 [US2] Maintain group health, healthy node count, total node count, node membership, and switch set status.
-- [x] T012 [US2] Write and clean up Kubernetes Node leaf topology labels.
+- [x] T007 [US2] Define the `Switch` API resource for switch-side scale-out topology inputs.
+- [x] T008 [US2] Generate and include CRD output for `Switch`.
+- [x] T009 [US2] Implement topology computation based on `FabricNode.status.scaleOutNics[*].lldpNeighbor` and `Switch.status.lldpNeighbors`.
+- [x] T010 [US2] Exclude storage nodes from scale-out topology labeling.
+- [x] T011 [US2] Maintain switch health and internal leaf, spine, and core topology projections.
+- [x] T012 [US2] Write and clean up Kubernetes Node scale-out topology labels.
 
 ## Phase 3: RDMA Metrics
 
@@ -33,7 +33,7 @@
 ## Phase 4: Documentation
 
 - [x] T018 [P] Document FabricNode design in `docs/design/fabricnode.md`.
-- [x] T019 [P] Document ScaleOutLeafGroup design in `docs/design/scaleoutleafgroup.md`.
+- [x] T019 [P] Document switch-driven scale-out topology design in `docs/design/scaleout-topology.md`.
 - [x] T020 [P] Document the initial project scope in `specs/001-init/spec.md`.
 
 ## Completion Notes

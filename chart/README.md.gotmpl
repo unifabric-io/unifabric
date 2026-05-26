@@ -1,1 +1,66 @@
-{{ template "chart.valuesSection" . }}
+{{- define "unifabric.valuesTableHeader" -}}| Key | Type | Default | Description |
+|-----|------|---------|-------------|{{- end -}}
+
+{{- define "unifabric.valuesRowsForPrefix" -}}
+{{- $prefix := .prefix -}}
+{{- if eq $prefix "agent" }}
+| agent.affinity.nodeAffinity | object | See chart/values.yaml for the full default node affinity. | Default Linux node affinity for agent pods. |
+{{- end }}
+{{- range .values }}
+  {{- $row := . -}}
+  {{- if or (eq $row.Key $prefix) (hasPrefix (printf "%s." $prefix) $row.Key) }}
+    {{- $hasChildren := false -}}
+    {{- range $.values }}
+      {{- if hasPrefix (printf "%s." $row.Key) .Key }}
+        {{- $hasChildren = true -}}
+      {{- end }}
+    {{- end }}
+    {{- $isDocumentedList := and $hasChildren (eq $row.Type "list") -}}
+    {{- if and (or (not $hasChildren) $isDocumentedList) (not (contains "[" $row.Key)) (not (hasPrefix "agent.affinity.nodeAffinity." $row.Key)) }}
+      {{- $default := $row.AutoDefault -}}
+      {{- if $row.Default }}{{- $default = $row.Default -}}{{- end -}}
+      {{- $description := $row.AutoDescription -}}
+      {{- if $row.Description }}{{- $description = $row.Description -}}{{- end -}}
+      {{- printf "\n| %s | %s | %s | %s |" $row.Key $row.Type $default $description -}}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{- define "unifabric.valuesTableForPrefixes" -}}
+{{- template "unifabric.valuesTableHeader" . -}}
+{{- $values := .values -}}
+{{- range .prefixes -}}
+{{- template "unifabric.valuesRowsForPrefix" (dict "values" $values "prefix" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.valuesSection" -}}
+# Helm Values
+
+## Global Settings
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "global")) }}
+
+## Topology Labels
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "topologyLabels" "topologyGroupNaming")) }}
+
+## Switch Topology Discovery
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "switchTopologyDiscovery")) }}
+
+## Node Topology Discovery and Observability
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "nodeTopologyDiscovery" "nodeMetrics" "grafanaDashboard")) }}
+
+## Controller and Agent
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "controller" "agent")) }}
+
+## NVIDIA Topograph
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "nvidiaTopograph")) }}
+{{- end -}}
+
+{{ template "unifabric.valuesSection" . }}

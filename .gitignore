@@ -20,7 +20,6 @@ Thumbs.db
 # Config files
 .env
 .env.local
-kubeconfig-*.yaml
 
 # Go Test
 coverage.out
@@ -32,6 +31,7 @@ coverage.out
 
 # Temp files
 *.tmp
+.tmp/
 
 ## AI
 .codex

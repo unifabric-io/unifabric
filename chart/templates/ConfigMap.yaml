@@ -13,8 +13,15 @@ data:
     {{- if hasKey .Values "topologyLabels" }}
     {{- $_ := set $controllerConfig "topologyLabels" .Values.topologyLabels }}
     {{- end }}
-    {{- if hasKey .Values "scaleOutDiscovery" }}
-    {{- $_ := set $controllerConfig "scaleOutDiscovery" .Values.scaleOutDiscovery }}
+    {{- if hasKey .Values "nodeTopologyDiscovery" }}
+    {{- $_ := set $controllerConfig "nodeTopologyDiscovery" .Values.nodeTopologyDiscovery }}
+    {{- end }}
+    {{- if hasKey .Values "switchTopologyDiscovery" }}
+    {{- $switchDiscoveryConfig := deepCopy .Values.switchTopologyDiscovery }}
+    {{- if hasKey .Values "topologyGroupNaming" }}
+    {{- $_ := set $switchDiscoveryConfig "groupNaming" .Values.topologyGroupNaming }}
+    {{- end }}
+    {{- $_ := set $controllerConfig "scaleOutDiscovery" (dict "switches" $switchDiscoveryConfig) }}
     {{- end }}
     {{- include "unifabric.render" (dict "value" $controllerConfig "context" $) | nindent 4 }}
 {{- end }}

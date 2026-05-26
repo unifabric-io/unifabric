@@ -1,6 +1,6 @@
 # RDMA Observability Usage Guide
 
-Chinese version: [rdma-metrics.zh.md](./rdma-metrics.zh.md)
+中文版: [rdma-metrics.zh.md](./rdma-metrics.zh.md)
 
 This guide explains how to use Unifabric RDMA observability, including verifying
 Prometheus metrics, checking NIC classification, and viewing Grafana dashboards.
@@ -116,9 +116,9 @@ If there are no RDMA metrics:
    ```
 
    Spectrum-X and InfiniBand scenarios use NVIDIA topograph to write Node
-   labels and do not depend on `FabricNode` / `ScaleOutLeafGroup`. For these
-   two scenarios, check the Agent metrics endpoint and `/sys/class/infiniband`
-   first.
+   labels and do not depend on Unifabric `FabricNode` or `Switch` topology
+   resources. For these two scenarios, check the Agent metrics endpoint and
+   `/sys/class/infiniband` first.
 
 4. Confirm that the Agent Pod metrics endpoint returns Unifabric metrics directly:
 

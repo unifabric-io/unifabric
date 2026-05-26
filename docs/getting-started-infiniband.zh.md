@@ -13,7 +13,7 @@
 - 节点 RDMA 状态可观测，能够通过 Unifabric Agent metrics 查看 RDMA device、port、
   priority 和 Pod 归属等指标。
 
-> 该场景不会创建 `FabricNode` CR，也不会创建或更新 `ScaleOutLeafGroup` CR。
+> 该场景不会为 Unifabric switch-driven discovery 创建 `FabricNode` 或 `Switch` CR。
 
 ## 前置条件
 
@@ -35,9 +35,7 @@ kubectl get nodes -o wide
 ## 安装 Unifabric
 
 以下命令使用最新的 release 版本。示例将 RDMA interface selector 留空，因此所有 RDMA
-网卡都会被 metrics 观测；同时关闭 Unifabric 自身的 leaf group 路径，避免
-Unifabric Agent / Controller 通过 LLDP/FabricNode 写回拓扑 label。InfiniBand 拓扑
-label 由 NVIDIA topograph 写回。
+网卡都会被 metrics 观测。InfiniBand 拓扑 label 由 NVIDIA topograph 写回。
 
 ```bash
 LATEST_TAG=$(curl -fsSL https://api.github.com/repos/unifabric-io/unifabric/releases/latest | grep '"tag_name":' | cut -d '"' -f4)
@@ -51,7 +49,6 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --set nvidiaTopograph.provider.name=infiniband-k8s \
   --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="" \
   --set-string nodeTopologyDiscovery.storageInterfaceSelector="" \
-  --set scaleOutDiscovery.leafGroups.enabled=false \
   --set nodeMetrics.enabled=true \
   --set nodeMetrics.serviceMonitor.enabled=true \
   --set grafanaDashboard.enabled=true \
@@ -65,7 +62,6 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 | `nvidiaTopograph.enable` | 启用 NVIDIA topograph。InfiniBand IB 网络场景必须为 `true`。 |
 | `nvidiaTopograph.provider.name` | 设置为 `infiniband-k8s`，表示使用 `ibnetdiscover` 命令发现拓扑。 |
 
-| `scaleOutDiscovery.leafGroups.enabled` | 关闭 Unifabric 自身的 `ScaleOutLeafGroup` 和 leaf Node label 写回。 |
 | `nodeMetrics.enabled` | 开启 Agent Metrics 用于节点 RDMA 可观测。 |
 | `nodeTopologyDiscovery.scaleUpInterfaceSelector` | 选择特定 RDMA 网卡用于观测，并在 RDMA 指标中打上 `kind=scaleOut` 标签，支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`，默认为全部 RDMA 网卡。 |
 | `nodeTopologyDiscovery.storageInterfaceSelector` | 选择一组 RDMA 存储网卡观测，并在 RDMA 指标中打上 `kind=storage` 标签。支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`。默认为空。|

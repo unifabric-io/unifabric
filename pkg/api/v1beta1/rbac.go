@@ -1,9 +1,6 @@
 // Copyright 2026 Authors of unifabric-io
 // SPDX-License-Identifier: Apache-2.0
 
-// +kubebuilder:rbac:groups=unifabric.io,resources=scaleoutleafgroups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=unifabric.io,resources=scaleoutleafgroups/status,verbs=get;update;patch
-
 // +kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=create;get;update;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;get;list;watch;patch;update;delete
 
