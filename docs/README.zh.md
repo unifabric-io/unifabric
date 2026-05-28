@@ -62,6 +62,8 @@ Pod、namespace 和顶层 workload。Grafana dashboard 用于按集群、节点�
 RDMA 流量与健康问题。
 
 - [RDMA 可观测性使用指南](./usage/rdma-metrics.zh.md)
+- [应用间流量观测指南](./usage/sflow.zh.md)：通过 Helm 安装交换机采样流量接收、
+  流记录存储、schema 初始化和 workload dashboard。
 
 ## 开发
 
@@ -73,3 +75,5 @@ RDMA 流量与健康问题。
 - [Topology CRD 设计](./design/topology-crd.zh.md)：了解性能域、Node 路径和拓扑数据模型。
 - [Scale-out 拓扑发现设计](./design/scaleout-topology.zh.md)：了解 Scale-out 拓扑的发现与构建过程。
 - [RDMA 指标模型与 Pod 归因设计](./design/rdma-metrics.md)：了解指标定义与工作负载归因模型。
+- [应用流观测实现设计](./design/sflow.zh.md)：了解 sFlow collector、Pod / Workload
+  字段补充、ClickHouse 行模型和过载处理。

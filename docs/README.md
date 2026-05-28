@@ -67,6 +67,8 @@ attribute traffic to Pods, namespaces, and top-level workloads. Grafana dashboar
 diagnose RDMA traffic and health by cluster, Node, and workload.
 
 - [RDMA observability usage guide](./usage/rdma-metrics.md)
+- [Application flow observability guide](./usage/sflow.md): Install switch sample ingestion,
+  flow-record storage, schema initialization, and workload dashboards with Helm.
 
 ## Development
 
@@ -82,3 +84,5 @@ diagnose RDMA traffic and health by cluster, Node, and workload.
   topologies are discovered and constructed.
 - [RDMA metric model and Pod attribution design](./design/rdma-metrics.md): Understand metric
   definitions and workload attribution.
+- [Application flow observability design](./design/sflow.md): Understand the sFlow collector,
+  Pod attribution, ClickHouse row model, and overload behavior.

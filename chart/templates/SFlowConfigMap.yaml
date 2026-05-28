@@ -1,0 +1,39 @@
+{{- if .Values.sflow.enabled }}
+{{- if not (include "unifabric.sflowClickHouseAddress" .) }}
+{{- fail "sflow.clickhouse.address is required unless sflow.clickhouse.managed.enabled=true" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "unifabric.sflowName" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+data:
+  sflow.yaml: |-
+    logLevel: {{ .Values.sflow.config.logLevel | quote }}
+    listen:
+      bindAddress: {{ .Values.sflow.listen.bindAddress | quote }}
+    metrics:
+      bindAddress: {{ .Values.sflow.metrics.bindAddress | quote }}
+    healthProbe:
+      bindAddress: {{ .Values.sflow.healthProbe.bindAddress | quote }}
+    clickhouse:
+      address: {{ include "unifabric.sflowClickHouseAddress" . | quote }}
+      database: {{ .Values.sflow.clickhouse.database | quote }}
+      username: {{ .Values.sflow.clickhouse.username | quote }}
+      password: {{ ternary "" .Values.sflow.clickhouse.password (ne (include "unifabric.sflowClickHouseSecretName" .) "") | quote }}
+      table: {{ .Values.sflow.clickhouse.table | quote }}
+      schema:
+        retentionDays: {{ .Values.sflow.clickhouse.schema.retentionDays }}
+        lock:
+          name: {{ .Values.sflow.clickhouse.schema.lock.name | quote }}
+          namespace: {{ default .Release.Namespace .Values.sflow.clickhouse.schema.lock.namespace | quote }}
+          leaseDuration: {{ .Values.sflow.clickhouse.schema.lock.leaseDuration | quote }}
+          retryInterval: {{ .Values.sflow.clickhouse.schema.lock.retryInterval | quote }}
+    writer:
+      batchSize: {{ .Values.sflow.writer.batchSize }}
+      flushInterval: {{ .Values.sflow.writer.flushInterval | quote }}
+      queueSize: {{ .Values.sflow.writer.queueSize }}
+{{- end }}

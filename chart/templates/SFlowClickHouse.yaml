@@ -1,0 +1,167 @@
+{{- if and .Values.sflow.enabled .Values.sflow.clickhouse.managed.enabled }}
+{{- $persistenceType := default "pvc" .Values.sflow.clickhouse.managed.persistence.type }}
+{{- if and .Values.sflow.clickhouse.managed.persistence.enabled (not (or (eq $persistenceType "pvc") (eq $persistenceType "hostPath"))) }}
+{{- fail "sflow.clickhouse.managed.persistence.type must be pvc or hostPath" }}
+{{- end }}
+{{- if and .Values.sflow.clickhouse.managed.persistence.enabled (eq $persistenceType "hostPath") (not .Values.sflow.clickhouse.managed.persistence.hostPath.path) }}
+{{- fail "sflow.clickhouse.managed.persistence.hostPath.path is required when persistence.type=hostPath" }}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "unifabric.sflowClickHouseName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow-clickhouse
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "unifabric.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow-clickhouse
+  ports:
+    - name: native
+      port: {{ .Values.sflow.clickhouse.managed.service.nativePort }}
+      targetPort: native
+      protocol: TCP
+    - name: http
+      port: {{ .Values.sflow.clickhouse.managed.service.httpPort }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "unifabric.sflowClickHouseName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow-clickhouse
+spec:
+  replicas: 1
+  serviceName: {{ include "unifabric.sflowClickHouseName" . }}
+  selector:
+    matchLabels:
+      {{- include "unifabric.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: unifabric-sflow-clickhouse
+  template:
+    metadata:
+      labels:
+        {{- include "unifabric.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: unifabric-sflow-clickhouse
+        {{- with .Values.sflow.clickhouse.managed.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.sflow.clickhouse.managed.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sflow.clickhouse.managed.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sflow.clickhouse.managed.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sflow.clickhouse.managed.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sflow.clickhouse.managed.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: clickhouse
+          image: {{ printf "%s/%s:%s" .Values.sflow.clickhouse.managed.image.registry .Values.sflow.clickhouse.managed.image.repository .Values.sflow.clickhouse.managed.image.tag }}
+          imagePullPolicy: {{ .Values.sflow.clickhouse.managed.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8123
+              protocol: TCP
+            - name: native
+              containerPort: 9000
+              protocol: TCP
+          env:
+            - name: CLICKHOUSE_DB
+              value: {{ .Values.sflow.clickhouse.database | quote }}
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.sflow.clickhouse.username | quote }}
+            - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+              value: "1"
+            {{- if include "unifabric.sflowClickHouseSecretName" . }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "unifabric.sflowClickHouseSecretName" . }}
+                  key: {{ include "unifabric.sflowClickHouseSecretKey" . }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          {{- with .Values.sflow.clickhouse.managed.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sflow.clickhouse.managed.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+      {{- if not .Values.sflow.clickhouse.managed.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- else if eq $persistenceType "hostPath" }}
+      volumes:
+        - name: data
+          hostPath:
+            path: {{ .Values.sflow.clickhouse.managed.persistence.hostPath.path | quote }}
+            type: {{ .Values.sflow.clickhouse.managed.persistence.hostPath.type | quote }}
+      {{- end }}
+  {{- if and .Values.sflow.clickhouse.managed.persistence.enabled (eq $persistenceType "pvc") }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.sflow.clickhouse.managed.persistence.accessModes | nindent 10 }}
+        {{- if .Values.sflow.clickhouse.managed.persistence.storageClassName }}
+        storageClassName: {{ .Values.sflow.clickhouse.managed.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.sflow.clickhouse.managed.persistence.size | quote }}
+  {{- end }}
+{{- if and .Values.sflow.clickhouse.password (not .Values.sflow.clickhouse.passwordSecret.name) }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "unifabric.sflowClickHouseName" . }}-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow-clickhouse
+type: Opaque
+stringData:
+  password: {{ .Values.sflow.clickhouse.password | quote }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,26 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: sflow-clickhouse
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasource:
+    name: sflow-clickhouse
+    uid: sflow-clickhouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    isDefault: false
+    jsonData:
+      host: unifabric-sflow-clickhouse.unifabric-system.svc.cluster.local
+      port: 9000
+      protocol: native
+      username: default
+      defaultDatabase: default
+      defaultTable: flows_raw
+      dialTimeout: 10s
+      queryTimeout: 60s
+      validateSql: true
+      enableRowLimit: true

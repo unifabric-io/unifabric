@@ -71,6 +71,10 @@ jobs:
             dockerfile: image/controller/Dockerfile
           - name: unifabric-agent
             dockerfile: image/agent/Dockerfile
+          - name: unifabric-sflow
+            dockerfile: image/sflow/Dockerfile
+          - name: unifabric-hsflowd
+            dockerfile: image/hsflowd/Dockerfile
           - name: unifabric-switch-agent
             dockerfile: image/switch-agent/Dockerfile
     

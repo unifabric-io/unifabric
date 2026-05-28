@@ -1,0 +1,1676 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "${clickhouse}",
+      "description": "Number of distinct switch samplers that observed TX or RX traffic for the selected workload.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 10,
+      "links": [],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "table",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "table",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT countDistinct(sampler_address) AS switches\nFROM flows_raw\nWHERE $__timeFilter(time_flow_start)\n  AND (\n       (src_k8s_top_owner_namespace = w[1]\n        AND src_k8s_top_owner_kind = w[2]\n        AND src_k8s_top_owner_name = w[3])\n    OR (dst_k8s_top_owner_namespace = w[1]\n        AND dst_k8s_top_owner_kind = w[2]\n        AND dst_k8s_top_owner_name = w[3])\n  )",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Switch Count Observing Workload Traffic",
+      "transformations": [],
+      "type": "stat"
+    },
+    {
+      "datasource": "${clickhouse}",
+      "description": "Number of distinct Pods that sent or received traffic for the selected workload.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 11,
+      "links": [],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "table",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "table",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "table",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT countDistinct(pod) AS pods\nFROM\n(\n    SELECT src_k8s_pod_name AS pod\n    FROM flows_raw\n    WHERE $__timeFilter(time_flow_start)\n      AND src_k8s_top_owner_namespace = w[1]\n      AND src_k8s_top_owner_kind = w[2]\n      AND src_k8s_top_owner_name = w[3]\n      AND src_k8s_pod_name != ''\n\n    UNION DISTINCT\n\n    SELECT dst_k8s_pod_name AS pod\n    FROM flows_raw\n    WHERE $__timeFilter(time_flow_start)\n      AND dst_k8s_top_owner_namespace = w[1]\n      AND dst_k8s_top_owner_kind = w[2]\n      AND dst_k8s_top_owner_name = w[3]\n      AND dst_k8s_pod_name != ''\n)",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Workload Pod Count",
+      "transformations": [],
+      "type": "stat"
+    },
+    {
+      "datasource": "${clickhouse}",
+      "description": "Outbound traffic rate from the selected workload, grouped by observing switch. Legend format: Switch <IP> TX rate.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "displayName": "Switch ${__field.labels.switch} TX rate",
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 12,
+      "links": [],
+      "options": {
+        "annotations": {
+          "clustering": -1,
+          "multiLane": false
+        },
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "timeseries",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT\n    $__timeInterval(time_flow_start) AS time,\n    IPv4NumToString(reinterpretAsUInt32(reverse(substring(sampler_address, 13, 4)))) AS switch,\n    sum(bytes * if(sampling_rate = 0, toUInt64(1), sampling_rate)) / greatest(toFloat64($__interval_ms) / 1000.0, 1.0) AS tx_rate\nFROM flows_raw\nWHERE $__timeFilter(time_flow_start)\n  AND src_k8s_top_owner_namespace = w[1]\n  AND src_k8s_top_owner_kind = w[2]\n  AND src_k8s_top_owner_name = w[3]\nGROUP BY time, switch\nORDER BY time ASC",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Workload TX Rate by Switch",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${clickhouse}",
+      "description": "Inbound traffic rate to the selected workload, grouped by observing switch. Legend format: Switch <IP> RX rate.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "displayName": "Switch ${__field.labels.switch} RX rate",
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 13,
+      "links": [],
+      "options": {
+        "annotations": {
+          "clustering": -1,
+          "multiLane": false
+        },
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "timeseries",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT\n    $__timeInterval(time_flow_start) AS time,\n    IPv4NumToString(reinterpretAsUInt32(reverse(substring(sampler_address, 13, 4)))) AS switch,\n    sum(bytes * if(sampling_rate = 0, toUInt64(1), sampling_rate)) / greatest(toFloat64($__interval_ms) / 1000.0, 1.0) AS rx_rate\nFROM flows_raw\nWHERE $__timeFilter(time_flow_start)\n  AND dst_k8s_top_owner_namespace = w[1]\n  AND dst_k8s_top_owner_kind = w[2]\n  AND dst_k8s_top_owner_name = w[3]\nGROUP BY time, switch\nORDER BY time ASC",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Workload RX Rate by Switch",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${clickhouse}",
+      "description": "Outbound traffic rate from the selected workload, limited to the top 10 source Pods by total TX bytes in the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "displayName": "Pod ${__field.labels.pod} on ${__field.labels.node} TX rate",
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "id": 15,
+      "links": [],
+      "options": {
+        "annotations": {
+          "clustering": -1,
+          "multiLane": false
+        },
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "timeseries",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT\n    $__timeInterval(f.time_flow_start) AS time,\n    concat(f.src_k8s_pod_namespace, '/', f.src_k8s_pod_name) AS pod,\n    f.src_k8s_node_name AS node,\n    sum(f.bytes * if(f.sampling_rate = 0, toUInt64(1), f.sampling_rate)) / greatest(toFloat64($__interval_ms) / 1000.0, 1.0) AS tx_rate\nFROM flows_raw AS f\nWHERE $__timeFilter(f.time_flow_start)\n  AND f.src_k8s_top_owner_namespace = w[1]\n  AND f.src_k8s_top_owner_kind = w[2]\n  AND f.src_k8s_top_owner_name = w[3]\n  AND f.src_k8s_pod_name != ''\n  AND (f.src_k8s_pod_namespace, f.src_k8s_pod_name, f.src_k8s_node_name) IN\n  (\n      SELECT\n          src_k8s_pod_namespace,\n          src_k8s_pod_name,\n          src_k8s_node_name\n      FROM flows_raw\n      WHERE $__timeFilter(time_flow_start)\n        AND src_k8s_top_owner_namespace = w[1]\n        AND src_k8s_top_owner_kind = w[2]\n        AND src_k8s_top_owner_name = w[3]\n        AND src_k8s_pod_name != ''\n      GROUP BY src_k8s_pod_namespace, src_k8s_pod_name, src_k8s_node_name\n      ORDER BY sum(bytes * if(sampling_rate = 0, toUInt64(1), sampling_rate)) DESC\n      LIMIT 10\n  )\nGROUP BY time, pod, node\nORDER BY time ASC",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Workload Pods Sending Traffic Rate",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${clickhouse}",
+      "description": "Inbound traffic rate to the selected workload, limited to the top 10 destination Pods by total RX bytes in the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "displayName": "Pod ${__field.labels.pod} on ${__field.labels.node} RX rate",
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "id": 18,
+      "links": [],
+      "options": {
+        "annotations": {
+          "clustering": -1,
+          "multiLane": false
+        },
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "timeseries",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT\n    $__timeInterval(f.time_flow_start) AS time,\n    concat(f.dst_k8s_pod_namespace, '/', f.dst_k8s_pod_name) AS pod,\n    f.dst_k8s_node_name AS node,\n    sum(f.bytes * if(f.sampling_rate = 0, toUInt64(1), f.sampling_rate)) / greatest(toFloat64($__interval_ms) / 1000.0, 1.0) AS rx_rate\nFROM flows_raw AS f\nWHERE $__timeFilter(f.time_flow_start)\n  AND f.dst_k8s_top_owner_namespace = w[1]\n  AND f.dst_k8s_top_owner_kind = w[2]\n  AND f.dst_k8s_top_owner_name = w[3]\n  AND f.dst_k8s_pod_name != ''\n  AND (f.dst_k8s_pod_namespace, f.dst_k8s_pod_name, f.dst_k8s_node_name) IN\n  (\n      SELECT\n          dst_k8s_pod_namespace,\n          dst_k8s_pod_name,\n          dst_k8s_node_name\n      FROM flows_raw\n      WHERE $__timeFilter(time_flow_start)\n        AND dst_k8s_top_owner_namespace = w[1]\n        AND dst_k8s_top_owner_kind = w[2]\n        AND dst_k8s_top_owner_name = w[3]\n        AND dst_k8s_pod_name != ''\n      GROUP BY dst_k8s_pod_namespace, dst_k8s_pod_name, dst_k8s_node_name\n      ORDER BY sum(bytes * if(sampling_rate = 0, toUInt64(1), sampling_rate)) DESC\n      LIMIT 10\n  )\nGROUP BY time, pod, node\nORDER BY time ASC",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Workload Pods Receiving Traffic Rate",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${clickhouse}",
+      "description": "Selected workload is the source side. Shows traffic rate sent to other workloads over time, limited to the top 10 destination workloads by total TX bytes in the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "displayName": "To ${__field.labels.peer_workload} TX rate",
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 16,
+      "links": [],
+      "options": {
+        "annotations": {
+          "clustering": -1,
+          "multiLane": false
+        },
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "table",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "timeseries",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT\n    $__timeInterval(f.time_flow_start) AS time,\n    concat(f.dst_k8s_top_owner_namespace, '/', f.dst_k8s_top_owner_kind, '/', f.dst_k8s_top_owner_name) AS peer_workload,\n    sum(f.bytes * if(f.sampling_rate = 0, toUInt64(1), f.sampling_rate)) / greatest(toFloat64($__interval_ms) / 1000.0, 1.0) AS tx_rate\nFROM flows_raw AS f\nWHERE $__timeFilter(f.time_flow_start)\n  AND f.src_k8s_top_owner_namespace = w[1]\n  AND f.src_k8s_top_owner_kind = w[2]\n  AND f.src_k8s_top_owner_name = w[3]\n  AND f.dst_k8s_top_owner_name != ''\n  AND NOT (\n      f.dst_k8s_top_owner_namespace = w[1]\n      AND f.dst_k8s_top_owner_kind = w[2]\n      AND f.dst_k8s_top_owner_name = w[3]\n  )\n  AND (f.dst_k8s_top_owner_namespace, f.dst_k8s_top_owner_kind, f.dst_k8s_top_owner_name) IN\n  (\n      SELECT\n          dst_k8s_top_owner_namespace,\n          dst_k8s_top_owner_kind,\n          dst_k8s_top_owner_name\n      FROM flows_raw\n      WHERE $__timeFilter(time_flow_start)\n        AND src_k8s_top_owner_namespace = w[1]\n        AND src_k8s_top_owner_kind = w[2]\n        AND src_k8s_top_owner_name = w[3]\n        AND dst_k8s_top_owner_name != ''\n        AND NOT (\n            dst_k8s_top_owner_namespace = w[1]\n            AND dst_k8s_top_owner_kind = w[2]\n            AND dst_k8s_top_owner_name = w[3]\n        )\n      GROUP BY dst_k8s_top_owner_namespace, dst_k8s_top_owner_kind, dst_k8s_top_owner_name\n      ORDER BY sum(bytes * if(sampling_rate = 0, toUInt64(1), sampling_rate)) DESC\n      LIMIT 10\n  )\nGROUP BY time, peer_workload\nORDER BY time ASC",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Traffic Rate Sent to Other Workloads",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${clickhouse}",
+      "description": "Selected workload is the destination side. Shows traffic rate received from other workloads over time, limited to the top 10 source workloads by total RX bytes in the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "displayName": "From ${__field.labels.peer_workload} RX rate",
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 17,
+      "links": [],
+      "options": {
+        "annotations": {
+          "clustering": -1,
+          "multiLane": false
+        },
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "timeseries",
+          "rawSql": "WITH splitByChar('/', '${workload}') AS w\nSELECT\n    $__timeInterval(f.time_flow_start) AS time,\n    concat(f.src_k8s_top_owner_namespace, '/', f.src_k8s_top_owner_kind, '/', f.src_k8s_top_owner_name) AS peer_workload,\n    sum(f.bytes * if(f.sampling_rate = 0, toUInt64(1), f.sampling_rate)) / greatest(toFloat64($__interval_ms) / 1000.0, 1.0) AS rx_rate\nFROM flows_raw AS f\nWHERE $__timeFilter(f.time_flow_start)\n  AND f.dst_k8s_top_owner_namespace = w[1]\n  AND f.dst_k8s_top_owner_kind = w[2]\n  AND f.dst_k8s_top_owner_name = w[3]\n  AND f.src_k8s_top_owner_name != ''\n  AND NOT (\n      f.src_k8s_top_owner_namespace = w[1]\n      AND f.src_k8s_top_owner_kind = w[2]\n      AND f.src_k8s_top_owner_name = w[3]\n  )\n  AND (f.src_k8s_top_owner_namespace, f.src_k8s_top_owner_kind, f.src_k8s_top_owner_name) IN\n  (\n      SELECT\n          src_k8s_top_owner_namespace,\n          src_k8s_top_owner_kind,\n          src_k8s_top_owner_name\n      FROM flows_raw\n      WHERE $__timeFilter(time_flow_start)\n        AND dst_k8s_top_owner_namespace = w[1]\n        AND dst_k8s_top_owner_kind = w[2]\n        AND dst_k8s_top_owner_name = w[3]\n        AND src_k8s_top_owner_name != ''\n        AND NOT (\n            src_k8s_top_owner_namespace = w[1]\n            AND src_k8s_top_owner_kind = w[2]\n            AND src_k8s_top_owner_name = w[3]\n        )\n      GROUP BY src_k8s_top_owner_namespace, src_k8s_top_owner_kind, src_k8s_top_owner_name\n      ORDER BY sum(bytes * if(sampling_rate = 0, toUInt64(1), sampling_rate)) DESC\n      LIMIT 10\n  )\nGROUP BY time, peer_workload\nORDER BY time ASC",
+          "datasource": "${clickhouse}",
+          "refId": "A"
+        }
+      ],
+      "title": "Traffic Rate Received from Other Workloads",
+      "transformations": [],
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 41,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "sflow-clickhouse",
+          "value": "sflow-clickhouse"
+        },
+        "description": "ClickHouse datasource used by the sFlow dashboards.",
+        "hide": 2,
+        "includeAll": false,
+        "label": "ClickHouse",
+        "multi": false,
+        "name": "clickhouse",
+        "options": [],
+        "query": "grafana-clickhouse-datasource",
+        "refresh": 0,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "definition": "SELECT DISTINCT workload\nFROM\n(\n    SELECT concat(src_k8s_top_owner_namespace, '/', src_k8s_top_owner_kind, '/', src_k8s_top_owner_name) AS workload\n    FROM flows_raw\n    WHERE $__timeFilter(time_flow_start)\n      AND src_k8s_top_owner_name != ''\n\n    UNION DISTINCT\n\n    SELECT concat(dst_k8s_top_owner_namespace, '/', dst_k8s_top_owner_kind, '/', dst_k8s_top_owner_name) AS workload\n    FROM flows_raw\n    WHERE $__timeFilter(time_flow_start)\n      AND dst_k8s_top_owner_name != ''\n)\nORDER BY workload",
+        "description": "Kubernetes top owner workload, formatted as namespace/kind/name.",
+        "datasource": "${clickhouse}",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Workload",
+        "multi": false,
+        "name": "workload",
+        "options": [],
+        "query": {
+          "builderOptions": {
+            "aggregates": [
+              {
+                "aggregateType": "sum",
+                "alias": "bytes",
+                "column": "bytes"
+              }
+            ],
+            "columns": [
+              {
+                "alias": "time_flow_start",
+                "hint": "time",
+                "name": "time_flow_start",
+                "type": "DateTime64(9)"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "time_flow_start"
+            ],
+            "limit": 1000,
+            "meta": {},
+            "mode": "trend",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "table",
+            "table": "flows_raw"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [
+                {
+                  "aggregateType": "sum",
+                  "alias": "bytes",
+                  "column": "bytes"
+                }
+              ],
+              "columns": [
+                {
+                  "alias": "time_flow_start",
+                  "hint": "time",
+                  "name": "time_flow_start",
+                  "type": "DateTime64(9)"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "time_flow_start"
+              ],
+              "limit": 1000,
+              "meta": {},
+              "mode": "trend",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "table",
+              "table": "flows_raw"
+            }
+          },
+          "pluginVersion": "4.17.0",
+          "queryType": "table",
+          "rawSql": "SELECT DISTINCT workload\nFROM\n(\n    SELECT concat(src_k8s_top_owner_namespace, '/', src_k8s_top_owner_kind, '/', src_k8s_top_owner_name) AS workload\n    FROM flows_raw\n    WHERE $__timeFilter(time_flow_start)\n      AND src_k8s_top_owner_name != ''\n\n    UNION DISTINCT\n\n    SELECT concat(dst_k8s_top_owner_namespace, '/', dst_k8s_top_owner_kind, '/', dst_k8s_top_owner_name) AS workload\n    FROM flows_raw\n    WHERE $__timeFilter(time_flow_start)\n      AND dst_k8s_top_owner_name != ''\n)\nORDER BY workload",
+          "datasource": "${clickhouse}"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "Unifabric Workload sFlow",
+  "uid": "unifabric-workload-sflow",
+  "version": 1,
+  "weekStart": ""
+}
