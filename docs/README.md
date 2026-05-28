@@ -16,6 +16,7 @@ Choose the installation guide that matches the cluster's physical network:
 ## Usage Guides
 
 - [RDMA observability usage guide](./usage/rdma-metrics.md): Enable and verify RDMA metrics, Prometheus scraping, and Grafana dashboards.
+- [sFlow processing usage guide](./usage/sflow.md): Enable switch sFlow ingestion, ClickHouse writes, and workload dashboards.
 - [Kueue TAS workload example](./usage/workload-tas.md): Use Unifabric scale-out leaf Node labels with Kueue Topology Aware Scheduling.
 
 ## Design Docs
@@ -23,6 +24,7 @@ Choose the installation guide that matches the cluster's physical network:
 - [FabricNode CRD design](./design/fabricnode.md): Node-local RDMA topology state resource design.
 - [ScaleOutLeafGroup CRD design](./design/scaleoutleafgroup.md): Scale-out leaf grouping and Node label reconciliation design.
 - [RDMA observability design](./design/rdma-metrics.md): RDMA metric model, Pod attribution, and collection design.
+- [sFlow processing design](./design/sflow.md): sFlow collector, Pod attribution, ClickHouse row model, and overload behavior.
 
 ## Development
 

@@ -1,0 +1,29 @@
+{{- if .Values.sflow.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "unifabric.sflowName" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+data:
+  sflow.yaml: |-
+    logLevel: {{ .Values.sflow.config.logLevel | quote }}
+    listen:
+      bindAddress: {{ .Values.sflow.listen.bindAddress | quote }}
+    metrics:
+      bindAddress: {{ .Values.sflow.metrics.bindAddress | quote }}
+    healthProbe:
+      bindAddress: {{ .Values.sflow.healthProbe.bindAddress | quote }}
+    clickhouse:
+      address: {{ .Values.sflow.clickhouse.address | quote }}
+      database: {{ .Values.sflow.clickhouse.database | quote }}
+      username: {{ .Values.sflow.clickhouse.username | quote }}
+      password: {{ .Values.sflow.clickhouse.password | quote }}
+      table: {{ .Values.sflow.clickhouse.table | quote }}
+    writer:
+      batchSize: {{ .Values.sflow.writer.batchSize }}
+      flushInterval: {{ .Values.sflow.writer.flushInterval | quote }}
+      queueSize: {{ .Values.sflow.writer.queueSize }}
+{{- end }}

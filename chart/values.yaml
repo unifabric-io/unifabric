@@ -77,6 +77,101 @@ grafanaDashboard:
   # -- Selector used by Grafana Operator to choose Grafana instances that import dashboards.
   instanceSelector: {}
 
+# -- Controls switch sFlow ingestion and ClickHouse export.
+sflow:
+  # -- Enable the sFlow collector deployment and UDP service.
+  enabled: false
+  replicaCount: 1
+  image:
+    # -- Container image registry for the sFlow collector.
+    registry: ghcr.io
+    # -- Container image repository for the sFlow collector.
+    repository: unifabric-io/unifabric-sflow
+    # -- Container image tag for the sFlow collector. Defaults to the chart appVersion when empty.
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  listen:
+    # -- UDP bind address used by the sFlow collector container.
+    bindAddress: ":6343"
+    # -- UDP container port used by the sFlow collector.
+    port: 6343
+  metrics:
+    # -- Metrics bind address used by the sFlow collector.
+    bindAddress: ":8084"
+    # -- Metrics container port exposed by the sFlow collector.
+    port: 8084
+    # -- Metrics path exposed by the sFlow collector.
+    path: /metrics
+  healthProbe:
+    # -- Health probe bind address used by the sFlow collector.
+    bindAddress: ":8085"
+    # -- Health probe container port exposed by the sFlow collector.
+    port: 8085
+  service:
+    # -- Enable the UDP Service for switch sFlow exporters.
+    enabled: true
+    # -- Service type used for switch sFlow exporters. NodePort is the default because sFlow datagrams usually arrive from switches outside the cluster.
+    type: NodePort
+    # -- UDP Service port used by switch sFlow exporters.
+    port: 6343
+    # -- Optional UDP nodePort used by switch sFlow exporters. Set to 0 to let Kubernetes allocate one.
+    nodePort: 0
+    annotations: {}
+  config:
+    logLevel: info
+  clickhouse:
+    # -- ClickHouse native protocol address used by the sFlow collector.
+    address: ""
+    # -- ClickHouse database containing the flows_raw table.
+    database: default
+    # -- ClickHouse username used by the sFlow collector.
+    username: default
+    # -- Inline ClickHouse password. Prefer passwordSecret for production installs.
+    password: ""
+    passwordSecret:
+      # -- Secret name containing the ClickHouse password.
+      name: ""
+      # -- Secret key containing the ClickHouse password.
+      key: ""
+    # -- ClickHouse table that stores enriched sFlow rows.
+    table: flows_raw
+  writer:
+    # -- Maximum sFlow records per ClickHouse write batch.
+    batchSize: 2000
+    # -- Maximum delay before flushing a non-empty write batch.
+    flushInterval: 2s
+    # -- Maximum records buffered before overload drops begin.
+    queueSize: 65536
+
 controller:
   enabled: true
   replicaCount: 1

@@ -11,6 +11,7 @@
 ## Usage Guides
 
 - [RDMA 可观测性使用指南](./usage/rdma-metrics.zh.md)：开启并验证 RDMA metrics、Prometheus 抓取和 Grafana dashboard。
+- [sFlow 可观测性使用指南](./usage/sflow.zh.md)：开启交换机 sFlow 接收、ClickHouse 写入和 workload dashboard。
 - [Kueue TAS 工作负载示例](./usage/workload-tas.zh.md)：将 Unifabric scale-out leaf Node label 用于 Kueue Topology Aware Scheduling。
 
 ## Design Docs
@@ -18,6 +19,7 @@
 - [FabricNode CRD 设计](./design/fabricnode.md)：节点本地 RDMA 拓扑状态资源设计。
 - [ScaleOutLeafGroup CRD 设计](./design/scaleoutleafgroup.md)：scale-out leaf 分组和 Node label 写回设计。
 - [RDMA 可观测性设计](./design/rdma-metrics.md)：RDMA 指标模型、Pod 归因和采集设计。
+- [sFlow 处理设计](./design/sflow.zh.md)：sFlow collector、Pod / Workload 字段补充、ClickHouse 行模型和过载处理设计。
 
 ## Development
 

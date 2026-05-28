@@ -37,12 +37,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-agent" (include "unifabric.fullname" .) -}}
 {{- end -}}
 
+{{- define "unifabric.sflowName" -}}
+{{- printf "%s-sflow" (include "unifabric.fullname" .) -}}
+{{- end -}}
+
 {{- define "unifabric.controllerServiceAccountName" -}}
 {{- default (include "unifabric.controllerName" .) .Values.controller.serviceAccount.name -}}
 {{- end -}}
 
 {{- define "unifabric.agentServiceAccountName" -}}
 {{- default (include "unifabric.agentName" .) .Values.agent.serviceAccount.name -}}
+{{- end -}}
+
+{{- define "unifabric.sflowServiceAccountName" -}}
+{{- default (include "unifabric.sflowName" .) .Values.sflow.serviceAccount.name -}}
 {{- end -}}
 
 {{- define "unifabric.render" -}}
