@@ -1,0 +1,59 @@
+{{- if .Values.sflow.enabled }}
+{{- if .Values.sflow.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "unifabric.sflowServiceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+  {{- with .Values.sflow.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "unifabric.sflowName" . }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get"]
+  - apiGroups: ["kubeflow.org"]
+    resources: ["mpijobs", "pytorchjobs", "tfjobs", "xgboostjobs"]
+    verbs: ["get"]
+  - apiGroups: ["ray.io"]
+    resources: ["rayjobs"]
+    verbs: ["get"]
+  - apiGroups: ["sparkoperator.k8s.io"]
+    resources: ["sparkapplications"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "unifabric.sflowName" . }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "unifabric.sflowName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "unifabric.sflowServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -234,6 +234,32 @@
 | scaleOutDiscovery | object | `{"leafGroups":{"enabled":true}}` | Controls controller-side scale-out discovery derived from FabricNode topology. |
 | scaleOutDiscovery.leafGroups | object | `{"enabled":true}` | Settings for ScaleOutLeafGroup discovery and Node leaf label reconciliation. |
 | scaleOutDiscovery.leafGroups.enabled | bool | `true` | Enable ScaleOutLeafGroup discovery and Node leaf label updates. |
+| sflow | object | `{"affinity":{},"clickhouse":{"address":"","database":"default","password":"","passwordSecret":{"key":"","name":""},"table":"flows_raw","username":"default"},"config":{"logLevel":"info"},"containerSecurityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true},"enabled":false,"healthProbe":{"bindAddress":":8085","port":8085},"image":{"pullPolicy":"IfNotPresent","registry":"ghcr.io","repository":"unifabric-io/unifabric-sflow","tag":""},"listen":{"bindAddress":":6343","port":6343},"metrics":{"bindAddress":":8084","path":"/metrics","port":8084},"nodeSelector":{},"podAnnotations":{},"podLabels":{},"podSecurityContext":{"fsGroup":65532,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}},"replicaCount":1,"resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"service":{"annotations":{},"enabled":true,"nodePort":0,"port":6343,"type":"NodePort"},"serviceAccount":{"annotations":{},"create":true,"name":""},"tolerations":[],"writer":{"batchSize":2000,"flushInterval":"2s","queueSize":65536}}` | Controls switch sFlow ingestion and ClickHouse export. |
+| sflow.clickhouse.address | string | `""` | ClickHouse native protocol address used by the sFlow collector. |
+| sflow.clickhouse.database | string | `"default"` | ClickHouse database containing the flows_raw table. |
+| sflow.clickhouse.password | string | `""` | Inline ClickHouse password. Prefer passwordSecret for production installs. |
+| sflow.clickhouse.passwordSecret.key | string | `""` | Secret key containing the ClickHouse password. |
+| sflow.clickhouse.passwordSecret.name | string | `""` | Secret name containing the ClickHouse password. |
+| sflow.clickhouse.table | string | `"flows_raw"` | ClickHouse table that stores enriched sFlow rows. |
+| sflow.clickhouse.username | string | `"default"` | ClickHouse username used by the sFlow collector. |
+| sflow.enabled | bool | `false` | Enable the sFlow collector deployment and UDP service. |
+| sflow.healthProbe.bindAddress | string | `":8085"` | Health probe bind address used by the sFlow collector. |
+| sflow.healthProbe.port | int | `8085` | Health probe container port exposed by the sFlow collector. |
+| sflow.image.registry | string | `"ghcr.io"` | Container image registry for the sFlow collector. |
+| sflow.image.repository | string | `"unifabric-io/unifabric-sflow"` | Container image repository for the sFlow collector. |
+| sflow.image.tag | string | `""` | Container image tag for the sFlow collector. Defaults to the chart appVersion when empty. |
+| sflow.listen.bindAddress | string | `":6343"` | UDP bind address used by the sFlow collector container. |
+| sflow.listen.port | int | `6343` | UDP container port used by the sFlow collector. |
+| sflow.metrics.bindAddress | string | `":8084"` | Metrics bind address used by the sFlow collector. |
+| sflow.metrics.path | string | `"/metrics"` | Metrics path exposed by the sFlow collector. |
+| sflow.metrics.port | int | `8084` | Metrics container port exposed by the sFlow collector. |
+| sflow.service.enabled | bool | `true` | Enable the UDP Service for switch sFlow exporters. |
+| sflow.service.nodePort | int | `0` | Optional UDP nodePort used by switch sFlow exporters. Set to 0 to let Kubernetes allocate one. |
+| sflow.service.port | int | `6343` | UDP Service port used by switch sFlow exporters. |
+| sflow.service.type | string | `"NodePort"` | Service type used for switch sFlow exporters. NodePort is the default because sFlow datagrams usually arrive from switches outside the cluster. |
+| sflow.writer.batchSize | int | `2000` | Maximum sFlow records per ClickHouse write batch. |
+| sflow.writer.flushInterval | string | `"2s"` | Maximum delay before flushing a non-empty write batch. |
+| sflow.writer.queueSize | int | `65536` | Maximum records buffered before overload drops begin. |
 | topologyLabels | object | `{"scaleOutCore":"unifabric.io/scale-out-core","scaleOutLeaf":"unifabric.io/scale-out-leaf","scaleOutSpine":"unifabric.io/scale-out-spine","scaleUp":"unifabric.io/scale-up"}` | Label keys written back to Kubernetes Nodes for discovered topology dimensions. |
 | topologyLabels.scaleOutCore | string | `"unifabric.io/scale-out-core"` | Label key used to mark the core-level scale-out topology group of a node. |
 | topologyLabels.scaleOutLeaf | string | `"unifabric.io/scale-out-leaf"` | Label key used to mark the leaf-level scale-out topology group of a node. |
