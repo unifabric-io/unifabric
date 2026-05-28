@@ -82,6 +82,7 @@ For more details, please refer to the [quickstart](../../docs/quickstart.md).
 CONTROLLER_REGISTRY="ghcr.io" CONTROLLER_REPOSITORY="unifabric-io/unifabric-controller" CONTROLLER_TAG="YOU_TAG" \
 AGENT_REGISTRY="ghcr.io" AGENT_REPOSITORY="unifabric-io/unifabric-agent" AGENT_TAG="YOU_TAG" \
 SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG" \
+HSFLOWD_IMAGE="ghcr.io/unifabric-io/unifabric-hsflowd:YOU_TAG" \
   bash e2e/topology/setup.sh all --delete-if-exists
 ```
 
@@ -96,6 +97,8 @@ CONTROLLER_REGISTRY="ghcr.io" CONTROLLER_REPOSITORY="unifabric-io/unifabric-cont
   bash e2e/topology/setup.sh step4-install-unifabric
 SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG" \
   bash e2e/topology/setup.sh step5-deploy-switch-agent
+HSFLOWD_IMAGE="ghcr.io/unifabric-io/unifabric-hsflowd:YOU_TAG" \
+  bash e2e/topology/setup.sh step6-deploy-hsflowd
 ```
 
 ### Access Nodes

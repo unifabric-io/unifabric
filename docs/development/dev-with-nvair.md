@@ -3,10 +3,16 @@
 ## 1. Deploy the Environment
 
 ```bash
-CONTROLLER_REGISTRY="ghcr.io" CONTROLLER_REPOSITORY="unifabric-io/unifabric-controller" CONTROLLER_TAG="YOU_TAG" \
-AGENT_REGISTRY="ghcr.io" AGENT_REPOSITORY="unifabric-io/unifabric-agent" AGENT_TAG="YOU_TAG" \
-SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG" \
-  bash e2e/topology/setup.sh all --delete-if-exists
+export CONTROLLER_REGISTRY="ghcr.io" 
+export CONTROLLER_REPOSITORY="unifabric-io/unifabric-controller" 
+export CONTROLLER_TAG="YOU_TAG"
+export AGENT_REGISTRY="ghcr.io" 
+export AGENT_REPOSITORY="unifabric-io/unifabric-agent" 
+export AGENT_TAG="YOU_TAG"
+export SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG"
+export HSFLOWD_IMAGE="ghcr.io/unifabric-io/unifabric-hsflowd:YOU_TAG"
+
+bash e2e/topology/setup.sh all --delete-if-exists
 ```
 
 ## 2. Configure KubeConfig

@@ -1,8 +1,10 @@
-{{- if and .Values.grafanaDashboard.enabled .Values.nodeMetrics.enabled -}}
+{{- if and .Values.grafanaDashboard.enabled (or .Values.nodeMetrics.enabled .Values.sflow.enabled) -}}
 {{- $dashboards := .Files.Glob "files/*.json" -}}
 {{- range $path, $_ := $dashboards }}
 {{- $file := base $path -}}
 {{- $name := trimSuffix ".json" $file -}}
+{{- $isSFlowDashboard := hasSuffix "-sflow" $name -}}
+{{- if or (and $.Values.nodeMetrics.enabled (not $isSFlowDashboard)) (and $.Values.sflow.enabled $isSFlowDashboard) }}
 {{- if eq $.Values.grafanaDashboard.kind "GrafanaDashboard" }}
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
@@ -42,5 +44,6 @@ data:
     {{- $.Files.Get $path | nindent 4 }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}
