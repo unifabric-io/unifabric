@@ -187,19 +187,9 @@ log "Bootstrap node: ${BOOTSTRAP_NODE}"
 step "PHASE 2/7 — Prepare GPU Nodes"
 COMMON_PREP_SCRIPT='set -euo pipefail
 if command -v systemctl >/dev/null 2>&1; then
-  for unit in \
-    unattended-upgrades.service \
-    apt-daily.service \
-    apt-daily.timer \
-    apt-daily-upgrade.service \
-    apt-daily-upgrade.timer
-  do
-    if systemctl list-unit-files | grep -q "^${unit}"; then
-      sudo systemctl stop "${unit}" || true
-      sudo systemctl disable "${unit}" || true
-      sudo systemctl mask "${unit}" || true
-    fi
-  done
+  sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true
+  sudo systemctl disable --now unattended-upgrades.service || true
+  sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service || true
 fi
 sudo apt-get update -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-apt sudo openssh-server curl

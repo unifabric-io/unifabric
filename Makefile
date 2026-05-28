@@ -18,17 +18,20 @@ IMAGE_TAG ?= dev
 IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
 CONTROLLER_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-controller:$(IMAGE_TAG)
 AGENT_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-agent:$(IMAGE_TAG)
+SFLOW_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-sflow:$(IMAGE_TAG)
 
 .DEFAULT_GOAL := help
 
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make build              - Build the unifabric controller and agent binaries"
-	@echo "  make image              - Build the unifabric controller and agent images"
-	@echo "  make image-push         - Build and push the unifabric controller and agent images"
+	@echo "  make build              - Build the unifabric controller, agent, and sFlow binaries"
+	@echo "  make image              - Build the unifabric controller, agent, and sFlow images"
+	@echo "  make image-push         - Build and push the unifabric controller, agent, and sFlow images"
 	@echo "  make image-controller   - Build the unifabric controller image"
 	@echo "  make image-agent        - Build the unifabric agent image"
+	@echo "  make image-sflow        - Build the unifabric sFlow collector image"
+	@echo "  make image-push-sflow   - Build and push the unifabric sFlow collector image"
 	@echo "  make test-unit          - Run unit tests with coverage"
 	@echo "  make test-e2e           - Run E2E validation"
 	@echo "  make test-coverage      - Generate HTML coverage report (coverage.html)"
@@ -45,6 +48,7 @@ build:
 	mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/controller ./cmd/controller
 	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/agent ./cmd/agent
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/sflow ./cmd/sflow
 
 .PHONY: build-controller
 build-controller:
@@ -56,8 +60,13 @@ build-agent:
 	mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/agent ./cmd/agent
 
+.PHONY: build-sflow
+build-sflow:
+	mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/sflow ./cmd/sflow
+
 .PHONY: image
-image: image-controller image-agent
+image: image-controller image-agent image-sflow
 
 .PHONY: image-controller
 image-controller:
@@ -67,8 +76,12 @@ image-controller:
 image-agent:
 	docker buildx build -t $(AGENT_IMAGE) -f image/agent/Dockerfile .
 
+.PHONY: image-sflow
+image-sflow:
+	docker buildx build -t $(SFLOW_IMAGE) -f image/sflow/Dockerfile .
+
 .PHONY: image-push
-image-push: image-push-controller image-push-agent
+image-push: image-push-controller image-push-agent image-push-sflow
 
 .PHONY: image-push-controller
 image-push-controller:
@@ -77,6 +90,10 @@ image-push-controller:
 .PHONY: image-push-agent
 image-push-agent:
 	docker buildx build --platform $(IMAGE_PLATFORMS) --push -t $(AGENT_IMAGE) -f image/agent/Dockerfile .
+
+.PHONY: image-push-sflow
+image-push-sflow:
+	docker buildx build --platform $(IMAGE_PLATFORMS) --push -t $(SFLOW_IMAGE) -f image/sflow/Dockerfile .
 
 .PHONY: test-unit
 test-unit:

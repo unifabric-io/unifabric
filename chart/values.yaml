@@ -77,6 +77,251 @@ grafanaDashboard:
   # -- Selector used by Grafana Operator to choose Grafana instances that import dashboards.
   instanceSelector: {}
 
+# -- Controls switch sFlow ingestion and ClickHouse export.
+# @default -- See child values.
+sflow:
+  # -- Enable the sFlow collector deployment and UDP service.
+  enabled: false
+  # -- Number of sFlow collector replicas to run.
+  replicaCount: 1
+  # -- Container image settings for the sFlow collector.
+  # @default -- See child values.
+  image:
+    # -- Container image registry for the sFlow collector.
+    registry: ghcr.io
+    # -- Container image repository for the sFlow collector.
+    repository: unifabric-io/unifabric-sflow
+    # -- Container image tag for the sFlow collector. Defaults to the chart appVersion when empty.
+    tag: ""
+    # -- Container image pull policy for the sFlow collector.
+    pullPolicy: IfNotPresent
+  # -- ServiceAccount settings for the sFlow collector.
+  # @default -- See child values.
+  serviceAccount:
+    # -- Create a dedicated ServiceAccount for the sFlow collector.
+    create: true
+    # -- ServiceAccount name for the sFlow collector. Defaults to the release-derived name when empty.
+    name: ""
+    # -- Additional annotations added to the sFlow collector ServiceAccount.
+    annotations: {}
+  # -- Additional annotations added to the sFlow collector Pod.
+  podAnnotations: {}
+  # -- Additional labels added to the sFlow collector Pod.
+  podLabels: {}
+  # -- Node selector applied to the sFlow collector Pod.
+  nodeSelector: {}
+  # -- Tolerations applied to the sFlow collector Pod.
+  tolerations: []
+  # -- Affinity rules applied to the sFlow collector Pod.
+  affinity: {}
+  # -- Pod security context applied to the sFlow collector Pod.
+  # @default -- See child values.
+  podSecurityContext:
+    # -- Run the sFlow collector as a non-root user.
+    runAsNonRoot: true
+    # -- User ID used by the sFlow collector container.
+    runAsUser: 65532
+    # -- Group ID used by the sFlow collector container.
+    runAsGroup: 65532
+    # -- Filesystem group ID used by the sFlow collector Pod.
+    fsGroup: 65532
+    # -- Seccomp profile applied to the sFlow collector Pod.
+    # @default -- See child values.
+    seccompProfile:
+      # -- Seccomp profile type applied to the sFlow collector Pod.
+      type: RuntimeDefault
+  # -- Container security context applied to the sFlow collector container.
+  # @default -- See child values.
+  containerSecurityContext:
+    # -- Allow privilege escalation in the sFlow collector container.
+    allowPrivilegeEscalation: false
+    # -- Mount the sFlow collector root filesystem as read-only.
+    readOnlyRootFilesystem: true
+    # -- Linux capabilities settings for the sFlow collector container.
+    # @default -- See child values.
+    capabilities:
+      # -- Linux capabilities dropped from the sFlow collector container.
+      drop:
+        - ALL
+  # -- Resource requests and limits for the sFlow collector container.
+  # @default -- See child values.
+  resources:
+    # -- Resource requests for the sFlow collector container.
+    # @default -- See child values.
+    requests:
+      # -- CPU requested by the sFlow collector container.
+      cpu: 100m
+      # -- Memory requested by the sFlow collector container.
+      memory: 128Mi
+    # -- Resource limits for the sFlow collector container.
+    # @default -- See child values.
+    limits:
+      # -- CPU limit for the sFlow collector container.
+      cpu: 500m
+      # -- Memory limit for the sFlow collector container.
+      memory: 512Mi
+  # -- UDP listener settings for the sFlow collector.
+  # @default -- See child values.
+  listen:
+    # -- UDP bind address used by the sFlow collector container.
+    bindAddress: ":6343"
+    # -- UDP container port used by the sFlow collector.
+    port: 6343
+  # -- Prometheus metrics settings for the sFlow collector.
+  # @default -- See child values.
+  metrics:
+    # -- Metrics bind address used by the sFlow collector.
+    bindAddress: ":8084"
+    # -- Metrics container port exposed by the sFlow collector.
+    port: 8084
+    # -- Metrics path exposed by the sFlow collector.
+    path: /metrics
+  # -- Health probe settings for the sFlow collector.
+  # @default -- See child values.
+  healthProbe:
+    # -- Health probe bind address used by the sFlow collector.
+    bindAddress: ":8085"
+    # -- Health probe container port exposed by the sFlow collector.
+    port: 8085
+  # -- UDP Service settings for switch sFlow exporters.
+  # @default -- See child values.
+  service:
+    # -- Enable the UDP Service for switch sFlow exporters.
+    enabled: true
+    # -- Service type used for switch sFlow exporters. NodePort is the default because sFlow datagrams usually arrive from switches outside the cluster.
+    type: NodePort
+    # -- UDP Service port used by switch sFlow exporters.
+    port: 6343
+    # -- Optional UDP nodePort used by switch sFlow exporters. Set to 0 to let Kubernetes allocate one.
+    nodePort: 0
+    # -- Additional annotations added to the sFlow UDP Service.
+    annotations: {}
+  # -- Runtime configuration for the sFlow collector.
+  # @default -- See child values.
+  config:
+    # -- Log level used by the sFlow collector.
+    logLevel: info
+  # -- ClickHouse settings used by the sFlow collector.
+  # @default -- See child values.
+  clickhouse:
+    # -- ClickHouse native protocol address used by the sFlow collector.
+    address: ""
+    # -- ClickHouse database containing the flows_raw table.
+    database: default
+    # -- ClickHouse username used by the sFlow collector.
+    username: default
+    # -- Inline ClickHouse password. Prefer passwordSecret for production installs.
+    password: ""
+    # -- Existing Secret reference for the ClickHouse password.
+    # @default -- See child values.
+    passwordSecret:
+      # -- Secret name containing the ClickHouse password.
+      name: ""
+      # -- Secret key containing the ClickHouse password. Defaults to "password" when a Secret name is provided.
+      key: ""
+    # -- ClickHouse table that stores enriched sFlow rows.
+    table: flows_raw
+    # -- Managed ClickHouse deployment settings for sFlow flow records.
+    # @default -- See child values.
+    managed:
+      # -- Deploy a single-node ClickHouse instance for sFlow flow records.
+      enabled: false
+      # -- Container image settings for the managed ClickHouse server.
+      # @default -- See child values.
+      image:
+        # -- Container image registry for the managed ClickHouse server.
+        registry: docker.io
+        # -- Container image repository for the managed ClickHouse server.
+        repository: clickhouse/clickhouse-server
+        # -- Container image tag for the managed ClickHouse server.
+        tag: "26.3"
+        # -- Container image pull policy for the managed ClickHouse server.
+        pullPolicy: IfNotPresent
+      # -- Service settings for the managed ClickHouse server.
+      # @default -- See child values.
+      service:
+        # -- Native protocol port exposed by the managed ClickHouse Service.
+        nativePort: 9000
+        # -- HTTP port exposed by the managed ClickHouse Service.
+        httpPort: 8123
+      # -- Persistence settings for the managed ClickHouse server.
+      # @default -- See child values.
+      persistence:
+        # -- Persist managed ClickHouse data. When false, data uses emptyDir.
+        enabled: true
+        # -- Persistence backend for managed ClickHouse data when enabled. Supported values: pvc, hostPath.
+        type: pvc
+        # -- StorageClass for the managed ClickHouse PVC. Empty uses the cluster default.
+        storageClassName: ""
+        # -- Requested size for managed ClickHouse data.
+        size: 20Gi
+        # -- Access modes for the managed ClickHouse PVC.
+        accessModes:
+          - ReadWriteOnce
+        # -- HostPath settings used when persistence.type=hostPath.
+        # @default -- See child values.
+        hostPath:
+          # -- Host path used when persistence.type=hostPath. The ClickHouse Pod must stay on a node that has this path.
+          path: ""
+          # -- Kubernetes hostPath type used when persistence.type=hostPath.
+          type: DirectoryOrCreate
+      # -- Additional annotations added to the managed ClickHouse Pod.
+      podAnnotations: {}
+      # -- Additional labels added to the managed ClickHouse Pod.
+      podLabels: {}
+      # -- Node selector applied to the managed ClickHouse Pod.
+      nodeSelector: {}
+      # -- Tolerations applied to the managed ClickHouse Pod.
+      tolerations: []
+      # -- Affinity rules applied to the managed ClickHouse Pod.
+      affinity: {}
+      # -- Pod security context applied to the managed ClickHouse Pod.
+      podSecurityContext: {}
+      # -- Container security context applied to the managed ClickHouse container.
+      containerSecurityContext: {}
+      # -- Resource requests and limits for the managed ClickHouse container.
+      # @default -- See child values.
+      resources:
+        # -- Resource requests for the managed ClickHouse container.
+        # @default -- See child values.
+        requests:
+          # -- CPU requested by the managed ClickHouse container.
+          cpu: 500m
+          # -- Memory requested by the managed ClickHouse container.
+          memory: 1Gi
+        # -- Resource limits for the managed ClickHouse container.
+        # @default -- See child values.
+        limits:
+          # -- CPU limit for the managed ClickHouse container.
+          cpu: "2"
+          # -- Memory limit for the managed ClickHouse container.
+          memory: 4Gi
+    # -- Schema reconciliation settings for the ClickHouse flows_raw table.
+    # @default -- See child values.
+    schema:
+      # -- Retention window in days for the flows_raw table. Must be at least 1. The collector reconciles this table TTL during startup.
+      retentionDays: 3
+      # -- Kubernetes Lease settings used to serialize schema migrations.
+      # @default -- See child values.
+      lock:
+        # -- Kubernetes Lease name used to serialize ClickHouse schema migrations across sFlow replicas.
+        name: unifabric-sflow-clickhouse-schema
+        # -- Kubernetes namespace for the schema migration Lease. Defaults to the chart release namespace in rendered config.
+        namespace: ""
+        # -- Duration before another sFlow replica can take over a stale schema migration Lease.
+        leaseDuration: 10s
+        # -- Retry interval used while waiting for the schema migration Lease.
+        retryInterval: 2s
+  # -- ClickHouse writer batching and queue settings for sFlow records.
+  # @default -- See child values.
+  writer:
+    # -- Maximum sFlow records per ClickHouse write batch.
+    batchSize: 2000
+    # -- Maximum delay before flushing a non-empty write batch.
+    flushInterval: 2s
+    # -- Maximum records buffered before overload drops begin.
+    queueSize: 65536
+
 controller:
   enabled: true
   replicaCount: 1
