@@ -105,7 +105,7 @@ jobs:
   release-notes:
     name: Generate Release Notes
     needs: [prepare, build-images]
-    uses: ./.github/workflows/call-generate-release-notes.yml
+    uses: ./.github/workflows/release-notes-generate.yml
     secrets:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}      
     with:
