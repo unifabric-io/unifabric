@@ -77,7 +77,26 @@ jobs:
           echo "repo=${repo}" >> "$GITHUB_OUTPUT"
           echo "model=${model}" >> "$GITHUB_OUTPUT"
 
+      - name: Check existing release notes
+        id: existing_release_notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ steps.get_ref.outputs.repo }}
+          TAG: ${{ steps.get_ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          body="$(gh release view "${TAG}" --repo "${REPO}" --json body --jq '.body // ""' 2>/dev/null || true)"
+          if [[ -n "${body}" ]]; then
+            printf '%s\n' "${body}" > release-notes.md
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release notes already exist for ${TAG}; skipping automatic generation."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate release notes
+        if: steps.existing_release_notes.outputs.exists != 'true'
         run: |
           ERROR_LOG_FILE=/tmp/release-notes.err
           chmod +x hack/generate_release_notes.sh

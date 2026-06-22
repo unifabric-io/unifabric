@@ -186,25 +186,9 @@ jobs:
 
       - name: Setup RDMA RXE on GPU nodes
         shell: bash
-        env:
-          SIMULATION_NAME: ${{ steps.vars.outputs.simulation_name }}
         run: |
           set -euo pipefail
-
-          mapfile -t GPU_NODES < <(
-            nvair get nodes --simulation "${SIMULATION_NAME}" \
-              | awk 'NR>1 && ($1 ~ /^node-gpu-/ || $1 ~ /^gpu-node-/) { print $1 }' \
-              | sort -V
-          )
-
-          if (( ${#GPU_NODES[@]} == 0 )); then
-            echo "No GPU nodes found for RDMA RXE setup." >&2
-            exit 1
-          fi
-
-          printf -v NODE_LIST '%s,' "${GPU_NODES[@]}"
-          NODE_LIST="${NODE_LIST%,}"
-          bash hack/setup-rdma-rxe.sh --simulation "${SIMULATION_NAME}" "${NODE_LIST}"
+          bash hack/setup-rdma-rxe.sh
 
       - name: Install monitoring operators
         shell: bash

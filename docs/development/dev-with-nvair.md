@@ -25,7 +25,7 @@ nvair get forwards
 ## 4. Set Up Soft-RoCE
 
 ```bash
-bash hack/setup-rdma-rxe.sh node-gpu-1,node-gpu-2,node-gpu-3,node-gpu-4
+bash hack/setup-rdma-rxe.sh
 ```
 
 ## 5. Deploy Unifabric
