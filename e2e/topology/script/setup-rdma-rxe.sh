@@ -141,9 +141,28 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-sudo -n apt-get update
-sudo -n apt-get install -y "linux-modules-extra-$(uname -r)" rdma-core
-sudo -n modprobe rdma_rxe
+running_kernel="$(uname -r)"
+if [[ "${running_kernel}" == "6.8.0-90-generic" ]]; then
+  download_dir="$(mktemp -d)"
+  cleanup() {
+    rm -rf "${download_dir}"
+  }
+  trap cleanup EXIT
+
+  curl -fsSL --retry 5 --retry-delay 2 -o "${download_dir}/wireless-regdb.deb" "http://archive.ubuntu.com/ubuntu/pool/main/w/wireless-regdb/wireless-regdb_2025.10.07-0ubuntu1~24.04.1_all.deb"
+  curl -fsSL --retry 5 --retry-delay 2 -o "${download_dir}/linux-modules-extra.deb" "https://launchpadlibrarian.net/832146409/linux-modules-extra-6.8.0-90-generic_6.8.0-90.91_amd64.deb"
+  sudo -n dpkg -i "${download_dir}/wireless-regdb.deb" "${download_dir}/linux-modules-extra.deb"
+  sudo -n modprobe rdma_rxe
+
+  if ! command -v rdma >/dev/null 2>&1; then
+    sudo -n apt-get update
+    sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y rdma-core
+  fi
+else
+  sudo -n apt-get update
+  sudo -n apt-get install -y "linux-modules-extra-$(uname -r)" rdma-core
+  sudo -n modprobe rdma_rxe
+fi
 
 for i in $(seq 1 13); do
   dev="eth${i}"
