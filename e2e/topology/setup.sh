@@ -9,12 +9,13 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
-  bash e2e/topology/setup.sh [all|step1-install-topology|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent] [args...]
+  bash e2e/topology/setup.sh [all|step1-install-topology|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-deploy-hsflowd|step7-install-spiderpool-macvlan] [args...]
 
 Examples:
   CONTROLLER_REGISTRY=ghcr.io CONTROLLER_REPOSITORY=unifabric-io/unifabric-controller CONTROLLER_TAG=YOU_TAG \
   AGENT_REGISTRY=ghcr.io AGENT_REPOSITORY=unifabric-io/unifabric-agent AGENT_TAG=YOU_TAG \
   SWITCH_AGENT_IMAGE=ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG \
+  HSFLOWD_IMAGE=ghcr.io/unifabric-io/unifabric-hsflowd:YOU_TAG \
     bash e2e/topology/setup.sh all --delete-if-exists
   bash e2e/topology/setup.sh step1-install-topology --delete-if-exists --bootstrap-node node-gpu-1
   bash e2e/topology/setup.sh step2-setup-rdma-rxe node-gpu-1,node-gpu-2,node-gpu-3,node-gpu-4
@@ -25,6 +26,9 @@ Examples:
     bash e2e/topology/setup.sh step4-install-unifabric
   SWITCH_AGENT_IMAGE=ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG \
     bash e2e/topology/setup.sh step5-deploy-switch-agent
+  HSFLOWD_IMAGE=ghcr.io/unifabric-io/unifabric-hsflowd:YOU_TAG \
+    bash e2e/topology/setup.sh step6-deploy-hsflowd
+  bash e2e/topology/setup.sh step7-install-spiderpool-macvlan
 EOF
 }
 
@@ -102,6 +106,7 @@ case "${stage}" in
     run_step install-monitoring-operators.sh
     run_step install-unifabric.sh
     run_step deploy-switch-agent.sh
+    run_step deploy-hsflowd.sh
     ;;
   step1-install-topology)
     run_step install-topology.sh "$@"
@@ -117,6 +122,12 @@ case "${stage}" in
     ;;
   step5-deploy-switch-agent)
     run_step deploy-switch-agent.sh "$@"
+    ;;
+  step6-deploy-hsflowd)
+    run_step deploy-hsflowd.sh "$@"
+    ;;
+  step7-install-spiderpool-macvlan)
+    run_step install-spiderpool-macvlan.sh "$@"
     ;;
   *)
     echo "Unknown stage: ${stage}" >&2

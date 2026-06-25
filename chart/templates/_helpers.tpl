@@ -37,6 +37,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-agent" (include "unifabric.fullname" .) -}}
 {{- end -}}
 
+{{- define "unifabric.sflowName" -}}
+{{- printf "%s-sflow" (include "unifabric.fullname" .) -}}
+{{- end -}}
+
 {{- define "unifabric.controllerServiceAccountName" -}}
 {{- default (include "unifabric.controllerName" .) .Values.controller.serviceAccount.name -}}
 {{- end -}}
@@ -142,4 +146,60 @@ app.kubernetes.io/part-of: {{ include "unifabric.name" .root }}
 {{- define "unifabric.nvidiaTopograph.nodeDataBrokerNodeSelector" -}}
 {{- $defaultSelector := dict .Values.topologyLabels.scaleUp "true" -}}
 {{- toYaml (mergeOverwrite $defaultSelector (.Values.nvidiaTopograph.nodeDataBroker.nodeSelector | default dict)) -}}
+{{- end -}}
+
+{{- define "unifabric.sflowServiceAccountName" -}}
+{{- default (include "unifabric.sflowName" .) .Values.sflow.serviceAccount.name -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHouseName" -}}
+{{- printf "%s-clickhouse" (include "unifabric.sflowName" .) -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHouseSecretName" -}}
+{{- if .Values.sflow.clickhouse.passwordSecret.name -}}
+{{- .Values.sflow.clickhouse.passwordSecret.name -}}
+{{- else if and .Values.sflow.clickhouse.managed.enabled .Values.sflow.clickhouse.password -}}
+{{- printf "%s-auth" (include "unifabric.sflowClickHouseName" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHouseSecretKey" -}}
+{{- if or .Values.sflow.clickhouse.passwordSecret.name .Values.sflow.clickhouse.managed.enabled -}}
+{{- default "password" .Values.sflow.clickhouse.passwordSecret.key -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHouseAddress" -}}
+{{- if .Values.sflow.clickhouse.address -}}
+{{- .Values.sflow.clickhouse.address -}}
+{{- else if .Values.sflow.clickhouse.managed.enabled -}}
+{{- printf "%s.%s.svc.cluster.local:%d" (include "unifabric.sflowClickHouseName" .) .Release.Namespace (int .Values.sflow.clickhouse.managed.service.nativePort) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHouseHost" -}}
+{{- $address := include "unifabric.sflowClickHouseAddress" . -}}
+{{- regexReplaceAll ":[0-9]+$" $address "" -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHousePort" -}}
+{{- $address := include "unifabric.sflowClickHouseAddress" . -}}
+{{- regexFind "[0-9]+$" $address -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHouseTableName" -}}
+{{- if contains "." .Values.sflow.clickhouse.table -}}
+{{- .Values.sflow.clickhouse.table -}}
+{{- else -}}
+{{- printf "%s.%s" .Values.sflow.clickhouse.database .Values.sflow.clickhouse.table -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.sflowClickHouseTableDatabase" -}}
+{{- if contains "." .Values.sflow.clickhouse.table -}}
+{{- regexReplaceAll "\\..*$" .Values.sflow.clickhouse.table "" -}}
+{{- else -}}
+{{- .Values.sflow.clickhouse.database -}}
+{{- end -}}
 {{- end -}}
