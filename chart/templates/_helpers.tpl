@@ -80,39 +80,27 @@ true
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.topographName" -}}
-{{- printf "%s-topograph" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-nvidia-topograph" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.nodeObserverName" -}}
-{{- printf "%s-node-observer" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-nvidia-node-observer" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.nodeDataBrokerName" -}}
-{{- printf "%s-node-data-broker" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-nvidia-node-data-broker" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.topographServiceAccountName" -}}
-{{- if .Values.nvidiaTopograph.topograph.serviceAccount.create -}}
-{{- default (include "unifabric.nvidiaTopograph.topographName" .) .Values.nvidiaTopograph.topograph.serviceAccount.name -}}
-{{- else -}}
-{{- default "default" .Values.nvidiaTopograph.topograph.serviceAccount.name -}}
-{{- end -}}
+{{- include "unifabric.nvidiaTopograph.topographName" . -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" -}}
-{{- if .Values.nvidiaTopograph.nodeObserver.serviceAccount.create -}}
-{{- default (include "unifabric.nvidiaTopograph.nodeObserverName" .) .Values.nvidiaTopograph.nodeObserver.serviceAccount.name -}}
-{{- else -}}
-{{- default "default" .Values.nvidiaTopograph.nodeObserver.serviceAccount.name -}}
-{{- end -}}
+{{- include "unifabric.nvidiaTopograph.nodeObserverName" . -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" -}}
-{{- if .Values.nvidiaTopograph.nodeDataBroker.serviceAccount.create -}}
-{{- default (include "unifabric.nvidiaTopograph.nodeDataBrokerName" .) .Values.nvidiaTopograph.nodeDataBroker.serviceAccount.name -}}
-{{- else -}}
-{{- default "default" .Values.nvidiaTopograph.nodeDataBroker.serviceAccount.name -}}
-{{- end -}}
+{{- include "unifabric.nvidiaTopograph.nodeDataBrokerName" . -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.selectorLabels" -}}
@@ -131,15 +119,20 @@ app.kubernetes.io/part-of: {{ include "unifabric.name" .root }}
 
 {{- define "unifabric.nvidiaTopograph.url" -}}
 {{- $serviceName := default (include "unifabric.nvidiaTopograph.topographName" .) .Values.nvidiaTopograph.topograph.serviceName -}}
-{{- printf "http://%s.%s.svc.cluster.local:%.0f" $serviceName .Release.Namespace .Values.nvidiaTopograph.service.port -}}
+{{- printf "http://%s.%s.svc.cluster.local:49021" $serviceName .Release.Namespace -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.nodeObserverTrigger" -}}
-{{- $defaultTrigger := dict "nodeSelector" (dict .Values.topologyLabels.scaleUp "true") -}}
-{{- toYaml (mergeOverwrite $defaultTrigger (.Values.nvidiaTopograph.nodeObserver.trigger | default dict)) -}}
+{{- toYaml (.Values.nvidiaTopograph.nodeObserver.topograph.trigger | default dict) -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.nodeDataBrokerNodeSelector" -}}
-{{- $defaultSelector := dict .Values.topologyLabels.scaleUp "true" -}}
-{{- toYaml (mergeOverwrite $defaultSelector (.Values.nvidiaTopograph.nodeDataBroker.nodeSelector | default dict)) -}}
+{{- toYaml (.Values.nvidiaTopograph.nodeDataBroker.nodeSelector | default dict) -}}
+{{- end -}}
+
+{{- define "unifabric.nvidiaTopograph.useGpuCliqueLabel" -}}
+{{- $providerParams := default dict .Values.nvidiaTopograph.provider.params -}}
+{{- if and (eq .Values.nvidiaTopograph.provider.name "infiniband-k8s") (eq (lower (toString (get $providerParams "useGpuCliqueLabel"))) "true") -}}
+true
+{{- end -}}
 {{- end -}}

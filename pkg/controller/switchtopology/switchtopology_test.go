@@ -405,6 +405,81 @@ func TestReconcileProjectsFabricNodeOnlyLeafLabelsWhenSwitchDiscoveryDisabled(t 
 	}
 }
 
+func TestReconcileSkipsTopologyLabelsWhenInternalWriterDisabled(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := v1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add api scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add core scheme: %v", err)
+	}
+
+	fabricNode := &v1beta1.FabricNode{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		Status: v1beta1.FabricNodeStatus{
+			NodeRole: v1beta1.NodeRoleGPU,
+			ScaleOutNics: []v1beta1.NicInfo{
+				{Name: "eth0", State: "up", LLDPNeighbor: v1beta1.LLDPNeighbor{Hostname: "Leaf_1", Port: "Ethernet1"}},
+			},
+		},
+	}
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			Labels: map[string]string{
+				config.DefaultLabelScaleOutSpine: "topograph-spine",
+				config.DefaultLabelScaleOutCore:  "topograph-core",
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(fabricNode, node).
+		Build()
+
+	reconciler := &Reconciler{
+		client: fakeClient,
+		cfg: &config.ControllerConfig{
+			TopologyLabels: config.TopologyLabelsConfig{
+				ScaleOutLeaf:  config.DefaultLabelScaleOutLeaf,
+				ScaleOutSpine: config.DefaultLabelScaleOutSpine,
+				ScaleOutCore:  config.DefaultLabelScaleOutCore,
+			},
+			InternalTopologyLabelWriter: config.InternalTopologyLabelWriterConfig{
+				Enabled: testBoolPtr(false),
+			},
+			ScaleOutDiscovery: config.ScaleOutDiscoveryConfig{
+				Switches: config.ScaleOutSwitchesConfig{
+					GroupNaming: config.TopologyGroupNamingConfig{
+						LabelValueFormat: "name",
+						HashLength:       7,
+					},
+				},
+			},
+		},
+		log: logger.MustNew(logger.LevelDebug),
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), reconcile.Request{}); err != nil {
+		t.Fatalf("reconcile returned error: %v", err)
+	}
+
+	stored := &corev1.Node{}
+	if err := fakeClient.Get(context.Background(), types.NamespacedName{Name: "node1"}, stored); err != nil {
+		t.Fatalf("failed to fetch node: %v", err)
+	}
+	if _, ok := stored.Labels[config.DefaultLabelScaleOutLeaf]; ok {
+		t.Fatalf("expected leaf label to remain absent, labels=%#v", stored.Labels)
+	}
+	if got := stored.Labels[config.DefaultLabelScaleOutSpine]; got != "topograph-spine" {
+		t.Fatalf("expected spine label to be preserved, got %q", got)
+	}
+	if got := stored.Labels[config.DefaultLabelScaleOutCore]; got != "topograph-core" {
+		t.Fatalf("expected core label to be preserved, got %q", got)
+	}
+}
+
 func TestReconcileRemovesStaleSpineLabelsFromNodesWithoutFabricNodesWhenSwitchDiscoveryDisabled(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := v1beta1.AddToScheme(scheme); err != nil {
@@ -1297,4 +1372,8 @@ func TestHandleSnapshotClassifiesRemoteSystemType(t *testing.T) {
 	if neighborTypesByName["spine1"] != v1beta1.SwitchLLDPRemoteSystemTypeSwitch {
 		t.Fatalf("expected spine1 to be classified as Switch, got %#v", neighborTypesByName)
 	}
+}
+
+func testBoolPtr(v bool) *bool {
+	return &v
 }

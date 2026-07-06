@@ -18,6 +18,11 @@ topologyLabels:
   # -- Label key for the core-level scale-out topology domain on a node.
   scaleOutCore: unifabric.io/scale-out-core
 
+# -- Controls whether the built-in Unifabric topology label writer writes discovered topology to Kubernetes Node labels.
+internalTopologyLabelWriter:
+  # -- Let Unifabric write and clean topology Node labels internally. Disable when another component, such as NVIDIA Topograph, owns topology labels.
+  enabled: true
+
 # -- Controls the format of topology group values written to Kubernetes Node labels.
 topologyGroupNaming:
   # -- Format for topology label values. Use name for readable switch-based values, or hash for compact stable values.
@@ -25,7 +30,7 @@ topologyGroupNaming:
   # -- Number of hash characters used when labelValueFormat is hash.
   hashLength: 7
 
-# -- Controls switch-agent discovery from Switch resources. FabricNode LLDP data is always used for leaf label calculation.
+# -- Controls switch-agent discovery from Switch resources.
 switchTopologyDiscovery:
   # -- Enable controller-to-switch-agent subscriptions for switch-side topology discovery.
   enabled: false
@@ -325,6 +330,10 @@ nvidiaTopograph:
   provider:
     # -- Topograph provider name, such as infiniband-k8s or netq.
     name: infiniband-k8s
+    # -- Provider-specific parameters passed to NVIDIA Topograph components.
+    params:
+      # -- Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s.
+      useGpuCliqueLabel: true
   # -- Engine settings passed to node-observer.
   engine:
     # -- Topograph engine name used by node-observer.
@@ -333,8 +342,6 @@ nvidiaTopograph:
   service:
     # -- Kubernetes Service type for the topograph HTTP API.
     type: ClusterIP
-    # -- Service port for the topograph HTTP API.
-    port: 49021
   # -- Image pull secrets applied to NVIDIA Topograph workloads. Defaults to global.imagePullSecrets when empty.
   imagePullSecrets: []
   topograph:
@@ -346,24 +353,16 @@ nvidiaTopograph:
       # -- Container image repository for the topograph API.
       repository: nvidia/topograph
       # -- Container image tag for the topograph API.
-      tag: v0.3.0
+      tag: v0.5.0
       # -- Image pull policy for the topograph API container.
       pullPolicy: IfNotPresent
     # -- Existing topograph Service name used by node-observer. Leave empty to use the chart-managed Service.
     serviceName: ""
-    serviceAccount:
-      # -- Create a ServiceAccount for the topograph API.
-      create: true
-      # -- Automount the Kubernetes API token in the topograph API pod.
-      automount: true
-      # -- Annotations added to the topograph API ServiceAccount.
-      annotations: {}
-      # -- Topograph API ServiceAccount name. Defaults to the generated topograph name when empty.
-      name: ""
     # -- Verbosity level passed to the topograph API process.
     verbosity: 3
     # -- Extra environment variables added to the topograph API container.
     env: {}
+    # -- Runtime configuration written to topograph-config.yaml.
     config:
       # -- Delay used by topograph to aggregate topology generation requests.
       requestAggregationDelay: 15s
@@ -394,12 +393,14 @@ nvidiaTopograph:
     volumes: []
     # -- Extra volume mounts added to the topograph API container.
     volumeMounts: []
+    # -- Liveness probe configuration for the topograph API container.
     livenessProbe:
       httpGet:
         # -- HTTP path used by the topograph API liveness probe.
         path: /healthz
         # -- Named port used by the topograph API liveness probe.
         port: http
+    # -- Readiness probe configuration for the topograph API container.
     readinessProbe:
       httpGet:
         # -- HTTP path used by the topograph API readiness probe.
@@ -412,22 +413,6 @@ nvidiaTopograph:
     tolerations: []
     # -- Affinity rules for scheduling topograph API pods.
     affinity: {}
-    ingress:
-      # -- Create an Ingress for the topograph HTTP API.
-      enabled: false
-      # -- IngressClass name for the topograph Ingress.
-      className: ""
-      # -- Annotations added to the topograph Ingress.
-      annotations: {}
-      # -- Hosts and paths routed to the topograph Service.
-      hosts:
-        - host: chart-example.local
-          paths:
-            - path: /
-              # -- Path matching mode for the topograph Ingress path.
-              pathType: ImplementationSpecific
-      # -- TLS configuration for the topograph Ingress.
-      tls: []
     serviceMonitor:
       # -- Create a Prometheus Operator ServiceMonitor for the topograph API.
       enabled: false
@@ -450,32 +435,32 @@ nvidiaTopograph:
       # -- Container image repository for node-observer.
       repository: nvidia/topograph
       # -- Container image tag for node-observer.
-      tag: v0.3.0
+      tag: v0.5.0
       # -- Image pull policy for the node-observer container.
       pullPolicy: IfNotPresent
-    wait:
-      image:
-        # -- Container image registry for the node-observer wait init container.
-        registry: docker.io
-        # -- Container image repository for the node-observer wait init container.
-        repository: curlimages/curl
-        # -- Container image tag for the node-observer wait init container.
-        tag: 8.13.0
-        # -- Image pull policy for the node-observer wait init container.
-        pullPolicy: IfNotPresent
-    serviceAccount:
-      # -- Create a ServiceAccount for node-observer.
-      create: true
-      # -- Automount the Kubernetes API token in node-observer pods.
-      automount: true
-      # -- Annotations added to the node-observer ServiceAccount.
-      annotations: {}
-      # -- Node-observer ServiceAccount name. Defaults to the generated node-observer name when empty.
-      name: ""
     # -- Verbosity level passed to node-observer.
     verbosity: 3
-    # -- node-observer trigger configuration. Defaults to selecting nodes with topologyLabels.scaleUp=true.
-    trigger: {}
+    # -- Topograph API and node-data-broker readiness inputs watched by node-observer.
+    topograph:
+      apiServer:
+        # -- Watch the Topograph API pod and trigger topology generation when it becomes ready.
+        enabled: true
+        # -- Pod selector used to find the Topograph API pod. Empty uses the chart-managed API pod labels.
+        podSelector: {}
+        # -- Topograph API container name watched by node-observer.
+        containerName: topograph
+      nodeDataBroker:
+        # -- Wait for node-data-broker pods before the first topology request.
+        enabled: true
+        # -- Pod selector used to find node-data-broker pods. Empty uses the chart-managed broker pod labels.
+        podSelector: {}
+        # -- node-data-broker container name watched by node-observer.
+        containerName: node-data-broker
+      # -- node-observer trigger configuration.
+      trigger:
+        # -- Node selector used by node-observer to choose Nodes that trigger topology generation.
+        nodeSelector:
+          nvidia.com/gpu.present: "true"
     # -- Annotations added to node-observer pods.
     podAnnotations: {}
     # -- Extra labels added to node-observer pods.
@@ -508,49 +493,30 @@ nvidiaTopograph:
       # -- Container image registry for node-data-broker.
       registry: ghcr.io
       # -- Container image repository for node-data-broker.
-      repository: nvidia/topograph/ib
+      repository: nvidia/topograph
       # -- Container image tag for node-data-broker.
-      tag: main
+      tag: v0.5.0
       # -- Image pull policy for the node-data-broker container.
       pullPolicy: IfNotPresent
-    # -- Command used by the node-data-broker container.
-    command:
-      - tail
-      - -f
-      - /dev/null
-    initContainer:
-      # -- Run the node-data-broker init container that prepares provider-specific node data.
-      enable: true
-      image:
-        # -- Container image registry for the node-data-broker init container.
-        registry: ghcr.io
-        # -- Container image repository for the node-data-broker init container.
-        repository: nvidia/topograph
-        # -- Container image tag for the node-data-broker init container.
-        tag: v0.3.0
-        # -- Image pull policy for the node-data-broker init container.
-        pullPolicy: IfNotPresent
-      # -- Extra --set arguments passed to node-data-broker-initc.
-      extraArgs:
-        - gpu-operator-namespace=gpu-operator
-        - device-plugin-daemonset=nvidia-device-plugin-daemonset
-    serviceAccount:
-      # -- Create a ServiceAccount for node-data-broker.
-      create: true
-      # -- Automount the Kubernetes API token in node-data-broker pods.
-      automount: true
-      # -- Annotations added to the node-data-broker ServiceAccount.
-      annotations: {}
-      # -- node-data-broker ServiceAccount name. Defaults to the generated node-data-broker name when empty.
-      name: ""
-    # -- Verbosity level passed to node-data-broker init container.
+    # -- Port the node-data-broker serves its /healthz endpoint on after applying node annotations.
+    port: 8080
+    # -- How often node-data-broker reapplies node annotations. Set to 0 to disable periodic refresh.
+    refreshInterval: 5m
+    # -- Extra key=value parameters passed to node-data-broker via --set.
+    extraArgs: []
+    # -- Startup probe configuration for slow node-data-broker topology discovery.
+    startupProbe:
+      # -- Startup probe failure threshold for slow IB topology discovery.
+      failureThreshold: 30
+      # -- Startup probe period in seconds for node-data-broker.
+      periodSeconds: 10
+    # -- Verbosity level passed to node-data-broker.
     verbosity: 3
     # -- Annotations added to node-data-broker pods.
     podAnnotations: {}
     # -- Extra labels added to node-data-broker pods.
     podLabels: {}
-    # -- Pod security context for node-data-broker pods.
-    podSecurityContext: {}
+    # -- Container security context for the node-data-broker container.
     securityContext:
       # -- Run node-data-broker as privileged so it can read host topology data.
       privileged: true
@@ -565,21 +531,9 @@ nvidiaTopograph:
         cpu: 100m
         # -- node-data-broker memory request.
         memory: 128Mi
-    # -- Volume mounts added to the node-data-broker container and init container.
-    volumeMounts:
-      - name: sys-class
-        # -- Mount path for host sysfs class data.
-        mountPath: /sys/class
-    # -- Volumes added to node-data-broker pods.
-    volumes:
-      - name: sys-class
-        hostPath:
-          # -- Host path exposing sysfs class data to node-data-broker.
-          path: /sys/class
-          # -- HostPath type for sysfs class data.
-          type: Directory
-    # -- Node selector for scheduling node-data-broker pods. Defaults to topologyLabels.scaleUp=true plus this map.
-    nodeSelector: {}
+    # -- Node selector for scheduling node-data-broker pods.
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
     # -- Tolerations for scheduling node-data-broker pods.
     tolerations: []
     # -- Affinity rules for scheduling node-data-broker pods.

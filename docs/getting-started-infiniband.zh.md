@@ -10,18 +10,17 @@
 - Node 被写入可供调度系统消费的拓扑 label，包括：
   `unifabric.io/scale-up`、`unifabric.io/scale-out-leaf`、
   `unifabric.io/scale-out-spine`、`unifabric.io/scale-out-core`。
-- 节点 RDMA 状态可观测，能够通过 Unifabric Agent metrics 查看 RDMA device、port、
-  priority 和 Pod 归属等指标。
+- 可通过 Unifabric Agent metrics 和内置 RDMA Grafana Dashboard 观测节点 RDMA 状态，
+  按集群、节点、Pod 和 Workload 维度查看吞吐、利用率、QoS、拥塞和错误指标。
 
 > 该场景不会为 Unifabric switch-driven discovery 创建 `FabricNode` 或 `Switch` CR。
 
 ## 前置条件
 
 - Kubernetes 集群，包含目标 GPU 节点。
-- 已安装 `kubectl` 和 Helm 3。
+- 已安装 `kubectl` 和 `helm` cli。
 - 节点上存在 InfiniBand / RDMA 设备，并能在 `/sys/class/infiniband` 下看到。
 - GPU Operator 和 NVIDIA device plugin 已部署。
-- node-data-broker 能在目标节点运行，并具备所需 `pods/exec` 权限。
 - 集群需要安装 Prometheus Operator 和 Grafana Operator，如果未安装，请在安装 Unifabric 时取消下发 ServiceMonitor
   和 GrafanaDashboard，避免下发 CRD 失败。
 
@@ -47,6 +46,7 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --create-namespace \
   --set nvidiaTopograph.enable=true \
   --set nvidiaTopograph.provider.name=infiniband-k8s \
+  --set internalTopologyLabelWriter.enabled=false \
   --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="" \
   --set-string nodeTopologyDiscovery.storageInterfaceSelector="" \
   --set nodeMetrics.enabled=true \
@@ -59,18 +59,19 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 
 | Helm value | 用途 |
 | --- | --- |
-| `nvidiaTopograph.enable` | 启用 NVIDIA topograph。InfiniBand IB 网络场景必须为 `true`。 |
-| `nvidiaTopograph.provider.name` | 设置为 `infiniband-k8s`，表示使用 `ibnetdiscover` 命令发现拓扑。 |
-
+| `nvidiaTopograph.enable` | 启用 NVIDIA topograph。InfiniBand 网络场景必须为 `true`。 |
+| `nvidiaTopograph.provider.name` | 设置为 `infiniband-k8s`，表示使用 InfiniBand Kubernetes provider。 |
+| `nvidiaTopograph.provider.params.useGpuCliqueLabel` | 默认 `true`，使用 GPU Operator clique label 作为加速卡拓扑来源；设为 `false` 时才需要 node-data-broker 通过 `pods/exec` 发现拓扑。 |
+| `internalTopologyLabelWriter.enabled` | 设置为 `false`，避免 Unifabric 内置 writer 和 NVIDIA topograph 同时写拓扑 Node label。 |
 | `nodeMetrics.enabled` | 开启 Agent Metrics 用于节点 RDMA 可观测。 |
-| `nodeTopologyDiscovery.scaleUpInterfaceSelector` | 选择特定 RDMA 网卡用于观测，并在 RDMA 指标中打上 `kind=scaleOut` 标签，支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`，默认为全部 RDMA 网卡。 |
-| `nodeTopologyDiscovery.storageInterfaceSelector` | 选择一组 RDMA 存储网卡观测，并在 RDMA 指标中打上 `kind=storage` 标签。支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`。默认为空。|
+| `nodeTopologyDiscovery.scaleOutInterfaceSelector` | 选择参与 scale-out 拓扑和 RDMA 指标观测的 RDMA 网卡，并在 RDMA 指标中打上 `kind=scaleOut` 标签。支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`，默认为全部 RDMA 网卡。 |
+| `nodeTopologyDiscovery.storageInterfaceSelector` | 选择一组 RDMA 存储网卡观测，并在 RDMA 指标中打上 `kind=storage` 标签。支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`。默认为空。 |
 | `nodeMetrics.serviceMonitor.enabled` | 创建 Prometheus Operator 使用的 `ServiceMonitor`。 |
 | `grafanaDashboard.enabled` | 渲染内置 RDMA Dashboard。 |
 
 更多 Helm 参数见 [chart/README.md](../chart/README.md)。
 
-如果您位于中国地区，可以额外增加下面的参数，加速下载
+如果您位于中国地区，可以额外增加下面的参数，加速下载：
 
 ```bash
 --set global.registry=m.daocloud.io \
@@ -79,10 +80,8 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 --set agent.lldp.image.repository=ghcr.io/unifabric-io/unifabric-agent \
 --set nvidiaTopograph.topograph.image.repository=ghcr.io/nvidia/topograph \
 --set nvidiaTopograph.nodeObserver.image.repository=ghcr.io/nvidia/topograph \
---set nvidiaTopograph.nodeDataBroker.image.repository=ghcr.io/nvidia/topograph/ib \
---set nvidiaTopograph.nodeDataBroker.initContainer.image.repository=ghcr.io/nvidia/topograph \
+--set nvidiaTopograph.nodeDataBroker.image.repository=ghcr.io/nvidia/topograph
 ```
-
 
 ## 验证部署
 
@@ -117,13 +116,13 @@ curl -s "http://${POD_IP}:8082/metrics" | grep '^unifabric_'
 - 确认 NVIDIA topograph、node-observer 和 node-data-broker 组件正常运行，并且有权限更新 Node。
 - 确认 node-data-broker Pod 已运行在目标 GPU 节点。
 - 确认对应节点有 `topograph.nvidia.com/cluster-id` annotation。
-- 确认 `ibnetdiscover` 可用。
+- 如果关闭了 `nvidiaTopograph.provider.params.useGpuCliqueLabel`，确认 `ibnetdiscover` 可用。
 - 如果自定义了 Helm values 中的 `topologyLabels.*`，调度器配置中的 label key 也必须同步更新。
 
 ### RDMA metrics 没有采集到 IB 网卡
 
 - 确认 Agent Pod 正常运行，并且节点上能在 `/sys/class/infiniband` 下看到 IB 设备。
-- 确认 `nodeTopologyDiscovery.scaleUpInterfaceSelector` 匹配节点上的 IB 网卡名称或 CIDR。
+- 确认 `nodeTopologyDiscovery.scaleOutInterfaceSelector` 匹配节点上的 IB 网卡名称或 CIDR。
 - 确认 `nodeMetrics.enabled=true`。
 - 如果使用 Prometheus Operator，确认 `nodeMetrics.serviceMonitor.enabled=true` 且
   `ServiceMonitor` 能被 Prometheus selector 选中。

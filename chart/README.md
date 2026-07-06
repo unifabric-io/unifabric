@@ -15,6 +15,7 @@
 | topologyLabels.scaleOutLeaf | string | `"unifabric.io/scale-out-leaf"` | Label key for the leaf-level scale-out topology domain on a node. |
 | topologyLabels.scaleOutSpine | string | `"unifabric.io/scale-out-spine"` | Label key for the spine-level scale-out topology domain on a node. |
 | topologyLabels.scaleUp | string | `"unifabric.io/scale-up"` | Label key for the scale-up topology domain on a node. |
+| internalTopologyLabelWriter.enabled | bool | `true` | Let Unifabric write and clean topology Node labels internally. Disable when another component, such as NVIDIA Topograph, owns topology labels. |
 | topologyGroupNaming.hashLength | int | `7` | Number of hash characters used when labelValueFormat is hash. |
 | topologyGroupNaming.labelValueFormat | string | `"hash"` | Format for topology label values. Use name for readable switch-based values, or hash for compact stable values. |
 
@@ -154,39 +155,31 @@
 | nvidiaTopograph.engine.name | string | `"k8s"` | Topograph engine name used by node-observer. |
 | nvidiaTopograph.imagePullSecrets | list | `[]` | Image pull secrets applied to NVIDIA Topograph workloads. Defaults to global.imagePullSecrets when empty. |
 | nvidiaTopograph.nodeDataBroker.affinity | object | `{}` | Affinity rules for scheduling node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.command | list | `["tail","-f","/dev/null"]` | Command used by the node-data-broker container. |
 | nvidiaTopograph.nodeDataBroker.enable | bool | `true` | Deploy the node-data-broker DaemonSet used by NVIDIA Topograph. |
+| nvidiaTopograph.nodeDataBroker.extraArgs | list | `[]` |  |
 | nvidiaTopograph.nodeDataBroker.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the node-data-broker container. |
 | nvidiaTopograph.nodeDataBroker.image.registry | string | `"ghcr.io"` | Container image registry for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.image.repository | string | `"nvidia/topograph/ib"` | Container image repository for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.image.tag | string | `"main"` | Container image tag for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.initContainer.enable | bool | `true` | Run the node-data-broker init container that prepares provider-specific node data. |
-| nvidiaTopograph.nodeDataBroker.initContainer.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the node-data-broker init container. |
-| nvidiaTopograph.nodeDataBroker.initContainer.image.registry | string | `"ghcr.io"` | Container image registry for the node-data-broker init container. |
-| nvidiaTopograph.nodeDataBroker.initContainer.image.repository | string | `"nvidia/topograph"` | Container image repository for the node-data-broker init container. |
-| nvidiaTopograph.nodeDataBroker.initContainer.image.tag | string | `"v0.3.0"` | Container image tag for the node-data-broker init container. |
-| nvidiaTopograph.nodeDataBroker.nodeSelector | object | `{}` | Node selector for scheduling node-data-broker pods. Defaults to topologyLabels.scaleUp=true plus this map. |
+| nvidiaTopograph.nodeDataBroker.image.repository | string | `"nvidia/topograph"` | Container image repository for node-data-broker. |
+| nvidiaTopograph.nodeDataBroker.image.tag | string | `"v0.5.0"` | Container image tag for node-data-broker. |
+| nvidiaTopograph.nodeDataBroker.nodeSelector | object | `{"nvidia.com/gpu.present":"true"}` | Node selector for scheduling node-data-broker pods. |
 | nvidiaTopograph.nodeDataBroker.podAnnotations | object | `{}` | Annotations added to node-data-broker pods. |
 | nvidiaTopograph.nodeDataBroker.podLabels | object | `{}` | Extra labels added to node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.podSecurityContext | object | `{}` | Pod security context for node-data-broker pods. |
+| nvidiaTopograph.nodeDataBroker.port | int | `8080` | Port the node-data-broker serves its /healthz endpoint on after applying node annotations. |
+| nvidiaTopograph.nodeDataBroker.refreshInterval | string | `"5m"` | How often node-data-broker reapplies node annotations. Set to 0 to disable periodic refresh. |
 | nvidiaTopograph.nodeDataBroker.resources.limits.cpu | string | `"100m"` | node-data-broker CPU limit. |
 | nvidiaTopograph.nodeDataBroker.resources.limits.memory | string | `"128Mi"` | node-data-broker memory limit. |
 | nvidiaTopograph.nodeDataBroker.resources.requests.cpu | string | `"100m"` | node-data-broker CPU request. |
 | nvidiaTopograph.nodeDataBroker.resources.requests.memory | string | `"128Mi"` | node-data-broker memory request. |
 | nvidiaTopograph.nodeDataBroker.securityContext.privileged | bool | `true` | Run node-data-broker as privileged so it can read host topology data. |
-| nvidiaTopograph.nodeDataBroker.serviceAccount.annotations | object | `{}` | Annotations added to the node-data-broker ServiceAccount. |
-| nvidiaTopograph.nodeDataBroker.serviceAccount.automount | bool | `true` | Automount the Kubernetes API token in node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.serviceAccount.create | bool | `true` | Create a ServiceAccount for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.serviceAccount.name | string | `""` | node-data-broker ServiceAccount name. Defaults to the generated node-data-broker name when empty. |
+| nvidiaTopograph.nodeDataBroker.startupProbe.failureThreshold | int | `30` | Startup probe failure threshold for slow IB topology discovery. |
+| nvidiaTopograph.nodeDataBroker.startupProbe.periodSeconds | int | `10` | Startup probe period in seconds for node-data-broker. |
 | nvidiaTopograph.nodeDataBroker.tolerations | list | `[]` | Tolerations for scheduling node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.verbosity | int | `3` | Verbosity level passed to node-data-broker init container. |
-| nvidiaTopograph.nodeDataBroker.volumeMounts | list | `[{"mountPath":"/sys/class","name":"sys-class"}]` | Volume mounts added to the node-data-broker container and init container. |
-| nvidiaTopograph.nodeDataBroker.volumes | list | `[{"hostPath":{"path":"/sys/class","type":"Directory"},"name":"sys-class"}]` | Volumes added to node-data-broker pods. |
+| nvidiaTopograph.nodeDataBroker.verbosity | int | `3` | Verbosity level passed to node-data-broker. |
 | nvidiaTopograph.nodeObserver.affinity | object | `{}` | Affinity rules for scheduling node-observer pods. |
 | nvidiaTopograph.nodeObserver.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the node-observer container. |
 | nvidiaTopograph.nodeObserver.image.registry | string | `"ghcr.io"` | Container image registry for node-observer. |
 | nvidiaTopograph.nodeObserver.image.repository | string | `"nvidia/topograph"` | Container image repository for node-observer. |
-| nvidiaTopograph.nodeObserver.image.tag | string | `"v0.3.0"` | Container image tag for node-observer. |
+| nvidiaTopograph.nodeObserver.image.tag | string | `"v0.5.0"` | Container image tag for node-observer. |
 | nvidiaTopograph.nodeObserver.nodeSelector | object | `{}` | Node selector for scheduling node-observer pods. |
 | nvidiaTopograph.nodeObserver.podAnnotations | object | `{}` | Annotations added to node-observer pods. |
 | nvidiaTopograph.nodeObserver.podLabels | object | `{}` | Extra labels added to node-observer pods. |
@@ -197,19 +190,17 @@
 | nvidiaTopograph.nodeObserver.resources.requests.cpu | string | `"250m"` | node-observer CPU request. |
 | nvidiaTopograph.nodeObserver.resources.requests.memory | string | `"256Mi"` | node-observer memory request. |
 | nvidiaTopograph.nodeObserver.securityContext | object | `{}` | Container security context for the node-observer container. |
-| nvidiaTopograph.nodeObserver.serviceAccount.annotations | object | `{}` | Annotations added to the node-observer ServiceAccount. |
-| nvidiaTopograph.nodeObserver.serviceAccount.automount | bool | `true` | Automount the Kubernetes API token in node-observer pods. |
-| nvidiaTopograph.nodeObserver.serviceAccount.create | bool | `true` | Create a ServiceAccount for node-observer. |
-| nvidiaTopograph.nodeObserver.serviceAccount.name | string | `""` | Node-observer ServiceAccount name. Defaults to the generated node-observer name when empty. |
 | nvidiaTopograph.nodeObserver.tolerations | list | `[]` | Tolerations for scheduling node-observer pods. |
-| nvidiaTopograph.nodeObserver.trigger | object | `{}` | node-observer trigger configuration. Defaults to selecting nodes with topologyLabels.scaleUp=true. |
+| nvidiaTopograph.nodeObserver.topograph.apiServer.containerName | string | `"topograph"` | Topograph API container name watched by node-observer. |
+| nvidiaTopograph.nodeObserver.topograph.apiServer.enabled | bool | `true` | Watch the Topograph API pod and trigger topology generation when it becomes ready. |
+| nvidiaTopograph.nodeObserver.topograph.apiServer.podSelector | object | `{}` | Pod selector used to find the Topograph API pod. Empty uses the chart-managed API pod labels. |
+| nvidiaTopograph.nodeObserver.topograph.nodeDataBroker.containerName | string | `"node-data-broker"` | node-data-broker container name watched by node-observer. |
+| nvidiaTopograph.nodeObserver.topograph.nodeDataBroker.enabled | bool | `true` | Wait for node-data-broker pods before the first topology request. |
+| nvidiaTopograph.nodeObserver.topograph.nodeDataBroker.podSelector | object | `{}` | Pod selector used to find node-data-broker pods. Empty uses the chart-managed broker pod labels. |
+| nvidiaTopograph.nodeObserver.topograph.trigger.nodeSelector | object | `{"nvidia.com/gpu.present":"true"}` | Node selector used by node-observer to choose Nodes that trigger topology generation. |
 | nvidiaTopograph.nodeObserver.verbosity | int | `3` | Verbosity level passed to node-observer. |
-| nvidiaTopograph.nodeObserver.wait.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the node-observer wait init container. |
-| nvidiaTopograph.nodeObserver.wait.image.registry | string | `"docker.io"` | Container image registry for the node-observer wait init container. |
-| nvidiaTopograph.nodeObserver.wait.image.repository | string | `"curlimages/curl"` | Container image repository for the node-observer wait init container. |
-| nvidiaTopograph.nodeObserver.wait.image.tag | string | `"8.13.0"` | Container image tag for the node-observer wait init container. |
 | nvidiaTopograph.provider.name | string | `"infiniband-k8s"` | Topograph provider name, such as infiniband-k8s or netq. |
-| nvidiaTopograph.service.port | int | `49021` | Service port for the topograph HTTP API. |
+| nvidiaTopograph.provider.params.useGpuCliqueLabel | bool | `true` | Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s. |
 | nvidiaTopograph.service.type | string | `"ClusterIP"` | Kubernetes Service type for the topograph HTTP API. |
 | nvidiaTopograph.topograph.affinity | object | `{}` | Affinity rules for scheduling topograph API pods. |
 | nvidiaTopograph.topograph.config.credentialsPath | string | `""` | Credentials file path written to topograph-config.yaml. Defaults to /etc/topograph/credentials/credentials.yaml when credentialsSecret is set. |
@@ -219,12 +210,7 @@
 | nvidiaTopograph.topograph.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the topograph API container. |
 | nvidiaTopograph.topograph.image.registry | string | `"ghcr.io"` | Container image registry for the topograph API. |
 | nvidiaTopograph.topograph.image.repository | string | `"nvidia/topograph"` | Container image repository for the topograph API. |
-| nvidiaTopograph.topograph.image.tag | string | `"v0.3.0"` | Container image tag for the topograph API. |
-| nvidiaTopograph.topograph.ingress.annotations | object | `{}` | Annotations added to the topograph Ingress. |
-| nvidiaTopograph.topograph.ingress.className | string | `""` | IngressClass name for the topograph Ingress. |
-| nvidiaTopograph.topograph.ingress.enabled | bool | `false` | Create an Ingress for the topograph HTTP API. |
-| nvidiaTopograph.topograph.ingress.hosts | list | `[{"host":"chart-example.local","paths":[{"path":"/","pathType":"ImplementationSpecific"}]}]` | Hosts and paths routed to the topograph Service. |
-| nvidiaTopograph.topograph.ingress.tls | list | `[]` | TLS configuration for the topograph Ingress. |
+| nvidiaTopograph.topograph.image.tag | string | `"v0.5.0"` | Container image tag for the topograph API. |
 | nvidiaTopograph.topograph.livenessProbe.httpGet.path | string | `"/healthz"` | HTTP path used by the topograph API liveness probe. |
 | nvidiaTopograph.topograph.livenessProbe.httpGet.port | string | `"http"` | Named port used by the topograph API liveness probe. |
 | nvidiaTopograph.topograph.nodeSelector | object | `{}` | Node selector for scheduling topograph API pods. |
@@ -239,10 +225,6 @@
 | nvidiaTopograph.topograph.resources.requests.cpu | string | `"250m"` | Topograph API CPU request. |
 | nvidiaTopograph.topograph.resources.requests.memory | string | `"256Mi"` | Topograph API memory request. |
 | nvidiaTopograph.topograph.securityContext | object | `{}` | Container security context for the topograph API container. |
-| nvidiaTopograph.topograph.serviceAccount.annotations | object | `{}` | Annotations added to the topograph API ServiceAccount. |
-| nvidiaTopograph.topograph.serviceAccount.automount | bool | `true` | Automount the Kubernetes API token in the topograph API pod. |
-| nvidiaTopograph.topograph.serviceAccount.create | bool | `true` | Create a ServiceAccount for the topograph API. |
-| nvidiaTopograph.topograph.serviceAccount.name | string | `""` | Topograph API ServiceAccount name. Defaults to the generated topograph name when empty. |
 | nvidiaTopograph.topograph.serviceMonitor.enabled | bool | `false` | Create a Prometheus Operator ServiceMonitor for the topograph API. |
 | nvidiaTopograph.topograph.serviceMonitor.interval | string | `"15s"` | Prometheus scrape interval for the topograph API. |
 | nvidiaTopograph.topograph.serviceMonitor.namespace | string | `"monitoring"` | Namespace where the topograph ServiceMonitor is created. |

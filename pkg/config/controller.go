@@ -80,6 +80,10 @@ type ScaleOutDiscoveryConfig struct {
 	Switches ScaleOutSwitchesConfig `json:"switches" yaml:"switches"`
 }
 
+type InternalTopologyLabelWriterConfig struct {
+	Enabled *bool `json:"enabled" yaml:"enabled"`
+}
+
 type ControllerNodeTopologyConfig struct {
 	ScaleOutInterfaceSelector string `json:"scaleOutInterfaceSelector" yaml:"scaleOutInterfaceSelector"`
 	StorageInterfaceSelector  string `json:"storageInterfaceSelector" yaml:"storageInterfaceSelector"`
@@ -87,15 +91,16 @@ type ControllerNodeTopologyConfig struct {
 }
 
 type ControllerConfig struct {
-	LogLevel              string                       `json:"logLevel" yaml:"logLevel"`
-	Metrics               BindAddressConfig            `json:"metrics" yaml:"metrics"`
-	HealthProbe           BindAddressConfig            `json:"healthProbe" yaml:"healthProbe"`
-	Pprof                 BindAddressConfig            `json:"pprof" yaml:"pprof"`
-	LeaderElection        LeaderElectionConfig         `json:"leaderElection" yaml:"leaderElection"`
-	TopologyLabels        TopologyLabelsConfig         `json:"topologyLabels" yaml:"topologyLabels"`
-	NodeTopologyDiscovery ControllerNodeTopologyConfig `json:"nodeTopologyDiscovery" yaml:"nodeTopologyDiscovery"`
-	ScaleOutDiscovery     ScaleOutDiscoveryConfig      `json:"scaleOutDiscovery" yaml:"scaleOutDiscovery"`
-	KubeConfig            *rest.Config                 `json:"-" yaml:"-"`
+	LogLevel                    string                            `json:"logLevel" yaml:"logLevel"`
+	Metrics                     BindAddressConfig                 `json:"metrics" yaml:"metrics"`
+	HealthProbe                 BindAddressConfig                 `json:"healthProbe" yaml:"healthProbe"`
+	Pprof                       BindAddressConfig                 `json:"pprof" yaml:"pprof"`
+	LeaderElection              LeaderElectionConfig              `json:"leaderElection" yaml:"leaderElection"`
+	TopologyLabels              TopologyLabelsConfig              `json:"topologyLabels" yaml:"topologyLabels"`
+	InternalTopologyLabelWriter InternalTopologyLabelWriterConfig `json:"internalTopologyLabelWriter" yaml:"internalTopologyLabelWriter"`
+	NodeTopologyDiscovery       ControllerNodeTopologyConfig      `json:"nodeTopologyDiscovery" yaml:"nodeTopologyDiscovery"`
+	ScaleOutDiscovery           ScaleOutDiscoveryConfig           `json:"scaleOutDiscovery" yaml:"scaleOutDiscovery"`
+	KubeConfig                  *rest.Config                      `json:"-" yaml:"-"`
 }
 
 func ReadControllerConfig(filename string) (*ControllerConfig, error) {
@@ -128,6 +133,7 @@ func ReadControllerConfig(filename string) (*ControllerConfig, error) {
 		cfg.LeaderElection.ID = defaultLeaderElectionID
 	}
 	normalizeTopologyLabels(&cfg.TopologyLabels)
+	normalizeInternalTopologyLabelWriter(&cfg.InternalTopologyLabelWriter)
 	if err := normalizeControllerNodeTopologyConfig(&cfg.NodeTopologyDiscovery); err != nil {
 		return nil, err
 	}
@@ -150,6 +156,12 @@ func normalizeTopologyLabels(cfg *TopologyLabelsConfig) {
 	}
 	if cfg.ScaleOutCore == "" {
 		cfg.ScaleOutCore = DefaultLabelScaleOutCore
+	}
+}
+
+func normalizeInternalTopologyLabelWriter(cfg *InternalTopologyLabelWriterConfig) {
+	if cfg.Enabled == nil {
+		cfg.Enabled = boolPtr(true)
 	}
 }
 
