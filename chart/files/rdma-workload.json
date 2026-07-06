@@ -121,7 +121,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (topowner_name) (\n  rate(unifabric_port_rcv_data{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n) * 8",
+          "expr": "sum by (topowner_name) (\n  rate(unifabric_port_rcv_data{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n) * 8",
           "legendFormat": "Read",
           "range": true,
           "refId": "A"
@@ -211,7 +211,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (topowner_name) (\n  rate(unifabric_port_xmit_data{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n) * 8",
+          "expr": "sum by (topowner_name) (\n  rate(unifabric_port_xmit_data{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n) * 8",
           "legendFormat": "Write",
           "range": true,
           "refId": "A"
@@ -314,7 +314,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod_name) (\n  rate(unifabric_port_rcv_data{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n) * 8",
+          "expr": "sum by (pod_name) (\n  rate(unifabric_port_rcv_data{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n) * 8",
           "interval": "",
           "legendFormat": "{{pod_name}}",
           "range": true,
@@ -404,7 +404,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod_name) (\n  rate(unifabric_port_xmit_data{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n) * 8",
+          "expr": "sum by (pod_name) (\n  rate(unifabric_port_xmit_data{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n) * 8",
           "interval": "",
           "legendFormat": "{{pod_name}}",
           "range": true,
@@ -498,7 +498,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (pod_name) (\n  rate(unifabric_unicast_rcv_packets{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n)",
+          "expr": "sum by (pod_name) (\n  rate(unifabric_unicast_rcv_packets{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n)",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -610,7 +610,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (pod_name) (\n  rate(unifabric_unicast_xmit_packets{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n)",
+          "expr": "sum by (pod_name) (\n  rate(unifabric_unicast_xmit_packets{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n)",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -706,7 +706,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (pod_name) (\n  rate(unifabric_multicast_rcv_packets{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n)",
+          "expr": "sum by (pod_name) (\n  rate(unifabric_multicast_rcv_packets{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n)",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -802,7 +802,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (pod_name) (\n  rate(unifabric_multicast_xmit_packets{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])\n)",
+          "expr": "sum by (pod_name) (\n  rate(unifabric_multicast_xmit_packets{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])\n)",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -896,7 +896,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(unifabric_out_of_sequence{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])",
+          "expr": "rate(unifabric_out_of_sequence{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -990,7 +990,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(unifabric_packet_seq_err{topowner_namespace=~\"$namespace\", topowner_kind=~\"$kind\", topowner_name=~\"$name\",cluster=~\"$cluster\"}[$__rate_interval])",
+          "expr": "rate(unifabric_packet_seq_err{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name=~\"$name\", topowner_name!=\"\"}[$__rate_interval])",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -1094,14 +1094,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\"}, topowner_kind)",
+        "definition": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\", cluster!=\"\", topowner_kind!=\"\"}, topowner_kind)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "kind",
         "options": [],
         "query": {
-          "query": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\"}, topowner_kind)",
+          "query": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\", cluster!=\"\", topowner_kind!=\"\"}, topowner_kind)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -1121,14 +1121,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(unifabric_port_speed_mbps{topowner_kind=~\"$kind\",cluster=~\"$cluster\"}, topowner_namespace)",
+        "definition": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace!=\"\"}, topowner_namespace)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(unifabric_port_speed_mbps{topowner_kind=~\"$kind\",cluster=~\"$cluster\"}, topowner_namespace)",
+          "query": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace!=\"\"}, topowner_namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -1148,14 +1148,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(unifabric_port_speed_mbps{topowner_kind=~\"$kind\", topowner_namespace=~\"$namespace\",cluster=~\"$cluster\"}, topowner_name)",
+        "definition": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name!=\"\"}, topowner_name)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "name",
         "options": [],
         "query": {
-          "query": "label_values(unifabric_port_speed_mbps{topowner_kind=~\"$kind\", topowner_namespace=~\"$namespace\",cluster=~\"$cluster\"}, topowner_name)",
+          "query": "label_values(unifabric_port_speed_mbps{cluster=~\"$cluster\", cluster!=\"\", topowner_kind=~\"$kind\", topowner_kind!=\"\", topowner_namespace=~\"$namespace\", topowner_namespace!=\"\", topowner_name!=\"\"}, topowner_name)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
