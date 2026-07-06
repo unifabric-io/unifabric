@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/Mellanox/rdmamap"
 	"github.com/vishvananda/netlink"
 )
 
@@ -406,9 +405,10 @@ func (r *fabricNodeReconciler) updateTopologyStatus(status *v1beta1.FabricNodeSt
 
 	var scaleOutLinks []v1beta1.NicInfo
 	var storageLinks []v1beta1.NicInfo
+	lldpOptionalInterfaces := make(map[string]struct{})
 
 	for _, l := range links {
-		if l.Type() != "device" {
+		if !utils.IsSupportedRdmaNetdeviceType(l.Type()) {
 			continue
 		}
 
@@ -417,14 +417,10 @@ func (r *fabricNodeReconciler) updateTopologyStatus(status *v1beta1.FabricNodeSt
 			continue
 		}
 
-		if !rdmamap.IsRDmaDeviceForNetdevice(l.Attrs().Name) {
-			r.Log.Debug("GetScaleOutNicInfos: skip non-rdma device", "ifname", l.Attrs().Name)
-			continue
-		}
-
-		rdmaDevice, err := rdmamap.GetRdmaDeviceForNetdevice(l.Attrs().Name)
+		rdmaDevice, err := utils.GetRdmaDeviceForNetdevice(l.Attrs().Name)
 		if err != nil {
-			r.Log.Error("failed to get rdma device for netdevice", "error", err)
+			r.Log.Debug("GetScaleOutNicInfos: skip non-rdma device", "ifname", l.Attrs().Name, "error", err)
+			continue
 		}
 
 		nic := v1beta1.NicInfo{
@@ -432,6 +428,9 @@ func (r *fabricNodeReconciler) updateTopologyStatus(status *v1beta1.FabricNodeSt
 			RDMA:           true,
 			State:          l.Attrs().OperState.String(),
 			RdmaDeviceName: rdmaDevice,
+		}
+		if utils.IsInfiniBandNetdeviceType(l.Type(), l.Attrs().EncapType) {
+			lldpOptionalInterfaces[nic.Name] = struct{}{}
 		}
 
 		// Check if neighborsMap is not nil before accessing it
@@ -475,7 +474,7 @@ func (r *fabricNodeReconciler) updateTopologyStatus(status *v1beta1.FabricNodeSt
 	selectedNics = append(selectedNics, scaleOutLinks...)
 	selectedNics = append(selectedNics, storageLinks...)
 
-	changed := setLLDPNeighborsReadyCondition(status, totalNics, selectedNics, lldpErr)
+	changed := setLLDPNeighborsReadyCondition(status, totalNics, selectedNics, lldpOptionalInterfaces, lldpErr)
 
 	if status.TotalNics != totalNics {
 		changed = true
@@ -505,9 +504,17 @@ func (r *fabricNodeReconciler) classifyTopologyNIC(nic v1beta1.NicInfo, addrs []
 	return topologyNICClassNone
 }
 
-func setLLDPNeighborsReadyCondition(status *v1beta1.FabricNodeStatus, totalNics int, nics []v1beta1.NicInfo, discoveryErr error) bool {
+func setLLDPNeighborsReadyCondition(status *v1beta1.FabricNodeStatus, totalNics int, nics []v1beta1.NicInfo, lldpOptionalInterfaces map[string]struct{}, discoveryErr error) bool {
 	if totalNics == 0 {
 		return meta.RemoveStatusCondition(&status.Conditions, v1beta1.FabricNodeConditionLLDPNeighborsReady)
+	}
+
+	var lldpRequiredNics []v1beta1.NicInfo
+	for _, nic := range nics {
+		if _, ok := lldpOptionalInterfaces[nic.Name]; ok {
+			continue
+		}
+		lldpRequiredNics = append(lldpRequiredNics, nic)
 	}
 
 	condition := metav1.Condition{
@@ -515,6 +522,10 @@ func setLLDPNeighborsReadyCondition(status *v1beta1.FabricNodeStatus, totalNics 
 		Status:  metav1.ConditionTrue,
 		Reason:  v1beta1.FabricNodeReasonLLDPNeighborsReady,
 		Message: "All selected RDMA interfaces have LLDP neighbors",
+	}
+	if len(lldpRequiredNics) == 0 {
+		condition.Message = "Selected RDMA interfaces do not require LLDP neighbors"
+		return meta.SetStatusCondition(&status.Conditions, condition)
 	}
 	if discoveryErr != nil {
 		condition.Status = metav1.ConditionUnknown
@@ -524,7 +535,7 @@ func setLLDPNeighborsReadyCondition(status *v1beta1.FabricNodeStatus, totalNics 
 	}
 
 	var missing []string
-	for _, nic := range nics {
+	for _, nic := range lldpRequiredNics {
 		if nic.State == "up" && nic.LLDPNeighbor.Hostname == "" {
 			missing = append(missing, nic.Name)
 		}
