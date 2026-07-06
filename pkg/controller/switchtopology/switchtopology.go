@@ -47,6 +47,9 @@ func NewSwitchTopologyDiscoveryController(mgr manager.Manager, cfg *config.Contr
 	if err := addSwitchSubscriptionManager(mgr, cfg, reconciler.log); err != nil {
 		return err
 	}
+	if !internalTopologyLabelWriterEnabled(cfg) {
+		return nil
+	}
 
 	controllerBuilder := builder.ControllerManagedBy(mgr).
 		Named("SwitchTopologyDiscovery").
@@ -90,7 +93,15 @@ func switchDiscoveryEnabled(cfg *config.ControllerConfig) bool {
 	return cfg.ScaleOutDiscovery.Switches.Enabled
 }
 
+func internalTopologyLabelWriterEnabled(cfg *config.ControllerConfig) bool {
+	return cfg.InternalTopologyLabelWriter.Enabled == nil || *cfg.InternalTopologyLabelWriter.Enabled
+}
+
 func (r *Reconciler) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
+	if !internalTopologyLabelWriterEnabled(r.cfg) {
+		return reconcile.Result{}, nil
+	}
+
 	switches := []v1beta1.Switch(nil)
 	managedSwitchCount := 0
 	if switchDiscoveryEnabled(r.cfg) {

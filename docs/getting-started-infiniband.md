@@ -9,7 +9,7 @@ This guide explains how to deploy Unifabric in an InfiniBand NIC cluster. This s
 After deployment, the cluster should achieve two goals:
 
 - Nodes are labeled with topology labels consumed by schedulers, including `unifabric.io/scale-up`, `unifabric.io/scale-out-leaf`, `unifabric.io/scale-out-spine`, and `unifabric.io/scale-out-core`.
-- Node RDMA state is observable through Unifabric Agent metrics, including RDMA device, port, priority, and Pod attribution metrics.
+- Node RDMA state is observable through Unifabric Agent metrics and the built-in RDMA Grafana dashboards, with throughput, utilization, QoS, congestion, and error metrics grouped by cluster, node, Pod, and workload.
 
 > This scenario does not create `FabricNode` or `Switch` CRs for Unifabric switch-driven discovery.
 
@@ -19,7 +19,8 @@ After deployment, the cluster should achieve two goals:
 - `kubectl` and Helm 3 installed.
 - InfiniBand / RDMA devices visible under `/sys/class/infiniband` on the nodes.
 - GPU Operator and NVIDIA device plugin are deployed.
-- node-data-broker can run on target nodes and has the required `pods/exec` permission.
+- node-data-broker can run on target GPU nodes. By default it uses the GPU Operator clique label;
+  `pods/exec` permission is only needed when `nvidiaTopograph.provider.params.useGpuCliqueLabel` is disabled.
 - Prometheus Operator and Grafana Operator are installed in the cluster. If they are not installed, disable
   `ServiceMonitor` and `GrafanaDashboard` when installing Unifabric to avoid CRD creation failures.
 
@@ -44,6 +45,7 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --create-namespace \
   --set nvidiaTopograph.enable=true \
   --set nvidiaTopograph.provider.name=infiniband-k8s \
+  --set internalTopologyLabelWriter.enabled=false \
   --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="" \
   --set-string nodeTopologyDiscovery.storageInterfaceSelector="" \
   --set nodeMetrics.enabled=true \
@@ -56,11 +58,12 @@ Parameters:
 
 | Helm value | Purpose |
 | --- | --- |
-| `nvidiaTopograph.enable` | Enables NVIDIA topograph. Must be `true` for InfiniBand IB networking. |
-| `nvidiaTopograph.provider.name` | Set to `infiniband-k8s`, which discovers topology with `ibnetdiscover`. |
-
+| `nvidiaTopograph.enable` | Enables NVIDIA topograph. Must be `true` for InfiniBand networking. |
+| `nvidiaTopograph.provider.name` | Set to `infiniband-k8s` to use the InfiniBand Kubernetes provider. |
+| `nvidiaTopograph.provider.params.useGpuCliqueLabel` | Defaults to `true` and uses the GPU Operator clique label as the accelerator topology source. Set it to `false` only when node-data-broker should discover topology through `pods/exec`. |
+| `internalTopologyLabelWriter.enabled` | Set to `false` to prevent the built-in Unifabric writer and NVIDIA topograph from both writing topology Node labels. |
 | `nodeMetrics.enabled` | Enables Agent metrics for node RDMA observability. |
-| `nodeTopologyDiscovery.scaleUpInterfaceSelector` | Selects specific RDMA NICs for observation and labels them with `kind=scaleOut` in RDMA metrics. Supports `interface=ib*,mlx*` or `cidr=172.17.0.0/16`. Defaults to all RDMA NICs. |
+| `nodeTopologyDiscovery.scaleOutInterfaceSelector` | Selects RDMA NICs included in scale-out topology and RDMA metrics, and labels them with `kind=scaleOut` in RDMA metrics. Supports `interface=ib*,mlx*` or `cidr=172.17.0.0/16`. Defaults to all RDMA NICs. |
 | `nodeTopologyDiscovery.storageInterfaceSelector` | Selects storage RDMA NICs and labels them with `kind=storage` in RDMA metrics. Supports `interface=ib*,mlx*` or `cidr=172.17.0.0/16`. Defaults to empty. |
 | `nodeMetrics.serviceMonitor.enabled` | Creates the Prometheus Operator `ServiceMonitor`. |
 | `grafanaDashboard.enabled` | Renders the built-in RDMA dashboards. |
@@ -100,13 +103,13 @@ curl -s "http://${POD_IP}:8082/metrics" | grep '^unifabric_'
 - Confirm that NVIDIA topograph, node-observer, and node-data-broker are running and have permission to update Nodes.
 - Confirm that node-data-broker Pods run on target GPU nodes.
 - Confirm that corresponding nodes have the `topograph.nvidia.com/cluster-id` annotation.
-- Confirm that `ibnetdiscover` is available.
+- If `nvidiaTopograph.provider.params.useGpuCliqueLabel` is disabled, confirm that `ibnetdiscover` is available.
 - If `topologyLabels.*` Helm values are customized, scheduler label keys must be updated accordingly.
 
 ### RDMA Metrics Do Not Include IB NICs
 
 - Confirm that the Agent Pod is running and IB devices are visible under `/sys/class/infiniband` on the node.
-- Confirm that `nodeTopologyDiscovery.scaleUpInterfaceSelector` matches the IB NIC name or CIDR.
+- Confirm that `nodeTopologyDiscovery.scaleOutInterfaceSelector` matches the IB NIC name or CIDR.
 - Confirm that `nodeMetrics.enabled=true`.
 - If using Prometheus Operator, confirm that `nodeMetrics.serviceMonitor.enabled=true` and the `ServiceMonitor` is selected by Prometheus.
 
