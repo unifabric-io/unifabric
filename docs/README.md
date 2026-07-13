@@ -23,6 +23,7 @@ Choose the installation guide that matches the cluster's physical network:
 ## Design Docs
 
 - [FabricNode CRD design](./design/fabricnode.md): Node-local RDMA topology state resource design.
+- [Topology CRD design](./design/topology-crd.md): Aggregates scale-out, scale-up, and storage status from labels on Nodes and Switches.
 - [Scale-out topology discovery design](./design/scaleout-topology.md): Switch-driven scale-out topology discovery and Node label reconciliation design.
 - [RDMA observability design](./design/rdma-metrics.md): RDMA metric model, Pod attribution, and collection design.
 
