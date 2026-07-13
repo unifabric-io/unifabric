@@ -17,6 +17,7 @@
 
 ## Design Docs
 
+- [Topology CRD 设计](./design/topology-crd.zh.md)：从 Node 和 Switch labels 汇总 scale-out、scale-up 和 storage 拓扑状态。
 - [Scale-Out 网络拓扑发现设计](./design/scaleout-topology.zh.md)：基于 Switch 的 scale-out 拓扑发现与 Node label 写回设计。
 - [FabricNode CRD 设计](./design/fabricnode.md)：节点本地 RDMA 拓扑状态资源设计。
 - [RDMA 可观测性设计](./design/rdma-metrics.md)：RDMA 指标模型、Pod 归因和采集设计。
