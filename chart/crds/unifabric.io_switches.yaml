@@ -62,7 +62,10 @@ spec:
                 minimum: 1
                 type: integer
               mgmtIP:
-                description: MgmtIP is the controller dial target for this switch.
+                description: |-
+                  MgmtIP is the optional controller dial target for this switch. When it is
+                  omitted, the Switch can still contribute topology membership and manual
+                  adjacency through metadata without starting a switch-agent subscription.
                 minLength: 1
                 type: string
               role:
@@ -73,8 +76,6 @@ spec:
                 - ScaleUp
                 - Storage
                 type: string
-            required:
-            - mgmtIP
             type: object
           status:
             properties:

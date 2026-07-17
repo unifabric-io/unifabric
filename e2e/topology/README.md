@@ -98,6 +98,44 @@ SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG" \
   bash e2e/topology/setup.sh step5-deploy-switch-agent
 ```
 
+### E2E Coverage
+
+CI runs three isolated flows against the same NVAIR infrastructure:
+
+1. **roce-lldp-full-auto**
+   - Install the Chart with pinned mTLS.
+   - Deploy switch-agent on the switches.
+   - Verify switch-agent LLDP through `Switch.status`, FabricNode LLDP, generated Node/Switch
+     labels, and the final `Topology/scaleout`.
+   - Restart the Controller and confirm that locked domain names remain stable.
+   - Delete `Topology/scaleout` and verify finalizer cleanup, recreation, and allocation restarting
+     at `group1`.
+2. **RoCE LLDP node-only**
+   - Uninstall the first release and remove its CRs and managed labels.
+   - Reinstall the Chart with switch subscription disabled.
+   - Apply only the upper-layer spine Switch resource. Its
+     `unifabric.io/switch-neighbors` annotation references the four leaf switches discovered from
+     Node LLDP; no leaf Switch CR is created.
+   - Verify that Node LLDP plus the annotations regenerate the same Node/Switch labels and
+     `Topology/scaleout` without switch-agent status.
+3. **nv-topograph**
+   - Uninstall the `roce-lldp-node-only` release and clean its CRs and managed labels.
+   - Reinstall with `scaleUp.mode=manual` and without NVIDIA Topograph.
+   - Apply Scale-up accelerator labels to simulate the labels that an InfiniBand Topograph source
+     would write.
+   - Verify `Topology/scaleup` domains, Node groups, and empty-status behavior, then uninstall and
+     clean again.
+
+The `nv-topograph` flow validates the label-to-Topology contract in a fresh installation. It
+simulates Topograph's labels and does not claim to validate a real InfiniBand fabric or a running
+NVIDIA Topograph deployment.
+
+Between flows, `step6-uninstall-unifabric` uninstalls the Helm release. Because the Controller is
+no longer running, the cleanup removes finalizers from the disposable E2E Topology objects before
+deleting them. It then removes FabricNode, Switch, Topology, managed Node-label state, and finally
+the three Unifabric CRD definitions. The next installation recreates the CRDs and starts from an
+empty API state.
+
 ### Access Nodes
 
 ```bash

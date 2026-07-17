@@ -152,7 +152,7 @@ The RDMA metrics collector reads the latest in-memory `FabricNode` snapshot, use
 
 1. ## Optional Configuration
 
-Configure these settings under `nodeTopologyDiscovery` in Helm values.
+Configure these settings under `fabricNode` in Helm values.
 
 Supported formats:
 

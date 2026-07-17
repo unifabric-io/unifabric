@@ -10,6 +10,7 @@ import (
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
 	"github.com/unifabric-io/unifabric/pkg/config"
 	switchtopology "github.com/unifabric-io/unifabric/pkg/controller/switchtopology"
+	topologystatus "github.com/unifabric-io/unifabric/pkg/controller/topologystatus"
 	"github.com/unifabric-io/unifabric/pkg/logger"
 	"github.com/unifabric-io/unifabric/pkg/types"
 	corev1 "k8s.io/api/core/v1"
@@ -56,6 +57,9 @@ func New(_ context.Context, cfg *config.ControllerConfig, slogger *slog.Logger) 
 	}
 
 	if err := switchtopology.NewSwitchTopologyDiscoveryController(mgr, cfg, slogger); err != nil {
+		return nil, err
+	}
+	if err := topologystatus.NewTopologyStatusController(mgr, cfg, slogger); err != nil {
 		return nil, err
 	}
 

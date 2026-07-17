@@ -208,7 +208,7 @@ jobs:
           set -euo pipefail
           bash e2e/topology/setup.sh step3-install-monitoring-operators
 
-      - name: Step 4 - Install Unifabric
+      - name: roce-lldp-full-auto - Install Unifabric
         shell: bash
         env:
           CONTROLLER_REGISTRY: ${{ env.IMAGE_REGISTRY }}
@@ -221,7 +221,7 @@ jobs:
           set -euo pipefail
           bash e2e/topology/setup.sh step4-install-unifabric
 
-      - name: Step 5 - Deploy switch-agent
+      - name: roce-lldp-full-auto - Deploy switch-agent
         shell: bash
         env:
           SWITCH_AGENT_IMAGE: ${{ env.IMAGE_REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/unifabric-switch-agent:${{ steps.vars.outputs.image_tag }}
@@ -229,19 +229,85 @@ jobs:
           set -euo pipefail
           bash e2e/topology/setup.sh step5-deploy-switch-agent
 
-      - name: Display cluster pods
+      - name: roce-lldp-full-auto - Display cluster pods
         shell: bash
         run: |
           set -euo pipefail
           kubectl get pods -A -o wide
 
-      - name: E2E check
+      - name: roce-lldp-full-auto - E2E check
         shell: bash
         run: |
           set -euo pipefail
           go run ./e2e \
+            --scenario roce-lldp-full-auto \
             --timeout-minutes "${E2E_WAIT_TIMEOUT_MINUTES}" \
             --topology-dir "${TOPOLOGY_DIR}"
+
+      - name: roce-lldp-full-auto - Uninstall and clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step6-uninstall-unifabric
+
+      - name: RoCE LLDP node-only - Install Unifabric
+        shell: bash
+        env:
+          CONTROLLER_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          CONTROLLER_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-controller
+          CONTROLLER_TAG: ${{ steps.vars.outputs.image_tag }}
+          AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
+          AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SWITCH_MTLS_MODE: disabled
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step4-install-unifabric
+          kubectl apply -f e2e/topology/script/switch-resources-roce-lldp-node-only.yaml
+
+      - name: RoCE LLDP node-only - E2E check
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./e2e \
+            --scenario roce-lldp-node-only \
+            --timeout-minutes "${E2E_WAIT_TIMEOUT_MINUTES}" \
+            --topology-dir "${TOPOLOGY_DIR}"
+
+      - name: RoCE LLDP node-only - Uninstall and clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step6-uninstall-unifabric
+
+      - name: nv-topograph - Install label simulation
+        shell: bash
+        env:
+          CONTROLLER_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          CONTROLLER_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-controller
+          CONTROLLER_TAG: ${{ steps.vars.outputs.image_tag }}
+          AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
+          AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SWITCH_MTLS_MODE: disabled
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step4-install-unifabric
+
+      - name: nv-topograph - Manual label E2E check
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./e2e \
+            --scenario nv-topograph \
+            --timeout-minutes "${E2E_WAIT_TIMEOUT_MINUTES}" \
+            --topology-dir "${TOPOLOGY_DIR}"
+
+      - name: nv-topograph - Uninstall and clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step6-uninstall-unifabric
 
       - name: Dump diagnostics on failure
         if: failure()
@@ -252,8 +318,9 @@ jobs:
           kubectl get pods -A -o wide
           kubectl get events -A --sort-by=.lastTimestamp | tail -n 200
           kubectl get fabricnodes.unifabric.io -o wide
-          kubectl get scaleoutleafgroups.unifabric.io -o wide
-          kubectl get scaleupleafgroups.unifabric.io -o wide
+          kubectl get switches.unifabric.io -o wide
+          kubectl get topologies.unifabric.io -o yaml
+          kubectl get nodes --show-labels
           kubectl -n unifabric-system logs deploy/unifabric-controller --tail=300
           kubectl -n unifabric-system logs daemonset/unifabric-agent --tail=200
 

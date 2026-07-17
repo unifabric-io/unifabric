@@ -4,71 +4,49 @@
 
 This guide explains how to deploy Unifabric in an InfiniBand NIC cluster. This scenario is for IB networking, such as Mellanox NICs in IB mode with IB switches.
 
-## Deployment Goals
+## Example Topology and Deployment Goals
 
-After deployment, the cluster should achieve two goals:
+The following diagram shows a three-tier topology with a tier 3 core, tier 2 spine, and tier 1
+leaf switches. The four Nodes belong to two tier 1 performance domains:
 
-- Nodes are labeled with topology labels consumed by schedulers, including `unifabric.io/scale-up`, `unifabric.io/scale-out-leaf`, `unifabric.io/scale-out-spine`, and `unifabric.io/scale-out-core`.
-- Node RDMA state is observable through Unifabric Agent metrics and the built-in RDMA Grafana dashboards, with throughput, utilization, QoS, congestion, and error metrics grouped by cluster, node, Pod, and workload.
+![Example InfiniBand three-tier topology](images/infiniband-topology-example.png)
 
-> This scenario does not create `FabricNode` or `Switch` CRs for Unifabric switch-driven discovery.
+After scale-out topology discovery completes, the four Nodes should have the following labels:
+
+| Node | Expected labels |
+| --- | --- |
+| `node1` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006636c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+| `node2` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006636c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+| `node3` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006637c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+| `node4` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006637c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+
+A larger tier number indicates a position closer to the upper layers of the network. Scale-up
+labels are derived from the high-speed GPU interconnect topology within each Node and are not
+shown in the diagram.
+
+After deployment, you can also use Unifabric Agent metrics and the built-in RDMA Grafana
+Dashboard to observe Node RDMA state, including throughput, utilization, QoS, congestion, and
+error metrics by cluster, Node, Pod, and Workload.
 
 ## Prerequisites
 
-- A Kubernetes cluster with target GPU nodes.
-- `kubectl` and Helm 3 installed.
-- InfiniBand / RDMA devices visible under `/sys/class/infiniband` on the nodes.
-- GPU Operator and NVIDIA device plugin are deployed.
-- node-data-broker can run on target GPU nodes. By default it uses the GPU Operator clique label;
-  `pods/exec` permission is only needed when `nvidiaTopograph.provider.params.useGpuCliqueLabel` is disabled.
-- Prometheus Operator and Grafana Operator are installed in the cluster. If they are not installed, disable
-  `ServiceMonitor` and `GrafanaDashboard` when installing Unifabric to avoid CRD creation failures.
+- Unifabric has been installed by following the [basic installation](./getting-started.md).
+- The Nodes have RDMA devices running in IB mode.
 
-Verify cluster access:
+## Configure InfiniBand Topology Discovery
+
+Complete the [basic installation](./getting-started.md), then run the following Helm upgrade for
+the InfiniBand scale-up and scale-out networks. It changes only the scenario-specific modes and
+retains every other value from the base installation.
 
 ```bash
-kubectl cluster-info
-kubectl get nodes -o wide
-```
-
-## Install Unifabric
-
-The following command uses the latest release. The example leaves RDMA interface selectors empty, so all RDMA NICs are observed by metrics. InfiniBand topology labels are written by NVIDIA topograph.
-
-```bash
-LATEST_TAG=$(curl -fsSL https://api.github.com/repos/unifabric-io/unifabric/releases/latest | grep '"tag_name":' | cut -d '"' -f4)
-CHART_VERSION="${LATEST_TAG#v}"
-
-helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --version "${CHART_VERSION}" \
+helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --namespace unifabric-system \
-  --create-namespace \
-  --set nvidiaTopograph.enable=true \
-  --set nvidiaTopograph.provider.name=infiniband-k8s \
-  --set internalTopologyLabelWriter.enabled=false \
-  --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="" \
-  --set-string nodeTopologyDiscovery.storageInterfaceSelector="" \
-  --set nodeMetrics.enabled=true \
-  --set nodeMetrics.serviceMonitor.enabled=true \
-  --set grafanaDashboard.enabled=true \
+  --reuse-values \
+  --set topoDiscovery.scaleUp.mode=nv-topograph \
+  --set topoDiscovery.scaleOut.mode=nv-topograph \
   --wait
 ```
-
-Parameters:
-
-| Helm value | Purpose |
-| --- | --- |
-| `nvidiaTopograph.enable` | Enables NVIDIA topograph. Must be `true` for InfiniBand networking. |
-| `nvidiaTopograph.provider.name` | Set to `infiniband-k8s` to use the InfiniBand Kubernetes provider. |
-| `nvidiaTopograph.provider.params.useGpuCliqueLabel` | Defaults to `true` and uses the GPU Operator clique label as the accelerator topology source. Set it to `false` only when node-data-broker should discover topology through `pods/exec`. |
-| `internalTopologyLabelWriter.enabled` | Set to `false` to prevent the built-in Unifabric writer and NVIDIA topograph from both writing topology Node labels. |
-| `nodeMetrics.enabled` | Enables Agent metrics for node RDMA observability. |
-| `nodeTopologyDiscovery.scaleOutInterfaceSelector` | Selects RDMA NICs included in scale-out topology and RDMA metrics, and labels them with `kind=scaleOut` in RDMA metrics. Supports `interface=ib*,mlx*` or `cidr=172.17.0.0/16`. Defaults to all RDMA NICs. |
-| `nodeTopologyDiscovery.storageInterfaceSelector` | Selects storage RDMA NICs and labels them with `kind=storage` in RDMA metrics. Supports `interface=ib*,mlx*` or `cidr=172.17.0.0/16`. Defaults to empty. |
-| `nodeMetrics.serviceMonitor.enabled` | Creates the Prometheus Operator `ServiceMonitor`. |
-| `grafanaDashboard.enabled` | Renders the built-in RDMA dashboards. |
-
-For more Helm parameters, see [chart/README.md](../chart/README.md).
 
 ## Verify the Deployment
 
@@ -77,41 +55,101 @@ Check topograph components, node-data-broker DaemonSet, Node annotation, and Nod
 ```bash
 kubectl -n unifabric-system get pods
 kubectl get pods -n unifabric-system -o wide
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
+kubectl get fabricnodes.unifabric.io
+kubectl get nodes -L scale-up.unifabric.io/tier-1,scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
+```
+
+The FabricNode list should include every target Node with `READY` set to `True`:
+
+```text
+NAME                TOTALNICS   READY   ROLE   NODEIP
+node1               2           True    GPU    10.0.0.1
+node2               2           True    GPU    10.0.0.2
+node3               2           True    GPU    10.0.0.3
+node4               2           True    GPU    10.0.0.4
+```
+
+Inspect the Agent report for an individual Node:
+
+```bash
+kubectl get fabricnode <node-name> -o yaml
+```
+
+Confirm that `status.nodeRole`, `status.scaleOutNics`, and `status.conditions`
+match the expected state and that participating IB NICs are `up`. You can also
+query `FabricNode` resources with the `fn` short name.
+
+After ScaleOut topology discovery succeeds, the `scaleout` Topology is created:
+
+```bash
+kubectl get topo
+```
+
+```text
+NAME       AGE
+scaleout   113m
+```
+
+Inspect the complete result:
+
+```bash
+kubectl get topo scaleout -o yaml
+```
+
+The following example represents a three-tier leaf, spine, and core topology.
+`status.domains` describes parent-child relationships between performance
+domains, while `status.nodes[].domainPath` records each Node's complete path
+from tier 3 to tier 1:
+
+```yaml
+apiVersion: unifabric.io/v1beta1
+kind: Topology
+metadata:
+  name: scaleout
+status:
+  domains:
+    - name: S-fc6a1c0300b03c40
+      tier: 3
+    - name: S-fc6a1c0300afca40
+      parent: S-fc6a1c0300b03c40
+      tier: 2
+    - name: S-fc6a1c03006636c0
+      parent: S-fc6a1c0300afca40
+      tier: 1
+    - name: S-fc6a1c03006637c0
+      parent: S-fc6a1c0300afca40
+      tier: 1
+  nodes:
+    - domainPath:
+        - S-fc6a1c0300b03c40
+        - S-fc6a1c0300afca40
+        - S-fc6a1c03006636c0
+      nodes:
+        - node1
+        - node2
+    - domainPath:
+        - S-fc6a1c0300b03c40
+        - S-fc6a1c0300afca40
+        - S-fc6a1c03006637c0
+      nodes:
+        - node3
+        - node4
 ```
 
 When configuring Kueue, Volcano, or KAI Scheduler, use only labels that are actually written to Nodes.
 
-Verify RDMA metrics resources:
-
-```bash
-kubectl -n unifabric-system get service unifabric-agent-metrics
-kubectl -n unifabric-system get servicemonitor unifabric-agent-metrics
-```
-
-Check the Agent metrics endpoint directly:
-
-```bash
-POD_IP=$(kubectl -n unifabric-system get pod -l app.kubernetes.io/component=unifabric-agent -o jsonpath='{.items[0].status.podIP}')
-curl -s "http://${POD_IP}:8082/metrics" | grep '^unifabric_'
-```
-
 ## Troubleshooting
+
+For general `FabricNode` and RDMA metrics troubleshooting, see
+[Basic installation troubleshooting](./getting-started.md#troubleshooting).
 
 ### Node Labels Are Not Written
 
 - Confirm that NVIDIA topograph, node-observer, and node-data-broker are running and have permission to update Nodes.
 - Confirm that node-data-broker Pods run on target GPU nodes.
-- Confirm that corresponding nodes have the `topograph.nvidia.com/cluster-id` annotation.
-- If `nvidiaTopograph.provider.params.useGpuCliqueLabel` is disabled, confirm that `ibnetdiscover` is available.
-- If `topologyLabels.*` Helm values are customized, scheduler label keys must be updated accordingly.
-
-### RDMA Metrics Do Not Include IB NICs
-
-- Confirm that the Agent Pod is running and IB devices are visible under `/sys/class/infiniband` on the node.
-- Confirm that `nodeTopologyDiscovery.scaleOutInterfaceSelector` matches the IB NIC name or CIDR.
-- Confirm that `nodeMetrics.enabled=true`.
-- If using Prometheus Operator, confirm that `nodeMetrics.serviceMonitor.enabled=true` and the `ServiceMonitor` is selected by Prometheus.
+- If ScaleOut labels are not written, confirm that `ibnetdiscover` is available
+  in the node-data-broker Pod.
+- If `topoDiscovery.*.nodeLabel.keyTemplate` values are customized, scheduler label keys must be updated accordingly.
 
 ## Uninstall
 
