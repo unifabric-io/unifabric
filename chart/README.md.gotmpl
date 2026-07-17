@@ -42,17 +42,29 @@
 
 {{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "global")) }}
 
-## Topology Labels
+## Topology Discovery
 
-{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "topologyLabels" "internalTopologyLabelWriter" "topologyGroupNaming")) }}
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "topoDiscovery")) }}
 
-## Switch Topology Discovery
+`topoDiscovery.*.mode` is the only topology-writer switch. The former
+`topologyLabels`, `internalTopologyLabelWriter.enabled`,
+`switchTopologyDiscovery`, `switchDiscovery`, `switchAgent`,
+`nodeTopologyDiscovery`, `nodeDiscovery`, and `nvidiaTopograph.enable` values
+are rejected with migration errors instead of being silently ignored. The
+former component-level NVIDIA blocks are replaced by the shared
+`nvidiaTopograph.image` and GPU-node values.
 
-{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "switchTopologyDiscovery")) }}
+## Switch Subscription
 
-## Node Topology Discovery and Observability
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "switchSubscription")) }}
 
-{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "nodeTopologyDiscovery" "nodeMetrics" "grafanaDashboard")) }}
+Per-switch addresses and port overrides belong to `Switch.spec`. gRPC transport
+tuning uses Controller defaults, while `switchSubscription.mtls.mode` selects
+auto-generated, existing, or disabled mTLS.
+
+## FabricNode Reporting and Observability
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "fabricNode" "nodeMetrics" "grafanaDashboard")) }}
 
 ## Controller and Agent
 

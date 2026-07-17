@@ -11,15 +11,15 @@ Unifabric or NVIDIA Topograph discovers the topology and writes it back as Node
 labels; Kueue, Volcano, or KAI Scheduler ultimately consumes these labels to
 place workloads.
 
-Unifabric uses Helm values `topologyLabels.*` to define the label keys consumed
+Unifabric uses Helm values `topoDiscovery.*.label.keyTemplate` to define the label keys consumed
 by schedulers:
 
 | Scheduling level | Default Node label | Usage |
 | --- | --- | --- |
-| scale-up | `unifabric.io/scale-up` | GPU high-speed interconnect domain, such as an NVLink domain |
-| scale-out leaf | `unifabric.io/scale-out-leaf` | Leaf-level scale-out topology domain, directly connected to hosts |
-| scale-out spine | `unifabric.io/scale-out-spine` | Spine-level scale-out topology domain, upstream of leaf switches |
-| scale-out core | `unifabric.io/scale-out-core` | Core-level scale-out topology domain, upstream of spine switches |
+| scale-up tier 1 | `scale-up.unifabric.io/tier-1` | GPU high-speed interconnect domain, such as an NVLink domain |
+| scale-out tier 1 | `scale-out.unifabric.io/tier-1` | First scale-out tier, directly connected to hosts |
+| scale-out tier 2 | `scale-out.unifabric.io/tier-2` | Second scale-out tier, upstream of tier 1 |
+| scale-out tier 3 | `scale-out.unifabric.io/tier-3` | Third scale-out tier, upstream of tier 2 |
 | node | `kubernetes.io/hostname` | Kubernetes default node label, the finest-grained node-level topology domain |
 
 Schedulers can only use labels that are actually written to Nodes. When
@@ -403,6 +403,6 @@ Topology labels are missing or unstable:
   kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
   ```
 
-- If Helm values `topologyLabels.*` are customized, the Kueue
+- If Helm values `topoDiscovery.*.label.keyTemplate` are customized, the Kueue
   `Topology.spec.levels[*].nodeLabel` and Job annotation values must be updated
   accordingly.

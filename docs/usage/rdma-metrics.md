@@ -63,7 +63,7 @@ curl -s "http://${POD_IP}:8082/metrics" | grep 'kind="storage"'
 ```
 
 The `kind` label is determined by the
-`nodeTopologyDiscovery.*InterfaceSelector` values configured during
+`fabricNode.*InterfaceSelector` values configured during
 installation. If no scale-out selector is configured and the interface can be
 identified, the Agent defaults the interface to `scaleOut`.
 
@@ -146,6 +146,6 @@ If there are no Pod-attributed metrics:
 
 If the `kind` label is empty:
 
-- Check `nodeTopologyDiscovery.scaleOutInterfaceSelector`, `nodeTopologyDiscovery.storageInterfaceSelector`, and `nodeTopologyDiscovery.scaleUpInterfaceSelector`.
+- Check `fabricNode.scaleOutInterfaceSelector`, `fabricNode.storageInterfaceSelector`, and `fabricNode.scaleUpInterfaceSelector`.
 - Selectors support `interface=eth*,!eth9` and `cidr=172.17.0.0/16`.
 - If no scale-out selector is configured and the interface is identifiable, the Agent defaults the interface to `scaleOut`.

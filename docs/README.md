@@ -16,6 +16,7 @@ Choose the installation guide that matches the cluster's physical network:
 ## Usage Guides
 
 - [RDMA observability usage guide](./usage/rdma-metrics.md): Enable and verify RDMA metrics, Prometheus scraping, and Grafana dashboards.
+- [Deploy switch-agent on multiple switches with the script](./usage/deploy-switch-agent-script.md): Distribute mTLS certificates and recreate switch-agent containers from a management host.
 - [switch-agent hostProc LLDP collection](./usage/switch-agent-host-proc.md): Use host `/proc` namespace collection when the switch cannot mount the `lldpd` socket.
 - [switch-agent systemd installation](./usage/switch-agent-systemd.md): Run switch-agent as a native binary when switches cannot run Docker.
 - [Kueue TAS workload example](./usage/workload-tas.md): Use Unifabric scale-out leaf Node labels with Kueue Topology Aware Scheduling.
@@ -33,4 +34,5 @@ Choose the installation guide that matches the cluster's physical network:
 
 ## Reference
 
+- [Unifabric API reference](./reference/README.md): Dedicated API references for `FabricNode`, `Switch`, and `Topology`.
 - [Helm values reference](../chart/README.md): Chart parameters and default values.

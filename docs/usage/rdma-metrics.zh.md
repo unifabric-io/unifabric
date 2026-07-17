@@ -55,7 +55,7 @@ curl -s "http://${POD_IP}:8082/metrics" | grep 'kind="scaleUp"'
 curl -s "http://${POD_IP}:8082/metrics" | grep 'kind="storage"'
 ```
 
-`kind` 标签由安装时配置的 `nodeTopologyDiscovery.*InterfaceSelector` 决定。未配置
+`kind` 标签由安装时配置的 `fabricNode.*InterfaceSelector` 决定。未配置
 scale-out selector 且接口可识别时，Agent 会默认将接口标记为 `scaleOut`。
 
 ## Dashboard
@@ -130,6 +130,6 @@ kubectl -n unifabric-system get grafanadashboard -l app.kubernetes.io/component=
 
 如果 `kind` 标签为空：
 
-- 检查 `nodeTopologyDiscovery.scaleOutInterfaceSelector`、`nodeTopologyDiscovery.storageInterfaceSelector` 和 `nodeTopologyDiscovery.scaleUpInterfaceSelector`。
+- 检查 `fabricNode.scaleOutInterfaceSelector`、`fabricNode.storageInterfaceSelector` 和 `fabricNode.scaleUpInterfaceSelector`。
 - selector 支持 `interface=eth*,!eth9` 和 `cidr=172.17.0.0/16` 两种形式。
 - 当没有配置 scale-out selector 且接口可识别时，Agent 会默认将接口标记为 `scaleOut`。

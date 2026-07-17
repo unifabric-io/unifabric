@@ -4,65 +4,48 @@ global:
   # -- Image pull secrets applied to Unifabric controller and agent pods.
   imagePullSecrets: []
 
-# -- Kubernetes Node label keys used for topology-aware scheduling and topology integrations.
-topologyLabels:
-  # -- Label key for the scale-up topology domain on a node.
-  scaleUp: unifabric.io/scale-up
+# -- Independently selects one discovery implementation and label contract for each topology. Mode is the only enablement switch for its topology writer.
+topoDiscovery:
+  scaleUp:
+    # -- Scale-up discovery mode. Options: nv-topograph (NVIDIA Topograph) or manual (labels are managed externally).
+    mode: manual
+    label:
+      # -- Go text/template for scale-up topology label keys. It must contain exactly one {{ .Tier }} action.
+      keyTemplate: "scale-up.unifabric.io/tier-{{ .Tier }}"
 
-  # -- Label key for the leaf-level scale-out topology domain on a node.
-  scaleOutLeaf: unifabric.io/scale-out-leaf
+  scaleOut:
+    # -- Scale-out discovery mode. Options: nv-topograph (NVIDIA Topograph) or unifabric-roce (built-in LLDP discovery).
+    mode: unifabric-roce
+    label:
+      # -- Go text/template for scale-out topology label keys. It must contain exactly one {{ .Tier }} action.
+      keyTemplate: "scale-out.unifabric.io/tier-{{ .Tier }}"
 
-  # -- Label key for the spine-level scale-out topology domain on a node.
-  scaleOutSpine: unifabric.io/scale-out-spine
+  storage:
+    # -- Storage discovery mode. Options: unifabric-roce (RoCE storage) or unifabric-ib (InfiniBand storage).
+    mode: unifabric-roce
+    label:
+      # -- Go text/template for storage topology label keys. It must contain exactly one {{ .Tier }} action.
+      keyTemplate: "storage.unifabric.io/tier-{{ .Tier }}"
 
-  # -- Label key for the core-level scale-out topology domain on a node.
-  scaleOutCore: unifabric.io/scale-out-core
-
-# -- Controls whether the built-in Unifabric topology label writer writes discovered topology to Kubernetes Node labels.
-internalTopologyLabelWriter:
-  # -- Let Unifabric write and clean topology Node labels internally. Disable when another component, such as NVIDIA Topograph, owns topology labels.
-  enabled: true
-
-# -- Controls the format of topology group values written to Kubernetes Node labels.
-topologyGroupNaming:
-  # -- Format for topology label values. Use name for readable switch-based values, or hash for compact stable values.
-  labelValueFormat: hash
-  # -- Number of hash characters used when labelValueFormat is hash.
-  hashLength: 7
-
-# -- Controls switch-agent discovery from Switch resources.
-switchTopologyDiscovery:
-  # -- Enable controller-to-switch-agent subscriptions for switch-side topology discovery.
-  enabled: false
-  # -- Timeout for one controller-to-switch-agent gRPC dial attempt.
-  dialTimeout: 5s
-  # -- Delay before retrying a disconnected switch-agent stream.
-  reconnectBackoff: 30s
-  # -- Maximum gRPC message size accepted from switch-agent topology snapshots, in bytes.
-  maxRecvMsgSize: 4194304
-  # -- gRPC keepalive interval for controller-to-switch-agent streams.
-  keepaliveTime: 30s
+# -- Controls Controller subscriptions to switch-agent endpoints described by Switch resources.
+switchSubscription:
   # -- Default gRPC port used when a Switch resource does not set spec.grpcPort.
   defaultGrpcPort: 8090
-  # -- Switch local port name patterns ignored before topology graph construction.
-  ignoreSwitchPorts:
+  # -- Glob patterns for switch local ports ignored before topology graph construction.
+  ignorePortPatterns:
     - mgmt*
     - Management*
     - oob*
   mtls:
-    # -- Require pinned mTLS for controller-to-switch-agent streams.
-    enabled: true
-    # -- Generate Helm-managed pinned mTLS Secrets when they do not already exist.
-    autoGenerate: true
-    # -- Validity period, in days, for auto-generated mTLS certificates.
-    validityDays: 36500
+    # -- Certificate mode: auto generates Helm-managed Secrets, existing uses pre-created Secrets, and disabled uses plaintext gRPC.
+    mode: auto
     # -- Secret mounted into the controller containing tls.crt, tls.key, and peer.crt.
     controllerSecretName: switch-controller-mtls-controller
     # -- Secret exported for switch agents containing tls.crt, tls.key, and peer.crt.
     switchAgentSecretName: switch-controller-mtls-agent
 
-# -- Controls node-local RDMA interface and LLDP neighbor discovery performed by the agent.
-nodeTopologyDiscovery:
+# -- Controls how the agent discovers local RDMA and LLDP state and reports it through the FabricNode resource.
+fabricNode:
   # -- Interval between agent refreshes of local RDMA interfaces and LLDP neighbors.
   refreshInterval: "1m"
   # -- Delay before the first agent scan, allowing lldpd to learn neighbors.
@@ -213,13 +196,13 @@ agent:
   # -- Deploy the Unifabric node agent DaemonSet.
   enabled: true
   image:
-    # -- Container image registry for the agent.
+    # -- Container image registry shared by the agent and lldpd sidecar.
     registry: ghcr.io
-    # -- Container image repository for the agent.
+    # -- Container image repository shared by the agent and lldpd sidecar.
     repository: unifabric-io/unifabric-agent
-    # -- Container image tag for the agent. Defaults to the chart appVersion when empty.
+    # -- Container image tag shared by the agent and lldpd sidecar. Defaults to the chart appVersion when empty.
     tag: ""
-    # -- Image pull policy for the agent container.
+    # -- Image pull policy shared by the agent and lldpd sidecar.
     pullPolicy: IfNotPresent
   serviceAccount:
     # -- Create a ServiceAccount for the agent.
@@ -291,15 +274,6 @@ agent:
   lldp:
     # -- Run the lldpd sidecar used by the agent to collect LLDP neighbors.
     enabled: true
-    image:
-      # -- Container image registry for lldpd.
-      registry: ghcr.io
-      # -- Container image repository for lldpd.
-      repository: unifabric-io/unifabric-agent
-      # -- Container image tag for lldpd. Defaults to the chart appVersion when empty.
-      tag: ""
-      # -- Image pull policy for the lldpd sidecar.
-      pullPolicy: IfNotPresent
     # -- lldpd management IP pattern written to lldpd.conf. Leave empty to let lldpd choose.
     managementIPPattern: ""
     # -- Interface pattern passed to lldpd for LLDP discovery. Leave empty to let lldpd use its defaults.
@@ -324,217 +298,28 @@ agent:
         memory: 128Mi
 
 nvidiaTopograph:
-  # -- Deploy the NVIDIA Topograph integration rendered by this chart.
-  enable: false
-  # -- Provider settings passed to node-observer.
+  # -- Topology provider settings passed to NVIDIA Topograph.
   provider:
-    # -- Topograph provider name, such as infiniband-k8s or netq.
+    # -- Provider name. Use infiniband-k8s for InfiniBand or netq for Spectrum-X.
     name: infiniband-k8s
-    # -- Provider-specific parameters passed to NVIDIA Topograph components.
-    params:
-      # -- Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s.
-      useGpuCliqueLabel: true
-  # -- Engine settings passed to node-observer.
-  engine:
-    # -- Topograph engine name used by node-observer.
-    name: k8s
-  # -- Service settings for the topograph HTTP API.
-  service:
-    # -- Kubernetes Service type for the topograph HTTP API.
-    type: ClusterIP
-  # -- Image pull secrets applied to NVIDIA Topograph workloads. Defaults to global.imagePullSecrets when empty.
-  imagePullSecrets: []
-  topograph:
-    # -- Number of topograph API replicas.
-    replicaCount: 1
-    image:
-      # -- Container image registry for the topograph API.
-      registry: ghcr.io
-      # -- Container image repository for the topograph API.
-      repository: nvidia/topograph
-      # -- Container image tag for the topograph API.
-      tag: v0.5.0
-      # -- Image pull policy for the topograph API container.
-      pullPolicy: IfNotPresent
-    # -- Existing topograph Service name used by node-observer. Leave empty to use the chart-managed Service.
-    serviceName: ""
-    # -- Verbosity level passed to the topograph API process.
-    verbosity: 3
-    # -- Extra environment variables added to the topograph API container.
-    env: {}
-    # -- Runtime configuration written to topograph-config.yaml.
-    config:
-      # -- Delay used by topograph to aggregate topology generation requests.
-      requestAggregationDelay: 15s
-      # -- Secret containing provider credentials for topograph. The Secret must include credentials.yaml by default.
-      credentialsSecret: ""
-      # -- Credentials file path written to topograph-config.yaml. Defaults to /etc/topograph/credentials/credentials.yaml when credentialsSecret is set.
-      credentialsPath: ""
-    # -- Annotations added to topograph API pods.
-    podAnnotations: {}
-    # -- Extra labels added to topograph API pods.
-    podLabels: {}
-    # -- Pod security context for topograph API pods.
-    podSecurityContext: {}
-    # -- Container security context for the topograph API container.
-    securityContext: {}
-    resources:
-      limits:
-        # -- Topograph API CPU limit.
-        cpu: 400m
-        # -- Topograph API memory limit.
-        memory: 512Mi
-      requests:
-        # -- Topograph API CPU request.
-        cpu: 250m
-        # -- Topograph API memory request.
-        memory: 256Mi
-    # -- Extra volumes added to topograph API pods.
-    volumes: []
-    # -- Extra volume mounts added to the topograph API container.
-    volumeMounts: []
-    # -- Liveness probe configuration for the topograph API container.
-    livenessProbe:
-      httpGet:
-        # -- HTTP path used by the topograph API liveness probe.
-        path: /healthz
-        # -- Named port used by the topograph API liveness probe.
-        port: http
-    # -- Readiness probe configuration for the topograph API container.
-    readinessProbe:
-      httpGet:
-        # -- HTTP path used by the topograph API readiness probe.
-        path: /healthz
-        # -- Named port used by the topograph API readiness probe.
-        port: http
-    # -- Node selector for scheduling topograph API pods.
-    nodeSelector: {}
-    # -- Tolerations for scheduling topograph API pods.
-    tolerations: []
-    # -- Affinity rules for scheduling topograph API pods.
-    affinity: {}
-    serviceMonitor:
-      # -- Create a Prometheus Operator ServiceMonitor for the topograph API.
-      enabled: false
-      # -- Namespace where the topograph ServiceMonitor is created.
-      namespace: monitoring
-      # -- Service port name scraped by the topograph ServiceMonitor.
-      port: http
-      # -- HTTP path scraped by the topograph ServiceMonitor.
-      path: /metrics
-      # -- Prometheus scrape interval for the topograph API.
-      interval: 15s
-      # -- HTTP scheme used by the topograph ServiceMonitor.
-      scheme: http
-  nodeObserver:
-    # -- Number of node-observer replicas.
-    replicaCount: 1
-    image:
-      # -- Container image registry for node-observer.
-      registry: ghcr.io
-      # -- Container image repository for node-observer.
-      repository: nvidia/topograph
-      # -- Container image tag for node-observer.
-      tag: v0.5.0
-      # -- Image pull policy for the node-observer container.
-      pullPolicy: IfNotPresent
-    # -- Verbosity level passed to node-observer.
-    verbosity: 3
-    # -- Topograph API and node-data-broker readiness inputs watched by node-observer.
-    topograph:
-      apiServer:
-        # -- Watch the Topograph API pod and trigger topology generation when it becomes ready.
-        enabled: true
-        # -- Pod selector used to find the Topograph API pod. Empty uses the chart-managed API pod labels.
-        podSelector: {}
-        # -- Topograph API container name watched by node-observer.
-        containerName: topograph
-      nodeDataBroker:
-        # -- Wait for node-data-broker pods before the first topology request.
-        enabled: true
-        # -- Pod selector used to find node-data-broker pods. Empty uses the chart-managed broker pod labels.
-        podSelector: {}
-        # -- node-data-broker container name watched by node-observer.
-        containerName: node-data-broker
-      # -- node-observer trigger configuration.
-      trigger:
-        # -- Node selector used by node-observer to choose Nodes that trigger topology generation.
-        nodeSelector:
-          nvidia.com/gpu.present: "true"
-    # -- Annotations added to node-observer pods.
-    podAnnotations: {}
-    # -- Extra labels added to node-observer pods.
-    podLabels: {}
-    # -- Pod security context for node-observer pods.
-    podSecurityContext: {}
-    # -- Container security context for the node-observer container.
-    securityContext: {}
-    resources:
-      limits:
-        # -- node-observer CPU limit.
-        cpu: 400m
-        # -- node-observer memory limit.
-        memory: 512Mi
-      requests:
-        # -- node-observer CPU request.
-        cpu: 250m
-        # -- node-observer memory request.
-        memory: 256Mi
-    # -- Node selector for scheduling node-observer pods.
-    nodeSelector: {}
-    # -- Tolerations for scheduling node-observer pods.
-    tolerations: []
-    # -- Affinity rules for scheduling node-observer pods.
-    affinity: {}
-  nodeDataBroker:
-    # -- Deploy the node-data-broker DaemonSet used by NVIDIA Topograph.
-    enable: true
-    image:
-      # -- Container image registry for node-data-broker.
-      registry: ghcr.io
-      # -- Container image repository for node-data-broker.
-      repository: nvidia/topograph
-      # -- Container image tag for node-data-broker.
-      tag: v0.5.0
-      # -- Image pull policy for the node-data-broker container.
-      pullPolicy: IfNotPresent
-    # -- Port the node-data-broker serves its /healthz endpoint on after applying node annotations.
-    port: 8080
-    # -- How often node-data-broker reapplies node annotations. Set to 0 to disable periodic refresh.
-    refreshInterval: 5m
-    # -- Extra key=value parameters passed to node-data-broker via --set.
-    extraArgs: []
-    # -- Startup probe configuration for slow node-data-broker topology discovery.
-    startupProbe:
-      # -- Startup probe failure threshold for slow IB topology discovery.
-      failureThreshold: 30
-      # -- Startup probe period in seconds for node-data-broker.
-      periodSeconds: 10
-    # -- Verbosity level passed to node-data-broker.
-    verbosity: 3
-    # -- Annotations added to node-data-broker pods.
-    podAnnotations: {}
-    # -- Extra labels added to node-data-broker pods.
-    podLabels: {}
-    # -- Container security context for the node-data-broker container.
-    securityContext:
-      # -- Run node-data-broker as privileged so it can read host topology data.
-      privileged: true
-    resources:
-      limits:
-        # -- node-data-broker CPU limit.
-        cpu: 100m
-        # -- node-data-broker memory limit.
-        memory: 128Mi
-      requests:
-        # -- node-data-broker CPU request.
-        cpu: 100m
-        # -- node-data-broker memory request.
-        memory: 128Mi
-    # -- Node selector for scheduling node-data-broker pods.
-    nodeSelector:
-      nvidia.com/gpu.present: "true"
-    # -- Tolerations for scheduling node-data-broker pods.
-    tolerations: []
-    # -- Affinity rules for scheduling node-data-broker pods.
-    affinity: {}
+    # -- Provider-specific parameters, such as apiUrl for netq.
+    params: {}
+  # -- Existing Secret containing a credentials.yaml key. Required by the netq provider; credentials are mounted only into the topograph Pod.
+  credentialsSecretName: ""
+  # -- Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s.
+  useGpuCliqueLabel: true
+  # -- Shared image used by topograph, node-observer, and node-data-broker.
+  image:
+    # -- NVIDIA Topograph image registry.
+    registry: ghcr.io
+    # -- NVIDIA Topograph image repository.
+    repository: nvidia/topograph
+    # -- NVIDIA Topograph image tag.
+    tag: v0.5.0
+    # -- NVIDIA Topograph image pull policy.
+    pullPolicy: IfNotPresent
+  # -- Selects GPU Nodes observed by node-observer and running node-data-broker.
+  gpuNodeSelector:
+    nvidia.com/gpu.present: "true"
+  # -- Tolerations applied to node-data-broker on selected GPU Nodes.
+  gpuNodeTolerations: []

@@ -210,10 +210,7 @@ jobs:
               .controller.image.tag = strenv(IMAGE_VERSION) |
               .agent.image.registry = "ghcr.io" |
               .agent.image.repository = strenv(IMAGE_NAMESPACE) + "/unifabric-agent" |
-              .agent.image.tag = strenv(IMAGE_VERSION) |
-              .agent.lldp.image.registry = "ghcr.io" |
-              .agent.lldp.image.repository = strenv(IMAGE_NAMESPACE) + "/unifabric-agent" |
-              .agent.lldp.image.tag = strenv(IMAGE_VERSION)
+              .agent.image.tag = strenv(IMAGE_VERSION)
             ' ./chart/values.yaml
 
       - name: Package Helm Chart

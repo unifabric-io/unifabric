@@ -45,18 +45,52 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default (include "unifabric.agentName" .) .Values.agent.serviceAccount.name -}}
 {{- end -}}
 
+{{- define "unifabric.topoDiscovery.scaleUpMode" -}}
+{{- .Values.topoDiscovery.scaleUp.mode | lower -}}
+{{- end -}}
+
+{{- define "unifabric.topoDiscovery.scaleOutMode" -}}
+{{- .Values.topoDiscovery.scaleOut.mode | lower -}}
+{{- end -}}
+
+{{- define "unifabric.topoDiscovery.storageMode" -}}
+{{- .Values.topoDiscovery.storage.mode | lower -}}
+{{- end -}}
+
+{{- define "unifabric.switchSubscription.enabled" -}}
+{{- $scaleOutMode := include "unifabric.topoDiscovery.scaleOutMode" . -}}
+{{- $storageMode := include "unifabric.topoDiscovery.storageMode" . -}}
+{{- if or (eq $scaleOutMode "unifabric-roce") (has $storageMode (list "unifabric-roce" "unifabric-ib")) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.nvidiaTopograph.enabled" -}}
+{{- $scaleUpMode := include "unifabric.topoDiscovery.scaleUpMode" . -}}
+{{- $scaleOutMode := include "unifabric.topoDiscovery.scaleOutMode" . -}}
+{{- if or (eq $scaleUpMode "nv-topograph") (eq $scaleOutMode "nv-topograph") -}}
+true
+{{- end -}}
+{{- end -}}
+
 {{- define "unifabric.switchMTLS.enabled" -}}
-{{- if and .Values.switchTopologyDiscovery.enabled .Values.switchTopologyDiscovery.mtls.enabled -}}
+{{- if and (eq (include "unifabric.switchSubscription.enabled" .) "true") (ne (lower .Values.switchSubscription.mtls.mode) "disabled") -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.switchMTLS.autoGenerate" -}}
+{{- if and (eq (include "unifabric.switchMTLS.enabled" .) "true") (eq (lower .Values.switchSubscription.mtls.mode) "auto") -}}
 true
 {{- end -}}
 {{- end -}}
 
 {{- define "unifabric.switchMTLS.controllerSecretName" -}}
-{{- default (printf "%s-switch-controller-mtls-controller" (include "unifabric.fullname" .)) .Values.switchTopologyDiscovery.mtls.controllerSecretName -}}
+{{- default (printf "%s-switch-controller-mtls-controller" (include "unifabric.fullname" .)) .Values.switchSubscription.mtls.controllerSecretName -}}
 {{- end -}}
 
 {{- define "unifabric.switchMTLS.switchAgentSecretName" -}}
-{{- default (printf "%s-switch-controller-mtls-agent" (include "unifabric.fullname" .)) .Values.switchTopologyDiscovery.mtls.switchAgentSecretName -}}
+{{- default (printf "%s-switch-controller-mtls-agent" (include "unifabric.fullname" .)) .Values.switchSubscription.mtls.switchAgentSecretName -}}
 {{- end -}}
 
 {{- define "unifabric.render" -}}
@@ -64,6 +98,140 @@ true
 {{- tpl .value .context -}}
 {{- else -}}
 {{- tpl (.value | toYaml) .context -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Validate and render the restricted topology label template with a Tier-only context. */}}
+{{- define "unifabric.topologyLabelKey" -}}
+{{- $raw := required "topology label template is required" .template -}}
+{{- $tier := int .tier -}}
+{{- if lt $tier 1 -}}
+{{- fail "topology label tier must be greater than or equal to 1" -}}
+{{- end -}}
+{{- $actionPattern := `\{\{[[:space:]]*\.Tier[[:space:]]*\}\}` -}}
+{{- $actions := regexFindAll $actionPattern $raw -1 -}}
+{{- $stripped := regexReplaceAll $actionPattern $raw "" -}}
+{{- if or (ne (len $actions) 1) (contains "{{" $stripped) (contains "}}" $stripped) -}}
+{{- fail (printf "topology label template %q must contain fixed text and exactly one {{ .Tier }} action" $raw) -}}
+{{- end -}}
+{{- $key := tpl $raw (dict "Tier" $tier) -}}
+{{- $parts := splitList "/" $key -}}
+{{- if or (lt (len $parts) 1) (gt (len $parts) 2) -}}
+{{- fail (printf "topology label template %q renders invalid Kubernetes label key %q" $raw $key) -}}
+{{- end -}}
+{{- $name := last $parts -}}
+{{- if or (gt (len $name) 63) (not (regexMatch `^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$` $name)) -}}
+{{- fail (printf "topology label template %q renders invalid Kubernetes label key %q" $raw $key) -}}
+{{- end -}}
+{{- if eq (len $parts) 2 -}}
+{{- $prefix := first $parts -}}
+{{- if or (gt (len $prefix) 253) (not (regexMatch `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$` $prefix)) -}}
+{{- fail (printf "topology label template %q renders invalid Kubernetes label key %q" $raw $key) -}}
+{{- end -}}
+{{- end -}}
+{{- $key -}}
+{{- end -}}
+
+{{- define "unifabric.topoDiscovery.validate" -}}
+{{- if hasKey .Values "topologyLabels" -}}
+{{- fail "topologyLabels has been replaced by topoDiscovery.*.label.keyTemplate" -}}
+{{- end -}}
+{{- if hasKey .Values "internalTopologyLabelWriter" -}}
+{{- fail "internalTopologyLabelWriter has been replaced by topoDiscovery.*.mode" -}}
+{{- end -}}
+{{- if hasKey .Values "switchTopologyDiscovery" -}}
+{{- fail "switchTopologyDiscovery has been renamed to switchSubscription" -}}
+{{- end -}}
+{{- if hasKey .Values "switchDiscovery" -}}
+{{- fail "switchDiscovery has been renamed to switchSubscription" -}}
+{{- end -}}
+{{- if hasKey .Values "switchAgent" -}}
+{{- fail "switchAgent has been renamed to switchSubscription" -}}
+{{- end -}}
+{{- if hasKey .Values "nodeTopologyDiscovery" -}}
+{{- fail "nodeTopologyDiscovery has been renamed to fabricNode" -}}
+{{- end -}}
+{{- if hasKey .Values "nodeDiscovery" -}}
+{{- fail "nodeDiscovery has been renamed to fabricNode" -}}
+{{- end -}}
+{{- if hasKey .Values.switchSubscription "enabled" -}}
+{{- fail "switchSubscription.enabled has been replaced by topoDiscovery.scaleOut.mode and topoDiscovery.storage.mode" -}}
+{{- end -}}
+{{- range $key := list "dialTimeout" "reconnectBackoff" "maxRecvMsgSize" "keepaliveTime" -}}
+{{- if hasKey $.Values.switchSubscription $key -}}
+{{- fail (printf "switchSubscription.%s is now an internal controller default and is no longer configurable" $key) -}}
+{{- end -}}
+{{- end -}}
+{{- if hasKey .Values.switchSubscription "ignoreSwitchPorts" -}}
+{{- fail "switchSubscription.ignoreSwitchPorts has been renamed to switchSubscription.ignorePortPatterns" -}}
+{{- end -}}
+{{- range $key := list "enabled" "autoGenerate" -}}
+{{- if hasKey $.Values.switchSubscription.mtls $key -}}
+{{- fail (printf "switchSubscription.mtls.%s has been replaced by switchSubscription.mtls.mode=auto|existing|disabled" $key) -}}
+{{- end -}}
+{{- end -}}
+{{- if hasKey .Values.switchSubscription.mtls "validityDays" -}}
+{{- fail "switchSubscription.mtls.validityDays is now an internal certificate default and is no longer configurable" -}}
+{{- end -}}
+{{- $switchMTLSMode := lower (required "switchSubscription.mtls.mode is required" .Values.switchSubscription.mtls.mode) -}}
+{{- if not (has $switchMTLSMode (list "auto" "existing" "disabled")) -}}
+{{- fail (printf "switchSubscription.mtls.mode %q is invalid; expected auto, existing, or disabled" .Values.switchSubscription.mtls.mode) -}}
+{{- end -}}
+{{- if and (eq $switchMTLSMode "existing") (or (empty .Values.switchSubscription.mtls.controllerSecretName) (empty .Values.switchSubscription.mtls.switchAgentSecretName)) -}}
+{{- fail "switchSubscription.mtls.mode=existing requires controllerSecretName and switchAgentSecretName" -}}
+{{- end -}}
+{{- if hasKey .Values.nvidiaTopograph "enable" -}}
+{{- fail "nvidiaTopograph.enable has been replaced by topoDiscovery.scaleUp.mode and topoDiscovery.scaleOut.mode" -}}
+{{- end -}}
+{{- range $key := list "engine" "service" "imagePullSecrets" "topograph" "nodeObserver" "nodeDataBroker" -}}
+{{- if hasKey $.Values.nvidiaTopograph $key -}}
+{{- fail (printf "nvidiaTopograph.%s has been removed; use the simplified provider, image, gpuNodeSelector, and gpuNodeTolerations values" $key) -}}
+{{- end -}}
+{{- end -}}
+{{- if hasKey .Values.nvidiaTopograph "credentialsSecret" -}}
+{{- fail "nvidiaTopograph.credentialsSecret has been replaced by nvidiaTopograph.credentialsSecretName" -}}
+{{- end -}}
+{{- if hasKey .Values.nvidiaTopograph.provider "creds" -}}
+{{- fail "nvidiaTopograph.provider.creds is not supported because it stores credentials in plaintext; use nvidiaTopograph.credentialsSecretName" -}}
+{{- end -}}
+{{- if and
+  (eq (include "unifabric.nvidiaTopograph.enabled" .) "true")
+  (eq (lower .Values.nvidiaTopograph.provider.name) "netq")
+  (empty .Values.nvidiaTopograph.credentialsSecretName) -}}
+{{- fail "nvidiaTopograph.credentialsSecretName is required when provider.name=netq" -}}
+{{- end -}}
+{{- if hasKey .Values.agent.lldp "image" -}}
+{{- fail "agent.lldp.image has been removed; the lldpd sidecar now reuses agent.image" -}}
+{{- end -}}
+{{- if hasKey (.Values.nvidiaTopograph.provider.params | default dict) "useGpuCliqueLabel" -}}
+{{- fail "nvidiaTopograph.provider.params.useGpuCliqueLabel has moved to nvidiaTopograph.useGpuCliqueLabel" -}}
+{{- end -}}
+{{- $scaleUpMode := include "unifabric.topoDiscovery.scaleUpMode" . -}}
+{{- $scaleOutMode := include "unifabric.topoDiscovery.scaleOutMode" . -}}
+{{- $storageMode := include "unifabric.topoDiscovery.storageMode" . -}}
+{{- if eq $scaleUpMode "nvswitch" -}}
+{{- fail "topoDiscovery.scaleUp.mode=nvswitch has been renamed to topoDiscovery.scaleUp.mode=nv-topograph" -}}
+{{- end -}}
+{{- if not (has $scaleUpMode (list "nv-topograph" "manual")) -}}
+{{- fail (printf "topoDiscovery.scaleUp.mode %q is invalid; expected nv-topograph or manual" .Values.topoDiscovery.scaleUp.mode) -}}
+{{- end -}}
+{{- if eq $scaleOutMode "topograph" -}}
+{{- fail "topoDiscovery.scaleOut.mode=topograph has been renamed to topoDiscovery.scaleOut.mode=nv-topograph" -}}
+{{- end -}}
+{{- if not (has $scaleOutMode (list "nv-topograph" "unifabric-roce")) -}}
+{{- fail (printf "topoDiscovery.scaleOut.mode %q is invalid; expected nv-topograph or unifabric-roce" .Values.topoDiscovery.scaleOut.mode) -}}
+{{- end -}}
+{{- if not (has $storageMode (list "unifabric-roce" "unifabric-ib")) -}}
+{{- fail (printf "topoDiscovery.storage.mode %q is invalid; expected unifabric-roce or unifabric-ib" .Values.topoDiscovery.storage.mode) -}}
+{{- end -}}
+{{- $scaleUp1 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleUp.label.keyTemplate "tier" 1) -}}
+{{- $scaleOut1 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleOut.label.keyTemplate "tier" 1) -}}
+{{- $storage1 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.storage.label.keyTemplate "tier" 1) -}}
+{{- $scaleUp12 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleUp.label.keyTemplate "tier" 12) -}}
+{{- $scaleOut12 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleOut.label.keyTemplate "tier" 12) -}}
+{{- $storage12 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.storage.label.keyTemplate "tier" 12) -}}
+{{- if or (eq $scaleUp1 $scaleOut1) (eq $scaleUp1 $storage1) (eq $scaleOut1 $storage1) (eq $scaleUp12 $scaleOut12) (eq $scaleUp12 $storage12) (eq $scaleOut12 $storage12) -}}
+{{- fail "topoDiscovery scaleUp, scaleOut, and storage label templates must generate disjoint label keys" -}}
 {{- end -}}
 {{- end -}}
 
@@ -118,21 +286,11 @@ app.kubernetes.io/part-of: {{ include "unifabric.name" .root }}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.url" -}}
-{{- $serviceName := default (include "unifabric.nvidiaTopograph.topographName" .) .Values.nvidiaTopograph.topograph.serviceName -}}
-{{- printf "http://%s.%s.svc.cluster.local:49021" $serviceName .Release.Namespace -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.nodeObserverTrigger" -}}
-{{- toYaml (.Values.nvidiaTopograph.nodeObserver.topograph.trigger | default dict) -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.nodeDataBrokerNodeSelector" -}}
-{{- toYaml (.Values.nvidiaTopograph.nodeDataBroker.nodeSelector | default dict) -}}
+{{- printf "http://%s.%s.svc.cluster.local:49021" (include "unifabric.nvidiaTopograph.topographName" .) .Release.Namespace -}}
 {{- end -}}
 
 {{- define "unifabric.nvidiaTopograph.useGpuCliqueLabel" -}}
-{{- $providerParams := default dict .Values.nvidiaTopograph.provider.params -}}
-{{- if and (eq .Values.nvidiaTopograph.provider.name "infiniband-k8s") (eq (lower (toString (get $providerParams "useGpuCliqueLabel"))) "true") -}}
+{{- if and (eq .Values.nvidiaTopograph.provider.name "infiniband-k8s") (eq (lower (toString .Values.nvidiaTopograph.useGpuCliqueLabel)) "true") -}}
 true
 {{- end -}}
 {{- end -}}

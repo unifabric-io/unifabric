@@ -27,6 +27,21 @@ var (
 		Name: "unifabric_switch_lldp_parse_failure_total",
 		Help: "The number of times the controller failed to parse or validate LLDP neighbor data reported by switches.",
 	})
+
+	autoLabelReconcileTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "unifabric_auto_discovered_topology_label_reconcile_total",
+		Help: "The number of auto-discovered topology label reconciliation attempts.",
+	})
+
+	autoLabelErrorTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "unifabric_auto_discovered_topology_label_error_total",
+		Help: "The number of auto-discovered topology label reconciliation errors.",
+	}, []string{"topology", "reason"})
+
+	autoLabelLastSuccess = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "unifabric_auto_discovered_topology_label_last_success_timestamp_seconds",
+		Help: "Unix timestamp of the last successful auto-discovered topology label reconciliation.",
+	})
 )
 
 func init() {
@@ -39,6 +54,9 @@ func registerSwitchTopologyMetrics() {
 			switchCountMetric,
 			switchLLDPParseSuccessTotal,
 			switchLLDPParseFailureTotal,
+			autoLabelReconcileTotal,
+			autoLabelErrorTotal,
+			autoLabelLastSuccess,
 		)
 	})
 }

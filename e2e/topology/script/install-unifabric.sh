@@ -98,8 +98,8 @@ HELM_ARGS=(
   --timeout "${HELM_TIMEOUT}"
   --debug
 
-  --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="interface=eth1\\,eth2\\,eth3\\,eth4\\,eth5\\,eth6\\,eth7\\,eth8"
-  --set-string nodeTopologyDiscovery.storageInterfaceSelector=interface=eth9
+  --set-string fabricNode.scaleOutInterfaceSelector="interface=eth1\\,eth2\\,eth3\\,eth4\\,eth5\\,eth6\\,eth7\\,eth8"
+  --set-string fabricNode.storageInterfaceSelector=interface=eth9
 
   --set-string controller.image.registry="${CONTROLLER_REGISTRY}"
   --set-string controller.image.repository="${CONTROLLER_REPOSITORY}"
@@ -109,20 +109,13 @@ HELM_ARGS=(
   --set-string agent.image.repository="${AGENT_REPOSITORY}"
   --set-string agent.image.tag="${AGENT_TAG}"
 
-  --set-string agent.lldp.image.registry="${AGENT_REGISTRY}"
-  --set-string agent.lldp.image.repository="${AGENT_REPOSITORY}"
-  --set-string agent.lldp.image.tag="${AGENT_TAG}"
-
-  --set nvidiaTopograph.enable=false
+  --set-string topoDiscovery.scaleUp.mode=manual
+  --set-string topoDiscovery.scaleOut.mode=unifabric-roce
+  --set-string topoDiscovery.storage.mode=unifabric-roce
   --set grafanaDashboard.enabled=true
   --set-string grafanaDashboard.kind=GrafanaDashboard
 
-  --set switchTopologyDiscovery.enabled=true
-
-  --set switchTopologyDiscovery.mtls.enabled=true
-  --set switchTopologyDiscovery.mtls.autoGenerate=true
-  --set-string switchTopologyDiscovery.mtls.controllerSecretName=switch-controller-mtls-controller
-  --set-string switchTopologyDiscovery.mtls.switchAgentSecretName=switch-controller-mtls-agent
+  --set switchSubscription.mtls.mode=auto
 
 )
 

@@ -6,14 +6,14 @@
 Unifabric 或 NVIDIA Topograph 负责发现拓扑并写回 Node label；Kueue、Volcano 或
 KAI Scheduler 最终消费这些 label 来放置工作负载。
 
-Unifabric 通过 helm values `topologyLabels.*` 统一定义会被调度器消费的 label key：
+Unifabric 通过 helm values `topoDiscovery.*.label.keyTemplate` 统一定义会被调度器消费的 label key：
 
 | 调度层级 | 默认 Node label | 使用说明 |
 | --- | --- | --- |
-| scale-up | `unifabric.io/scale-up` | GPU 高速互联域，例如 NVLink domain |
-| scale-out leaf | `unifabric.io/scale-out-leaf` | leaf 级 scale-out 拓扑域，主机直接上联域 |
-| scale-out spine | `unifabric.io/scale-out-spine` | spine 级 scale-out 拓扑域，leaf 的上联域 |
-| scale-out core | `unifabric.io/scale-out-core` | core 级 scale-out 拓扑域，spine 的上联域 |
+| scale-up tier 1 | `scale-up.unifabric.io/tier-1` | GPU 高速互联域，例如 NVLink domain |
+| scale-out tier 1 | `scale-out.unifabric.io/tier-1` | 主机直接上联的第一层 scale-out 拓扑域 |
+| scale-out tier 2 | `scale-out.unifabric.io/tier-2` | tier 1 的上联拓扑域 |
+| scale-out tier 3 | `scale-out.unifabric.io/tier-3` | tier 2 的上联拓扑域 |
 | node | `kubernetes.io/hostname` | Kubernetes 默认节点标签，是最细粒度的节点级拓扑域 |
 
 调度器只能使用已经真实写到 Node 上的 label。配置 Kueue `Topology`、Volcano 或 KAI
@@ -388,5 +388,5 @@ Pod 已准入但无法调度：
   kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
   ```
 
-- 如果自定义了 Helm values 中的 `topologyLabels.*`，Kueue
+- 如果自定义了 Helm values 中的 `topoDiscovery.*.label.keyTemplate`，Kueue
   `Topology.spec.levels[*].nodeLabel` 和 Job annotation 的值也必须同步更新。
