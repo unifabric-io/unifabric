@@ -103,8 +103,8 @@ spec:
             {{- end }}
         {{- if .Values.agent.lldp.enabled }}
         - name: lldpd
-          image: {{ include "unifabric.image" (dict "root" . "image" .Values.agent.lldp.image) }}
-          imagePullPolicy: {{ .Values.agent.lldp.image.pullPolicy }}
+          image: {{ include "unifabric.image" (dict "root" . "image" .Values.agent.image) }}
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
           command:
             - /usr/bin/unifabric/entrypoint.sh
           env:
@@ -139,10 +139,6 @@ spec:
               mountPath: /run/
             - name: lldpd-config
               mountPath: /etc/lldpd.d/
-          ports:
-            - name: lldp
-              containerPort: 5988
-              protocol: TCP
         {{- end }}
       volumes:
         - name: config

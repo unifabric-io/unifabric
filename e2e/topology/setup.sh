@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
-  bash e2e/topology/setup.sh [all|step1-install-topology|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent] [args...]
+  bash e2e/topology/setup.sh [all|step1-install-topology|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric] [args...]
 
 Examples:
   CONTROLLER_REGISTRY=ghcr.io CONTROLLER_REPOSITORY=unifabric-io/unifabric-controller CONTROLLER_TAG=YOU_TAG \
@@ -25,6 +25,7 @@ Examples:
     bash e2e/topology/setup.sh step4-install-unifabric
   SWITCH_AGENT_IMAGE=ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG \
     bash e2e/topology/setup.sh step5-deploy-switch-agent
+  bash e2e/topology/setup.sh step6-uninstall-unifabric
 EOF
 }
 
@@ -117,6 +118,9 @@ case "${stage}" in
     ;;
   step5-deploy-switch-agent)
     run_step deploy-switch-agent.sh "$@"
+    ;;
+  step6-uninstall-unifabric)
+    run_step uninstall-unifabric.sh "$@"
     ;;
   *)
     echo "Unknown stage: ${stage}" >&2

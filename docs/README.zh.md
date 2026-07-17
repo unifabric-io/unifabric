@@ -1,31 +1,75 @@
 # Unifabric 文档
 
-## Get Started
+English version: [README.md](./README.md)
 
-根据集群的物理网络类型，选择对应的安装文档：
+Unifabric 面向 Kubernetes AI 集群，把 RDMA 网络中的交换机层级、节点距离和网卡状态转换成
+Kubernetes 可以查询和消费的数据：
 
-- [通用 SONiC RoCE](./getting-started-sonic-roce.zh.md)：适用于 SONiC 交换机承载 RoCE 网络的场景。
-- [Spectrum-X fabric](./getting-started-spectrum-x.zh.md)：适用于 Spectrum-X 交换机的场景。
-- [InfiniBand fabric](./getting-started-infiniband.zh.md)：适用于 NVIDIA InfiniBand 网络场景。
+- Agent 采集节点 RDMA 网卡、LLDP 邻居和 Pod 网络归属。
+- Controller 或 NVIDIA Topograph 发现网络拓扑，并把结果写入 Node label。
+- `FabricNode`、`Switch` 和 `Topology` CR 提供集群级的网络状态视图。
+- Prometheus metrics 和 Grafana dashboard 提供 RDMA 流量、拥塞、错误及 Pod 归因观测。
 
-## Usage Guides
+这些能力让调度器能够尽量把通信密集型 AI 工作负载放到网络距离更近的节点，并帮助运维人员
+定位 RDMA 网络和工作负载流量问题。
 
-- [RDMA 可观测性使用指南](./usage/rdma-metrics.zh.md)：开启并验证 RDMA metrics、Prometheus 抓取和 Grafana dashboard。
-- [switch-agent hostProc LLDP 采集方式](./usage/switch-agent-host-proc.zh.md)：在交换机无法挂载 `lldpd` socket 时，通过宿主机 `/proc` 命名空间采集 LLDP。
-- [switch-agent systemd 安装方式](./usage/switch-agent-systemd.zh.md)：在交换机无法运行 Docker 时，以原生二进制方式运行 switch-agent。
-- [Kueue TAS 工作负载示例](./usage/workload-tas.zh.md)：将 Unifabric scale-out leaf Node label 用于 Kueue Topology Aware Scheduling。
+## 快速开始
 
-## Design Docs
+1. 按照[基础安装](./getting-started.zh.md)部署所有场景共用的 Controller、Agent 和观测组件。
+2. 根据集群的物理网络选择拓扑发现场景：
 
-- [Topology CRD 设计](./design/topology-crd.zh.md)：从 Node 和 Switch labels 汇总 scale-out、scale-up 和 storage 拓扑状态。
-- [Scale-Out 网络拓扑发现设计](./design/scaleout-topology.zh.md)：基于 Switch 的 scale-out 拓扑发现与 Node label 写回设计。
-- [FabricNode CRD 设计](./design/fabricnode.md)：节点本地 RDMA 拓扑状态资源设计。
-- [RDMA 可观测性设计](./design/rdma-metrics.md)：RDMA 指标模型、Pod 归因和采集设计。
+| 场景 | 主要拓扑 | 发现方式 | 配置文档 |
+| --- | --- | --- | --- |
+| 通用 SONiC RoCE | Scale-out、RoCE storage | 节点及交换机 LLDP 协议拓扑识别 | [通用 SONiC RoCE](./getting-started-sonic-roce.zh.md) |
+| Spectrum-X | Scale-out | NVIDIA Topograph + NetQ | [Spectrum-X fabric](./getting-started-spectrum-x.zh.md) |
+| InfiniBand | Scale-out、Scale-up | NVIDIA Topograph | [InfiniBand fabric](./getting-started-infiniband.zh.md) |
 
-## Development
+场景文档只覆盖该网络需要的 Helm values 和接入步骤；版本、镜像、监控等通用配置统一由
+基础安装文档维护。需要调整其他 Chart 参数时，可查看
+[Helm values 参考](../chart/README.md)中的默认值和配置说明。
 
-- [NVAIR 开发环境指南](./development/dev-with-nvair.md)：使用 NVAIR 搭建 e2e 拓扑、部署监控组件和安装本地 Unifabric。
+## 核心功能
 
-## Reference
+### 拓扑发现
 
-- [Helm values 参考](../chart/README.md)：chart 参数和默认值。
+拓扑发现把物理网络中的邻接关系整理为分层性能域，并写入 Kubernetes Node label。
+Unifabric 使用三类逻辑拓扑：
+
+- **Scale-out 网络**：表示节点通过 leaf、spine、core 等交换机进行横向通信的层级。
+  可以参考[通用 SONiC RoCE](./getting-started-sonic-roce.zh.md)、
+  [Spectrum-X](./getting-started-spectrum-x.zh.md)或
+  [InfiniBand](./getting-started-infiniband.zh.md)等不同场景的设置。
+- **Scale-up 网络**：表示 GPU 间的 NVLink、NVSwitch 等高速互联域。
+  可以参考 [InfiniBand 场景](./getting-started-infiniband.zh.md)进行设置。
+- **Storage 网络**：表示计算节点访问存储服务所经过的独立 RDMA 网络。当前仅支持
+  [通用 SONiC RoCE](./getting-started-sonic-roce.zh.md)设置。
+
+发现结果以 Node label 提供给调度器，并汇总到只读 `Topology` CR。可以通过
+[FabricNode、Switch、Topology API 参考](./reference/README.zh.md)查询发现结果。
+
+### 拓扑感知调度
+
+拓扑发现生成的 Node label 可以被 Kueue、Volcano、KAI Scheduler 等调度系统消费，
+让同一工作负载的 Pod 优先落在相同或相近的性能域，减少跨交换机层级通信。
+
+- [拓扑感知调度与 Kueue TAS 示例](./usage/workload-tas.zh.md)
+- [Topology API 参考](./reference/topology.zh.md)
+
+### RDMA 流量与健康观测
+
+Unifabric Agent 采集 RDMA 设备、端口、优先级、吞吐、拥塞和错误指标，并把流量归因到
+Pod、namespace 和顶层 workload。Grafana dashboard 用于按集群、节点和工作负载排查
+RDMA 流量与健康问题。
+
+- [RDMA 可观测性使用指南](./usage/rdma-metrics.zh.md)
+
+## 开发
+
+- [NVAIR 开发环境指南](./development/dev-with-nvair.md)：搭建本地拓扑和端到端开发环境。
+
+## 设计
+
+- [Unifabric API 参考](./reference/README.zh.md)：查询 `FabricNode`、`Switch` 和 `Topology`。
+- [Topology CRD 设计](./design/topology-crd.zh.md)：了解性能域、Node 路径和拓扑数据模型。
+- [Scale-out 拓扑发现设计](./design/scaleout-topology.zh.md)：了解 Scale-out 拓扑的发现与构建过程。
+- [RDMA 指标模型与 Pod 归因设计](./design/rdma-metrics.md)：了解指标定义与工作负载归因模型。

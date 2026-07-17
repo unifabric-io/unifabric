@@ -12,6 +12,7 @@ AGENT_REGISTRY="${AGENT_REGISTRY:-}"
 AGENT_REPOSITORY="${AGENT_REPOSITORY:-}"
 AGENT_TAG="${AGENT_TAG:-}"
 CHART_PATH_INPUT="${CHART_PATH:-chart}"
+SWITCH_MTLS_MODE="${SWITCH_MTLS_MODE:-auto}"
 
 HELM_TIMEOUT="15m"
 
@@ -30,6 +31,7 @@ Required image inputs:
 
 Optional environment variables:
   CHART_PATH                    Helm chart path. Default: chart
+  SWITCH_MTLS_MODE              switchSubscription.mtls.mode. Default: auto
 
 Kubeconfig:
   This script does not accept KUBECONFIG_PATH.
@@ -85,6 +87,14 @@ require_non_empty AGENT_REGISTRY
 require_non_empty AGENT_REPOSITORY
 require_non_empty AGENT_TAG
 
+case "${SWITCH_MTLS_MODE}" in
+  auto|existing|disabled) ;;
+  *)
+    echo "SWITCH_MTLS_MODE must be auto, existing, or disabled." >&2
+    exit 2
+    ;;
+esac
+
 if [[ ! -d "${CHART_PATH}" ]]; then
   echo "Helm chart path not found: ${CHART_PATH}" >&2
   exit 2
@@ -98,8 +108,8 @@ HELM_ARGS=(
   --timeout "${HELM_TIMEOUT}"
   --debug
 
-  --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="interface=eth1\\,eth2\\,eth3\\,eth4\\,eth5\\,eth6\\,eth7\\,eth8"
-  --set-string nodeTopologyDiscovery.storageInterfaceSelector=interface=eth9
+  --set-string fabricNode.scaleOutInterfaceSelector="interface=eth1\\,eth2\\,eth3\\,eth4\\,eth5\\,eth6\\,eth7\\,eth8"
+  --set-string fabricNode.storageInterfaceSelector=interface=eth9
 
   --set-string controller.image.registry="${CONTROLLER_REGISTRY}"
   --set-string controller.image.repository="${CONTROLLER_REPOSITORY}"
@@ -109,20 +119,13 @@ HELM_ARGS=(
   --set-string agent.image.repository="${AGENT_REPOSITORY}"
   --set-string agent.image.tag="${AGENT_TAG}"
 
-  --set-string agent.lldp.image.registry="${AGENT_REGISTRY}"
-  --set-string agent.lldp.image.repository="${AGENT_REPOSITORY}"
-  --set-string agent.lldp.image.tag="${AGENT_TAG}"
-
-  --set nvidiaTopograph.enable=false
+  --set-string topoDiscovery.scaleUp.mode=manual
+  --set-string topoDiscovery.scaleOut.mode=unifabric-roce
+  --set-string topoDiscovery.storage.mode=unifabric-roce
   --set grafanaDashboard.enabled=true
   --set-string grafanaDashboard.kind=GrafanaDashboard
 
-  --set switchTopologyDiscovery.enabled=true
-
-  --set switchTopologyDiscovery.mtls.enabled=true
-  --set switchTopologyDiscovery.mtls.autoGenerate=true
-  --set-string switchTopologyDiscovery.mtls.controllerSecretName=switch-controller-mtls-controller
-  --set-string switchTopologyDiscovery.mtls.switchAgentSecretName=switch-controller-mtls-agent
+  --set-string switchSubscription.mtls.mode="${SWITCH_MTLS_MODE}"
 
 )
 

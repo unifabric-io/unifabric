@@ -3,84 +3,47 @@
 本文说明如何在 InfiniBand 网卡集群中部署 Unifabric。该场景适用于 IB 网络，例如 Mellanox
 网卡运行在 IB 模式并连接 IB 交换机。
 
-## 部署目标
+## 示例拓扑和部署目标
 
-完成部署后，集群中应达成两个目标：
+下图展示一个 tier 3 core、tier 2 spine、tier 1 leaf 三层拓扑，四个节点分别位于两个
+tier 1 性能域：
 
-- Node 被写入可供调度系统消费的拓扑 label，包括：
-  `unifabric.io/scale-up`、`unifabric.io/scale-out-leaf`、
-  `unifabric.io/scale-out-spine`、`unifabric.io/scale-out-core`。
-- 可通过 Unifabric Agent metrics 和内置 RDMA Grafana Dashboard 观测节点 RDMA 状态，
-  按集群、节点、Pod 和 Workload 维度查看吞吐、利用率、QoS、拥塞和错误指标。
+![InfiniBand 三层拓扑示例](images/infiniband-topology-example.png)
 
-> 该场景不会为 Unifabric switch-driven discovery 创建 `FabricNode` 或 `Switch` CR。
+Scale-out 拓扑发现完成后，四个节点预期获得以下 label：
+
+| 节点 | 预期 label |
+| --- | --- |
+| `node1` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006636c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+| `node2` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006636c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+| `node3` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006637c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+| `node4` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006637c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
+
+tier 数字越大表示越靠近网络上层。Scale-up label 由节点内的 GPU 高速互联拓扑决定，
+不在上图中展示。
+
+部署完成后，还可以通过 Unifabric Agent metrics 和内置 RDMA Grafana Dashboard 观测
+节点 RDMA 状态，按集群、节点、Pod 和 Workload 维度查看吞吐、利用率、QoS、拥塞和错误指标。
 
 ## 前置条件
 
-- Kubernetes 集群，包含目标 GPU 节点。
-- 已安装 `kubectl` 和 `helm` cli。
-- 节点上存在 InfiniBand / RDMA 设备，并能在 `/sys/class/infiniband` 下看到。
-- GPU Operator 和 NVIDIA device plugin 已部署。
-- 集群需要安装 Prometheus Operator 和 Grafana Operator，如果未安装，请在安装 Unifabric 时取消下发 ServiceMonitor
-  和 GrafanaDashboard，避免下发 CRD 失败。
+- 已按照[基础安装](./getting-started.zh.md)完成 Unifabric 安装。
+- 节点上存在 IB 模式的 RDMA 设备。
 
-确认当前集群连接：
 
-```bash
-kubectl cluster-info
-kubectl get nodes -o wide
-```
+## 配置 InfiniBand 拓扑发现
 
-## 安装 Unifabric
-
-以下命令使用最新的 release 版本。示例将 RDMA interface selector 留空，因此所有 RDMA
-网卡都会被 metrics 观测。InfiniBand 拓扑 label 由 NVIDIA topograph 写回。
+先按照[基础安装](./getting-started.zh.md)完成通用组件安装，再为 InfiniBand scale-up
+和 scale-out 网络执行以下 Helm upgrade。该命令只设置当前场景相关的 mode，基础安装
+中的其他 values 保持不变。
 
 ```bash
-LATEST_TAG=$(curl -fsSL https://api.github.com/repos/unifabric-io/unifabric/releases/latest | grep '"tag_name":' | cut -d '"' -f4)
-CHART_VERSION="${LATEST_TAG#v}"
-
-helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --version "${CHART_VERSION}" \
+helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --namespace unifabric-system \
-  --create-namespace \
-  --set nvidiaTopograph.enable=true \
-  --set nvidiaTopograph.provider.name=infiniband-k8s \
-  --set internalTopologyLabelWriter.enabled=false \
-  --set-string nodeTopologyDiscovery.scaleOutInterfaceSelector="" \
-  --set-string nodeTopologyDiscovery.storageInterfaceSelector="" \
-  --set nodeMetrics.enabled=true \
-  --set nodeMetrics.serviceMonitor.enabled=true \
-  --set grafanaDashboard.enabled=true \
+  --reuse-values \
+  --set topoDiscovery.scaleUp.mode=nv-topograph \
+  --set topoDiscovery.scaleOut.mode=nv-topograph \
   --wait
-```
-
-参数说明：
-
-| Helm value | 用途 |
-| --- | --- |
-| `nvidiaTopograph.enable` | 启用 NVIDIA topograph。InfiniBand 网络场景必须为 `true`。 |
-| `nvidiaTopograph.provider.name` | 设置为 `infiniband-k8s`，表示使用 InfiniBand Kubernetes provider。 |
-| `nvidiaTopograph.provider.params.useGpuCliqueLabel` | 默认 `true`，使用 GPU Operator clique label 作为加速卡拓扑来源；设为 `false` 时才需要 node-data-broker 通过 `pods/exec` 发现拓扑。 |
-| `internalTopologyLabelWriter.enabled` | 设置为 `false`，避免 Unifabric 内置 writer 和 NVIDIA topograph 同时写拓扑 Node label。 |
-| `nodeMetrics.enabled` | 开启 Agent Metrics 用于节点 RDMA 可观测。 |
-| `nodeTopologyDiscovery.scaleOutInterfaceSelector` | 选择参与 scale-out 拓扑和 RDMA 指标观测的 RDMA 网卡，并在 RDMA 指标中打上 `kind=scaleOut` 标签。支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`，默认为全部 RDMA 网卡。 |
-| `nodeTopologyDiscovery.storageInterfaceSelector` | 选择一组 RDMA 存储网卡观测，并在 RDMA 指标中打上 `kind=storage` 标签。支持 `interface=ib*,mlx*` 或 `cidr=172.17.0.0/16`。默认为空。 |
-| `nodeMetrics.serviceMonitor.enabled` | 创建 Prometheus Operator 使用的 `ServiceMonitor`。 |
-| `grafanaDashboard.enabled` | 渲染内置 RDMA Dashboard。 |
-
-更多 Helm 参数见 [chart/README.md](../chart/README.md)。
-
-如果您位于中国地区，可以额外增加下面的参数，加速下载：
-
-```bash
---set global.registry=m.daocloud.io \
---set controller.image.repository=ghcr.io/unifabric-io/unifabric-controller \
---set agent.image.repository=ghcr.io/unifabric-io/unifabric-agent \
---set agent.lldp.image.repository=ghcr.io/unifabric-io/unifabric-agent \
---set nvidiaTopograph.topograph.image.repository=ghcr.io/nvidia/topograph \
---set nvidiaTopograph.nodeObserver.image.repository=ghcr.io/nvidia/topograph \
---set nvidiaTopograph.nodeDataBroker.image.repository=ghcr.io/nvidia/topograph
 ```
 
 ## 验证部署
@@ -90,42 +53,97 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 ```bash
 kubectl -n unifabric-system get pods
 kubectl get pods -n unifabric-system -o wide
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
+kubectl get fabricnodes.unifabric.io
+kubectl get nodes -L scale-up.unifabric.io/tier-1,scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
+```
+
+FabricNode 列表应包含所有目标节点，且 `READY` 为 `True`：
+
+```text
+NAME                TOTALNICS   READY   ROLE   NODEIP
+node1               2           True    GPU    10.0.0.1
+node2               2           True    GPU    10.0.0.2
+node3               2           True    GPU    10.0.0.3
+node4               2           True    GPU    10.0.0.4
+```
+
+查看单个节点的 Agent 上报结果：
+
+```bash
+kubectl get fabricnode <node-name> -o yaml
+```
+
+重点确认 `status.nodeRole`、`status.scaleOutNics` 和 `status.conditions` 符合预期，
+参与发现的 IB 网卡状态为 `up`。`FabricNode` 也可以使用缩写 `fn` 查询。
+
+ScaleOut 拓扑发现成功后，会生成 `scaleout` Topology：
+
+```bash
+kubectl get topo
+```
+
+```text
+NAME       AGE
+scaleout   113m
+```
+
+查看完整结果：
+
+```bash
+kubectl get topo scaleout -o yaml
+```
+
+以下示例展示了一个 leaf、spine、core 三层拓扑。`status.domains` 描述性能域之间的父子关系，
+`status.nodes[].domainPath` 按 tier 3 到 tier 1 的顺序记录节点所在的完整路径：
+
+```yaml
+apiVersion: unifabric.io/v1beta1
+kind: Topology
+metadata:
+  name: scaleout
+status:
+  domains:
+    - name: S-fc6a1c0300b03c40
+      tier: 3
+    - name: S-fc6a1c0300afca40
+      parent: S-fc6a1c0300b03c40
+      tier: 2
+    - name: S-fc6a1c03006636c0
+      parent: S-fc6a1c0300afca40
+      tier: 1
+    - name: S-fc6a1c03006637c0
+      parent: S-fc6a1c0300afca40
+      tier: 1
+  nodes:
+    - domainPath:
+        - S-fc6a1c0300b03c40
+        - S-fc6a1c0300afca40
+        - S-fc6a1c03006636c0
+      nodes:
+        - node1
+        - node2
+    - domainPath:
+        - S-fc6a1c0300b03c40
+        - S-fc6a1c0300afca40
+        - S-fc6a1c03006637c0
+      nodes:
+        - node3
+        - node4
 ```
 
 配置 Kueue、Volcano 或 KAI Scheduler 时，应只使用上述命令中已经真实写到 Node 上的 label。
 
-验证 RDMA metrics 资源：
-
-```bash
-kubectl -n unifabric-system get service unifabric-agent-metrics
-kubectl -n unifabric-system get servicemonitor unifabric-agent-metrics
-```
-
-直接检查 Agent metrics 端点：
-
-```bash
-POD_IP=$(kubectl -n unifabric-system get pod -l app.kubernetes.io/component=unifabric-agent -o jsonpath='{.items[0].status.podIP}')
-curl -s "http://${POD_IP}:8082/metrics" | grep '^unifabric_'
-```
-
 ## 常见问题
+
+`FabricNode` 和 RDMA 指标的通用排障请参阅
+[基础安装常见问题](./getting-started.zh.md#常见问题)。
 
 ### Node label 没有写入
 
 - 确认 NVIDIA topograph、node-observer 和 node-data-broker 组件正常运行，并且有权限更新 Node。
 - 确认 node-data-broker Pod 已运行在目标 GPU 节点。
-- 确认对应节点有 `topograph.nvidia.com/cluster-id` annotation。
-- 如果关闭了 `nvidiaTopograph.provider.params.useGpuCliqueLabel`，确认 `ibnetdiscover` 可用。
-- 如果自定义了 Helm values 中的 `topologyLabels.*`，调度器配置中的 label key 也必须同步更新。
-
-### RDMA metrics 没有采集到 IB 网卡
-
-- 确认 Agent Pod 正常运行，并且节点上能在 `/sys/class/infiniband` 下看到 IB 设备。
-- 确认 `nodeTopologyDiscovery.scaleOutInterfaceSelector` 匹配节点上的 IB 网卡名称或 CIDR。
-- 确认 `nodeMetrics.enabled=true`。
-- 如果使用 Prometheus Operator，确认 `nodeMetrics.serviceMonitor.enabled=true` 且
-  `ServiceMonitor` 能被 Prometheus selector 选中。
+- 如果 ScaleOut label 没有写入，确认 node-data-broker Pod 中的 `ibnetdiscover` 可用。
+- 如果自定义了 Helm values 中的 `topoDiscovery.*.nodeLabel.keyTemplate`，调度器配置中的 label key 也必须同步更新。
 
 ## 卸载
 

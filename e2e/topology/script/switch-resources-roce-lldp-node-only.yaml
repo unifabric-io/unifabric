@@ -1,0 +1,8 @@
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: switch-gpu-spine1
+  annotations:
+    unifabric.io/switch-neighbors: '["switch-gpu-leaf1", "switch-gpu-leaf2", "switch-gpu-leaf3", "switch-gpu-leaf4"]'
+spec:
+  role: ScaleOut

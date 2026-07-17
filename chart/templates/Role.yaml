@@ -25,6 +25,12 @@ rules:
   - apiGroups: ["unifabric.io"]
     resources: ["switches/status"]
     verbs: ["get", "patch", "update"]
+  - apiGroups: ["unifabric.io"]
+    resources: ["topologies"]
+    verbs: ["create", "get", "list", "watch", "patch", "update"]
+  - apiGroups: ["unifabric.io"]
+    resources: ["topologies/status"]
+    verbs: ["get", "patch", "update"]
 {{- end }}
 ---
 {{- if .Values.agent.enabled }}
