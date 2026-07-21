@@ -217,6 +217,9 @@ jobs:
           AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
           AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SFLOW_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          SFLOW_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-sflow
+          SFLOW_TAG: ${{ steps.vars.outputs.image_tag }}
         run: |
           set -euo pipefail
           bash e2e/topology/setup.sh step4-install-unifabric
@@ -228,6 +231,14 @@ jobs:
         run: |
           set -euo pipefail
           bash e2e/topology/setup.sh step5-deploy-switch-agent
+
+      - name: Step 6 - Deploy hsflowd
+        shell: bash
+        env:
+          HSFLOWD_IMAGE: ${{ env.IMAGE_REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/unifabric-hsflowd:${{ steps.vars.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step6-deploy-hsflowd
 
       - name: Display cluster pods
         shell: bash
