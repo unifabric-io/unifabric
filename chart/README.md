@@ -7,44 +7,48 @@
 | global.imagePullSecrets | list | `[]` | Image pull secrets applied to Unifabric controller and agent pods. |
 | global.registry | string | `""` | Registry prepended to chart-managed images when an image-specific registry is not set. |
 
-## Topology Labels
+## Topology Discovery
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| topologyLabels.scaleOutCore | string | `"unifabric.io/scale-out-core"` | Label key for the core-level scale-out topology domain on a node. |
-| topologyLabels.scaleOutLeaf | string | `"unifabric.io/scale-out-leaf"` | Label key for the leaf-level scale-out topology domain on a node. |
-| topologyLabels.scaleOutSpine | string | `"unifabric.io/scale-out-spine"` | Label key for the spine-level scale-out topology domain on a node. |
-| topologyLabels.scaleUp | string | `"unifabric.io/scale-up"` | Label key for the scale-up topology domain on a node. |
-| internalTopologyLabelWriter.enabled | bool | `true` | Let Unifabric write and clean topology Node labels internally. Disable when another component, such as NVIDIA Topograph, owns topology labels. |
-| topologyGroupNaming.hashLength | int | `7` | Number of hash characters used when labelValueFormat is hash. |
-| topologyGroupNaming.labelValueFormat | string | `"hash"` | Format for topology label values. Use name for readable switch-based values, or hash for compact stable values. |
+| topoDiscovery.scaleOut.label.keyTemplate | string | `"scale-out.unifabric.io/tier-{{ .Tier }}"` | Go text/template for scale-out topology label keys. It must contain exactly one {{ .Tier }} action. |
+| topoDiscovery.scaleOut.mode | string | `"unifabric-roce"` | Scale-out discovery mode. Options: nv-topograph (NVIDIA Topograph) or unifabric-roce (built-in LLDP discovery). |
+| topoDiscovery.scaleUp.label.keyTemplate | string | `"scale-up.unifabric.io/tier-{{ .Tier }}"` | Go text/template for scale-up topology label keys. It must contain exactly one {{ .Tier }} action. |
+| topoDiscovery.scaleUp.mode | string | `"manual"` | Scale-up discovery mode. Options: nv-topograph (NVIDIA Topograph) or manual (labels are managed externally). |
+| topoDiscovery.storage.label.keyTemplate | string | `"storage.unifabric.io/tier-{{ .Tier }}"` | Go text/template for storage topology label keys. It must contain exactly one {{ .Tier }} action. |
+| topoDiscovery.storage.mode | string | `"unifabric-roce"` | Storage discovery mode. Options: unifabric-roce (RoCE storage) or unifabric-ib (InfiniBand storage). |
 
-## Switch Topology Discovery
+`topoDiscovery.*.mode` is the only topology-writer switch. The former
+`topologyLabels`, `internalTopologyLabelWriter.enabled`,
+`switchTopologyDiscovery`, `switchDiscovery`, `switchAgent`,
+`nodeTopologyDiscovery`, `nodeDiscovery`, and `nvidiaTopograph.enable` values
+are rejected with migration errors instead of being silently ignored. The
+former component-level NVIDIA blocks are replaced by the shared
+`nvidiaTopograph.image` and GPU-node values.
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| switchTopologyDiscovery.defaultGrpcPort | int | `8090` | Default gRPC port used when a Switch resource does not set spec.grpcPort. |
-| switchTopologyDiscovery.dialTimeout | string | `"5s"` | Timeout for one controller-to-switch-agent gRPC dial attempt. |
-| switchTopologyDiscovery.enabled | bool | `false` | Enable controller-to-switch-agent subscriptions for switch-side topology discovery. |
-| switchTopologyDiscovery.ignoreSwitchPorts | list | `["mgmt*","Management*","oob*"]` | Switch local port name patterns ignored before topology graph construction. |
-| switchTopologyDiscovery.keepaliveTime | string | `"30s"` | gRPC keepalive interval for controller-to-switch-agent streams. |
-| switchTopologyDiscovery.maxRecvMsgSize | int | `4194304` | Maximum gRPC message size accepted from switch-agent topology snapshots, in bytes. |
-| switchTopologyDiscovery.mtls.autoGenerate | bool | `true` | Generate Helm-managed pinned mTLS Secrets when they do not already exist. |
-| switchTopologyDiscovery.mtls.controllerSecretName | string | `"switch-controller-mtls-controller"` | Secret mounted into the controller containing tls.crt, tls.key, and peer.crt. |
-| switchTopologyDiscovery.mtls.enabled | bool | `true` | Require pinned mTLS for controller-to-switch-agent streams. |
-| switchTopologyDiscovery.mtls.switchAgentSecretName | string | `"switch-controller-mtls-agent"` | Secret exported for switch agents containing tls.crt, tls.key, and peer.crt. |
-| switchTopologyDiscovery.mtls.validityDays | int | `36500` | Validity period, in days, for auto-generated mTLS certificates. |
-| switchTopologyDiscovery.reconnectBackoff | string | `"30s"` | Delay before retrying a disconnected switch-agent stream. |
-
-## Node Topology Discovery and Observability
+## Switch Subscription
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| nodeTopologyDiscovery.initialScanDelay | string | `"1m"` | Delay before the first agent scan, allowing lldpd to learn neighbors. |
-| nodeTopologyDiscovery.refreshInterval | string | `"1m"` | Interval between agent refreshes of local RDMA interfaces and LLDP neighbors. |
-| nodeTopologyDiscovery.scaleOutInterfaceSelector | string | `""` | RDMA interfaces included in scale-out topology and metrics. Supports selectors such as cidr=172.17.0.0/16 or interface=eth*,!eth9. |
-| nodeTopologyDiscovery.scaleUpInterfaceSelector | string | `""` | RDMA interfaces classified as scale-up and excluded from scale-out topology. Leave empty when no dedicated scale-up RDMA network exists. |
-| nodeTopologyDiscovery.storageInterfaceSelector | string | `""` | RDMA interfaces classified as storage and excluded from scale-out topology. Leave empty when no dedicated storage RDMA network exists. |
+| switchSubscription.defaultGrpcPort | int | `8090` | Default gRPC port used when a Switch resource does not set spec.grpcPort. |
+| switchSubscription.ignorePortPatterns | list | `["mgmt*","Management*","oob*"]` | Glob patterns for switch local ports ignored before topology graph construction. |
+| switchSubscription.mtls.controllerSecretName | string | `"switch-controller-mtls-controller"` | Secret mounted into the controller containing tls.crt, tls.key, and peer.crt. |
+| switchSubscription.mtls.mode | string | `"auto"` | Certificate mode: auto generates Helm-managed Secrets, existing uses pre-created Secrets, and disabled uses plaintext gRPC. |
+| switchSubscription.mtls.switchAgentSecretName | string | `"switch-controller-mtls-agent"` | Secret exported for switch agents containing tls.crt, tls.key, and peer.crt. |
+
+Per-switch addresses and port overrides belong to `Switch.spec`. gRPC transport
+tuning uses Controller defaults, while `switchSubscription.mtls.mode` selects
+auto-generated, existing, or disabled mTLS.
+
+## FabricNode Reporting and Observability
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| fabricNode.initialScanDelay | string | `"1m"` | Delay before the first agent scan, allowing lldpd to learn neighbors. |
+| fabricNode.refreshInterval | string | `"1m"` | Interval between agent refreshes of local RDMA interfaces and LLDP neighbors. |
+| fabricNode.scaleOutInterfaceSelector | string | `""` | RDMA interfaces included in scale-out topology and metrics. Supports selectors such as cidr=172.17.0.0/16 or interface=eth*,!eth9. |
+| fabricNode.scaleUpInterfaceSelector | string | `""` | RDMA interfaces classified as scale-up and excluded from scale-out topology. Leave empty when no dedicated scale-up RDMA network exists. |
+| fabricNode.storageInterfaceSelector | string | `""` | RDMA interfaces classified as storage and excluded from scale-out topology. Leave empty when no dedicated storage RDMA network exists. |
 | nodeMetrics.enabled | bool | `true` | Enable RDMA metrics collection and expose the agent metrics Service. |
 | nodeMetrics.path | string | `"/metrics"` | HTTP path served by the agent metrics endpoint. |
 | nodeMetrics.port | int | `8082` | Container port used by the agent metrics endpoint. |
@@ -114,17 +118,13 @@
 | agent.enabled | bool | `true` | Deploy the Unifabric node agent DaemonSet. |
 | agent.hostNetwork | bool | `true` | Run agent pods in the host network namespace. |
 | agent.hostPID | bool | `true` | Run agent pods in the host PID namespace. |
-| agent.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the agent container. |
-| agent.image.registry | string | `"ghcr.io"` | Container image registry for the agent. |
-| agent.image.repository | string | `"unifabric-io/unifabric-agent"` | Container image repository for the agent. |
-| agent.image.tag | string | `""` | Container image tag for the agent. Defaults to the chart appVersion when empty. |
+| agent.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy shared by the agent and lldpd sidecar. |
+| agent.image.registry | string | `"ghcr.io"` | Container image registry shared by the agent and lldpd sidecar. |
+| agent.image.repository | string | `"unifabric-io/unifabric-agent"` | Container image repository shared by the agent and lldpd sidecar. |
+| agent.image.tag | string | `""` | Container image tag shared by the agent and lldpd sidecar. Defaults to the chart appVersion when empty. |
 | agent.lldp.containerSecurityContext.privileged | bool | `true` | Run the lldpd sidecar as privileged so it can access host network interfaces. |
 | agent.lldp.enabled | bool | `true` | Run the lldpd sidecar used by the agent to collect LLDP neighbors. |
 | agent.lldp.extraConfig | string | `""` | Additional raw lldpd configuration appended to lldpd.conf. |
-| agent.lldp.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the lldpd sidecar. |
-| agent.lldp.image.registry | string | `"ghcr.io"` | Container image registry for lldpd. |
-| agent.lldp.image.repository | string | `"unifabric-io/unifabric-agent"` | Container image repository for lldpd. |
-| agent.lldp.image.tag | string | `""` | Container image tag for lldpd. Defaults to the chart appVersion when empty. |
 | agent.lldp.interfaces | string | `""` | Interface pattern passed to lldpd for LLDP discovery. Leave empty to let lldpd use its defaults. |
 | agent.lldp.managementIPPattern | string | `""` | lldpd management IP pattern written to lldpd.conf. Leave empty to let lldpd choose. |
 | agent.lldp.resources.limits.cpu | string | `"100m"` | lldpd sidecar CPU limit. |
@@ -151,88 +151,13 @@
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| nvidiaTopograph.enable | bool | `false` | Deploy the NVIDIA Topograph integration rendered by this chart. |
-| nvidiaTopograph.engine.name | string | `"k8s"` | Topograph engine name used by node-observer. |
-| nvidiaTopograph.imagePullSecrets | list | `[]` | Image pull secrets applied to NVIDIA Topograph workloads. Defaults to global.imagePullSecrets when empty. |
-| nvidiaTopograph.nodeDataBroker.affinity | object | `{}` | Affinity rules for scheduling node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.enable | bool | `true` | Deploy the node-data-broker DaemonSet used by NVIDIA Topograph. |
-| nvidiaTopograph.nodeDataBroker.extraArgs | list | `[]` |  |
-| nvidiaTopograph.nodeDataBroker.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the node-data-broker container. |
-| nvidiaTopograph.nodeDataBroker.image.registry | string | `"ghcr.io"` | Container image registry for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.image.repository | string | `"nvidia/topograph"` | Container image repository for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.image.tag | string | `"v0.5.0"` | Container image tag for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.nodeSelector | object | `{"nvidia.com/gpu.present":"true"}` | Node selector for scheduling node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.podAnnotations | object | `{}` | Annotations added to node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.podLabels | object | `{}` | Extra labels added to node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.port | int | `8080` | Port the node-data-broker serves its /healthz endpoint on after applying node annotations. |
-| nvidiaTopograph.nodeDataBroker.refreshInterval | string | `"5m"` | How often node-data-broker reapplies node annotations. Set to 0 to disable periodic refresh. |
-| nvidiaTopograph.nodeDataBroker.resources.limits.cpu | string | `"100m"` | node-data-broker CPU limit. |
-| nvidiaTopograph.nodeDataBroker.resources.limits.memory | string | `"128Mi"` | node-data-broker memory limit. |
-| nvidiaTopograph.nodeDataBroker.resources.requests.cpu | string | `"100m"` | node-data-broker CPU request. |
-| nvidiaTopograph.nodeDataBroker.resources.requests.memory | string | `"128Mi"` | node-data-broker memory request. |
-| nvidiaTopograph.nodeDataBroker.securityContext.privileged | bool | `true` | Run node-data-broker as privileged so it can read host topology data. |
-| nvidiaTopograph.nodeDataBroker.startupProbe.failureThreshold | int | `30` | Startup probe failure threshold for slow IB topology discovery. |
-| nvidiaTopograph.nodeDataBroker.startupProbe.periodSeconds | int | `10` | Startup probe period in seconds for node-data-broker. |
-| nvidiaTopograph.nodeDataBroker.tolerations | list | `[]` | Tolerations for scheduling node-data-broker pods. |
-| nvidiaTopograph.nodeDataBroker.verbosity | int | `3` | Verbosity level passed to node-data-broker. |
-| nvidiaTopograph.nodeObserver.affinity | object | `{}` | Affinity rules for scheduling node-observer pods. |
-| nvidiaTopograph.nodeObserver.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the node-observer container. |
-| nvidiaTopograph.nodeObserver.image.registry | string | `"ghcr.io"` | Container image registry for node-observer. |
-| nvidiaTopograph.nodeObserver.image.repository | string | `"nvidia/topograph"` | Container image repository for node-observer. |
-| nvidiaTopograph.nodeObserver.image.tag | string | `"v0.5.0"` | Container image tag for node-observer. |
-| nvidiaTopograph.nodeObserver.nodeSelector | object | `{}` | Node selector for scheduling node-observer pods. |
-| nvidiaTopograph.nodeObserver.podAnnotations | object | `{}` | Annotations added to node-observer pods. |
-| nvidiaTopograph.nodeObserver.podLabels | object | `{}` | Extra labels added to node-observer pods. |
-| nvidiaTopograph.nodeObserver.podSecurityContext | object | `{}` | Pod security context for node-observer pods. |
-| nvidiaTopograph.nodeObserver.replicaCount | int | `1` | Number of node-observer replicas. |
-| nvidiaTopograph.nodeObserver.resources.limits.cpu | string | `"400m"` | node-observer CPU limit. |
-| nvidiaTopograph.nodeObserver.resources.limits.memory | string | `"512Mi"` | node-observer memory limit. |
-| nvidiaTopograph.nodeObserver.resources.requests.cpu | string | `"250m"` | node-observer CPU request. |
-| nvidiaTopograph.nodeObserver.resources.requests.memory | string | `"256Mi"` | node-observer memory request. |
-| nvidiaTopograph.nodeObserver.securityContext | object | `{}` | Container security context for the node-observer container. |
-| nvidiaTopograph.nodeObserver.tolerations | list | `[]` | Tolerations for scheduling node-observer pods. |
-| nvidiaTopograph.nodeObserver.topograph.apiServer.containerName | string | `"topograph"` | Topograph API container name watched by node-observer. |
-| nvidiaTopograph.nodeObserver.topograph.apiServer.enabled | bool | `true` | Watch the Topograph API pod and trigger topology generation when it becomes ready. |
-| nvidiaTopograph.nodeObserver.topograph.apiServer.podSelector | object | `{}` | Pod selector used to find the Topograph API pod. Empty uses the chart-managed API pod labels. |
-| nvidiaTopograph.nodeObserver.topograph.nodeDataBroker.containerName | string | `"node-data-broker"` | node-data-broker container name watched by node-observer. |
-| nvidiaTopograph.nodeObserver.topograph.nodeDataBroker.enabled | bool | `true` | Wait for node-data-broker pods before the first topology request. |
-| nvidiaTopograph.nodeObserver.topograph.nodeDataBroker.podSelector | object | `{}` | Pod selector used to find node-data-broker pods. Empty uses the chart-managed broker pod labels. |
-| nvidiaTopograph.nodeObserver.topograph.trigger.nodeSelector | object | `{"nvidia.com/gpu.present":"true"}` | Node selector used by node-observer to choose Nodes that trigger topology generation. |
-| nvidiaTopograph.nodeObserver.verbosity | int | `3` | Verbosity level passed to node-observer. |
-| nvidiaTopograph.provider.name | string | `"infiniband-k8s"` | Topograph provider name, such as infiniband-k8s or netq. |
-| nvidiaTopograph.provider.params.useGpuCliqueLabel | bool | `true` | Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s. |
-| nvidiaTopograph.service.type | string | `"ClusterIP"` | Kubernetes Service type for the topograph HTTP API. |
-| nvidiaTopograph.topograph.affinity | object | `{}` | Affinity rules for scheduling topograph API pods. |
-| nvidiaTopograph.topograph.config.credentialsPath | string | `""` | Credentials file path written to topograph-config.yaml. Defaults to /etc/topograph/credentials/credentials.yaml when credentialsSecret is set. |
-| nvidiaTopograph.topograph.config.credentialsSecret | string | `""` | Secret containing provider credentials for topograph. The Secret must include credentials.yaml by default. |
-| nvidiaTopograph.topograph.config.requestAggregationDelay | string | `"15s"` | Delay used by topograph to aggregate topology generation requests. |
-| nvidiaTopograph.topograph.env | object | `{}` | Extra environment variables added to the topograph API container. |
-| nvidiaTopograph.topograph.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the topograph API container. |
-| nvidiaTopograph.topograph.image.registry | string | `"ghcr.io"` | Container image registry for the topograph API. |
-| nvidiaTopograph.topograph.image.repository | string | `"nvidia/topograph"` | Container image repository for the topograph API. |
-| nvidiaTopograph.topograph.image.tag | string | `"v0.5.0"` | Container image tag for the topograph API. |
-| nvidiaTopograph.topograph.livenessProbe.httpGet.path | string | `"/healthz"` | HTTP path used by the topograph API liveness probe. |
-| nvidiaTopograph.topograph.livenessProbe.httpGet.port | string | `"http"` | Named port used by the topograph API liveness probe. |
-| nvidiaTopograph.topograph.nodeSelector | object | `{}` | Node selector for scheduling topograph API pods. |
-| nvidiaTopograph.topograph.podAnnotations | object | `{}` | Annotations added to topograph API pods. |
-| nvidiaTopograph.topograph.podLabels | object | `{}` | Extra labels added to topograph API pods. |
-| nvidiaTopograph.topograph.podSecurityContext | object | `{}` | Pod security context for topograph API pods. |
-| nvidiaTopograph.topograph.readinessProbe.httpGet.path | string | `"/healthz"` | HTTP path used by the topograph API readiness probe. |
-| nvidiaTopograph.topograph.readinessProbe.httpGet.port | string | `"http"` | Named port used by the topograph API readiness probe. |
-| nvidiaTopograph.topograph.replicaCount | int | `1` | Number of topograph API replicas. |
-| nvidiaTopograph.topograph.resources.limits.cpu | string | `"400m"` | Topograph API CPU limit. |
-| nvidiaTopograph.topograph.resources.limits.memory | string | `"512Mi"` | Topograph API memory limit. |
-| nvidiaTopograph.topograph.resources.requests.cpu | string | `"250m"` | Topograph API CPU request. |
-| nvidiaTopograph.topograph.resources.requests.memory | string | `"256Mi"` | Topograph API memory request. |
-| nvidiaTopograph.topograph.securityContext | object | `{}` | Container security context for the topograph API container. |
-| nvidiaTopograph.topograph.serviceMonitor.enabled | bool | `false` | Create a Prometheus Operator ServiceMonitor for the topograph API. |
-| nvidiaTopograph.topograph.serviceMonitor.interval | string | `"15s"` | Prometheus scrape interval for the topograph API. |
-| nvidiaTopograph.topograph.serviceMonitor.namespace | string | `"monitoring"` | Namespace where the topograph ServiceMonitor is created. |
-| nvidiaTopograph.topograph.serviceMonitor.path | string | `"/metrics"` | HTTP path scraped by the topograph ServiceMonitor. |
-| nvidiaTopograph.topograph.serviceMonitor.port | string | `"http"` | Service port name scraped by the topograph ServiceMonitor. |
-| nvidiaTopograph.topograph.serviceMonitor.scheme | string | `"http"` | HTTP scheme used by the topograph ServiceMonitor. |
-| nvidiaTopograph.topograph.serviceName | string | `""` | Existing topograph Service name used by node-observer. Leave empty to use the chart-managed Service. |
-| nvidiaTopograph.topograph.tolerations | list | `[]` | Tolerations for scheduling topograph API pods. |
-| nvidiaTopograph.topograph.verbosity | int | `3` | Verbosity level passed to the topograph API process. |
-| nvidiaTopograph.topograph.volumeMounts | list | `[]` | Extra volume mounts added to the topograph API container. |
-| nvidiaTopograph.topograph.volumes | list | `[]` | Extra volumes added to topograph API pods. |
+| nvidiaTopograph.credentialsSecretName | string | `""` | Existing Secret containing a credentials.yaml key. Required by the netq provider; credentials are mounted only into the topograph Pod. |
+| nvidiaTopograph.gpuNodeSelector | object | `{"nvidia.com/gpu.present":"true"}` | Selects GPU Nodes observed by node-observer and running node-data-broker. |
+| nvidiaTopograph.gpuNodeTolerations | list | `[]` | Tolerations applied to node-data-broker on selected GPU Nodes. |
+| nvidiaTopograph.image.pullPolicy | string | `"IfNotPresent"` | NVIDIA Topograph image pull policy. |
+| nvidiaTopograph.image.registry | string | `"ghcr.io"` | NVIDIA Topograph image registry. |
+| nvidiaTopograph.image.repository | string | `"nvidia/topograph"` | NVIDIA Topograph image repository. |
+| nvidiaTopograph.image.tag | string | `"v0.5.0"` | NVIDIA Topograph image tag. |
+| nvidiaTopograph.provider.name | string | `"infiniband-k8s"` | Provider name. Use infiniband-k8s for InfiniBand or netq for Spectrum-X. |
+| nvidiaTopograph.provider.params | object | `{}` | Provider-specific parameters, such as apiUrl for netq. |
+| nvidiaTopograph.useGpuCliqueLabel | bool | `true` | Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s. |

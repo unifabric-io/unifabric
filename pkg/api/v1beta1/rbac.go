@@ -12,6 +12,10 @@
 
 // +kubebuilder:rbac:groups=unifabric.io,resources=fabricnodes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=unifabric.io,resources=fabricnodes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=unifabric.io,resources=switches,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=unifabric.io,resources=switches/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=unifabric.io,resources=topologies,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=unifabric.io,resources=topologies/status,verbs=get;update;patch
 
 // RBAC for retrieving the top owner of Pods (for fabric node status)
 // Common Kubernetes controllers

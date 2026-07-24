@@ -13,6 +13,8 @@ const (
 	SwitchRoleStorage  SwitchRole = "Storage"
 )
 
+const SwitchNeighborsAnnotation = "unifabric.io/neighbors"
+
 const (
 	SwitchConditionConnected = "Connected"
 	SwitchConditionReady     = "Ready"
@@ -26,9 +28,12 @@ const (
 )
 
 type SwitchSpec struct {
-	// MgmtIP is the controller dial target for this switch.
+	// MgmtIP is the optional controller dial target for this switch. When it is
+	// omitted, the Switch can still contribute topology membership and manual
+	// adjacency through metadata without starting a switch-agent subscription.
+	// +optional
 	// +kubebuilder:validation:MinLength=1
-	MgmtIP string `json:"mgmtIP"`
+	MgmtIP string `json:"mgmtIP,omitempty"`
 
 	// Role classifies this switch by fabric domain.
 	// +optional

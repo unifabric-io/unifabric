@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/unifabric-io/unifabric/pkg/logger"
+	"github.com/unifabric-io/unifabric/pkg/topologylabel"
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,6 +29,12 @@ const (
 	defaultSwitchLabelValueFormat             = "hash"
 	defaultSwitchHashLength                   = 7
 
+	DefaultLabelScaleUpTemplate  = "scale-up.unifabric.io/tier-{{ .Tier }}"
+	DefaultLabelScaleOutTemplate = "scale-out.unifabric.io/tier-{{ .Tier }}"
+	DefaultLabelStorageTemplate  = "storage.unifabric.io/tier-{{ .Tier }}"
+
+	// Deprecated fixed keys are retained only for source compatibility with
+	// the pre-Topology-CRD projection helpers.
 	DefaultLabelScaleUp       = "unifabric.io/scale-up"
 	DefaultLabelScaleOutLeaf  = "unifabric.io/scale-out-leaf"
 	DefaultLabelScaleOutSpine = "unifabric.io/scale-out-spine"
@@ -47,10 +54,13 @@ type LeaderElectionConfig struct {
 }
 
 type TopologyLabelsConfig struct {
-	ScaleUp       string `json:"scaleUp" yaml:"scaleUp"`
-	ScaleOutLeaf  string `json:"scaleOutLeaf" yaml:"scaleOutLeaf"`
-	ScaleOutSpine string `json:"scaleOutSpine" yaml:"scaleOutSpine"`
-	ScaleOutCore  string `json:"scaleOutCore" yaml:"scaleOutCore"`
+	ScaleUp  string `json:"scaleUp" yaml:"scaleUp"`
+	ScaleOut string `json:"scaleOut" yaml:"scaleOut"`
+	Storage  string `json:"storage" yaml:"storage"`
+
+	ScaleOutLeaf  string `json:"-" yaml:"-"`
+	ScaleOutSpine string `json:"-" yaml:"-"`
+	ScaleOutCore  string `json:"-" yaml:"-"`
 }
 
 type SwitchDiscoveryMTLSConfig struct {
@@ -66,6 +76,8 @@ type TopologyGroupNamingConfig struct {
 
 type ScaleOutSwitchesConfig struct {
 	Enabled           bool                      `json:"enabled" yaml:"enabled"`
+	ManageScaleOut    bool                      `json:"manageScaleOut" yaml:"manageScaleOut"`
+	ManageStorage     bool                      `json:"manageStorage" yaml:"manageStorage"`
 	DialTimeout       string                    `json:"dialTimeout" yaml:"dialTimeout"`
 	ReconnectBackoff  string                    `json:"reconnectBackoff" yaml:"reconnectBackoff"`
 	MaxRecvMsgSize    int                       `json:"maxRecvMsgSize" yaml:"maxRecvMsgSize"`
@@ -73,7 +85,7 @@ type ScaleOutSwitchesConfig struct {
 	DefaultGrpcPort   int32                     `json:"defaultGrpcPort" yaml:"defaultGrpcPort"`
 	IgnoreSwitchPorts []string                  `json:"ignoreSwitchPorts" yaml:"ignoreSwitchPorts"`
 	MTLS              SwitchDiscoveryMTLSConfig `json:"mtls" yaml:"mtls"`
-	GroupNaming       TopologyGroupNamingConfig `json:"groupNaming" yaml:"groupNaming"`
+	GroupNaming       TopologyGroupNamingConfig `json:"-" yaml:"-"`
 }
 
 type ScaleOutDiscoveryConfig struct {
@@ -97,10 +109,11 @@ type ControllerConfig struct {
 	Pprof                       BindAddressConfig                 `json:"pprof" yaml:"pprof"`
 	LeaderElection              LeaderElectionConfig              `json:"leaderElection" yaml:"leaderElection"`
 	TopologyLabels              TopologyLabelsConfig              `json:"topologyLabels" yaml:"topologyLabels"`
-	InternalTopologyLabelWriter InternalTopologyLabelWriterConfig `json:"internalTopologyLabelWriter" yaml:"internalTopologyLabelWriter"`
+	InternalTopologyLabelWriter InternalTopologyLabelWriterConfig `json:"-" yaml:"-"`
 	NodeTopologyDiscovery       ControllerNodeTopologyConfig      `json:"nodeTopologyDiscovery" yaml:"nodeTopologyDiscovery"`
 	ScaleOutDiscovery           ScaleOutDiscoveryConfig           `json:"scaleOutDiscovery" yaml:"scaleOutDiscovery"`
 	KubeConfig                  *rest.Config                      `json:"-" yaml:"-"`
+	TopologyLabelTemplates      *topologylabel.Set                `json:"-" yaml:"-"`
 }
 
 func ReadControllerConfig(filename string) (*ControllerConfig, error) {
@@ -132,7 +145,9 @@ func ReadControllerConfig(filename string) (*ControllerConfig, error) {
 	if cfg.LeaderElection.ID == "" {
 		cfg.LeaderElection.ID = defaultLeaderElectionID
 	}
-	normalizeTopologyLabels(&cfg.TopologyLabels)
+	if err := normalizeTopologyLabels(&cfg); err != nil {
+		return nil, err
+	}
 	normalizeInternalTopologyLabelWriter(&cfg.InternalTopologyLabelWriter)
 	if err := normalizeControllerNodeTopologyConfig(&cfg.NodeTopologyDiscovery); err != nil {
 		return nil, err
@@ -144,10 +159,20 @@ func ReadControllerConfig(filename string) (*ControllerConfig, error) {
 	return &cfg, nil
 }
 
-func normalizeTopologyLabels(cfg *TopologyLabelsConfig) {
+func normalizeTopologyLabels(controllerCfg *ControllerConfig) error {
+	cfg := &controllerCfg.TopologyLabels
 	if cfg.ScaleUp == "" {
-		cfg.ScaleUp = DefaultLabelScaleUp
+		cfg.ScaleUp = DefaultLabelScaleUpTemplate
 	}
+	if cfg.ScaleOut == "" {
+		cfg.ScaleOut = DefaultLabelScaleOutTemplate
+	}
+	if cfg.Storage == "" {
+		cfg.Storage = DefaultLabelStorageTemplate
+	}
+
+	// Keep old helper defaults available to legacy unit coverage. These fields
+	// are not accepted from YAML and are not used by the new controllers.
 	if cfg.ScaleOutLeaf == "" {
 		cfg.ScaleOutLeaf = DefaultLabelScaleOutLeaf
 	}
@@ -157,6 +182,25 @@ func normalizeTopologyLabels(cfg *TopologyLabelsConfig) {
 	if cfg.ScaleOutCore == "" {
 		cfg.ScaleOutCore = DefaultLabelScaleOutCore
 	}
+
+	compiled, err := topologylabel.CompileSet(cfg.ScaleUp, cfg.ScaleOut, cfg.Storage)
+	if err != nil {
+		return err
+	}
+	controllerCfg.TopologyLabelTemplates = compiled
+	return nil
+}
+
+// EnsureTopologyLabelTemplates applies defaults and compiles templates for
+// programmatically constructed controller configurations.
+func EnsureTopologyLabelTemplates(cfg *ControllerConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("controller config must not be nil")
+	}
+	if cfg.TopologyLabelTemplates != nil {
+		return nil
+	}
+	return normalizeTopologyLabels(cfg)
 }
 
 func normalizeInternalTopologyLabelWriter(cfg *InternalTopologyLabelWriterConfig) {
@@ -179,6 +223,17 @@ func normalizeControllerNodeTopologyConfig(cfg *ControllerNodeTopologyConfig) er
 }
 
 func normalizeScaleOutDiscoveryConfig(cfg *ScaleOutDiscoveryConfig) error {
+	// Keep direct controller configuration compatible with the former single
+	// switch-discovery toggle. The Helm chart always renders both ownership
+	// fields explicitly from topoDiscovery modes.
+	if cfg.Switches.Enabled && !cfg.Switches.ManageScaleOut && !cfg.Switches.ManageStorage {
+		cfg.Switches.ManageScaleOut = true
+		cfg.Switches.ManageStorage = true
+	}
+	if cfg.Switches.ManageScaleOut || cfg.Switches.ManageStorage {
+		cfg.Switches.Enabled = true
+	}
+
 	if err := normalizeSwitchDiscoveryDuration("scaleOutDiscovery.switches.dialTimeout", &cfg.Switches.DialTimeout, defaultSwitchDialTimeout); err != nil {
 		return err
 	}

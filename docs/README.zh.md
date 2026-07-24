@@ -11,6 +11,7 @@
 ## Usage Guides
 
 - [RDMA 可观测性使用指南](./usage/rdma-metrics.zh.md)：开启并验证 RDMA metrics、Prometheus 抓取和 Grafana dashboard。
+- [使用脚本批量部署 switch-agent](./usage/deploy-switch-agent-script.zh.md)：从管理机向多台交换机分发 mTLS 证书并重建 switch-agent 容器。
 - [switch-agent hostProc LLDP 采集方式](./usage/switch-agent-host-proc.zh.md)：在交换机无法挂载 `lldpd` socket 时，通过宿主机 `/proc` 命名空间采集 LLDP。
 - [switch-agent systemd 安装方式](./usage/switch-agent-systemd.zh.md)：在交换机无法运行 Docker 时，以原生二进制方式运行 switch-agent。
 - [Kueue TAS 工作负载示例](./usage/workload-tas.zh.md)：将 Unifabric scale-out leaf Node label 用于 Kueue Topology Aware Scheduling。
@@ -28,4 +29,5 @@
 
 ## Reference
 
+- [Unifabric API 参考](./reference/README.zh.md)：`FabricNode`、`Switch` 和 `Topology` 的独立 API 参考。
 - [Helm values 参考](../chart/README.md)：chart 参数和默认值。

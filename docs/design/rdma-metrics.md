@@ -115,7 +115,7 @@ All RDMA samples share this label set:
 
 ## 5. Interface Kind Labeling
 
-`kind` is derived from `nodeTopologyDiscovery` selectors:
+`kind` is derived from `fabricNode` selectors:
 
 1. Match `storageInterfaceSelector`.
 2. Match `scaleUpInterfaceSelector`.

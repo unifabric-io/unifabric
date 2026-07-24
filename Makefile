@@ -86,8 +86,8 @@ clean:
 
 .PHONY: crd
 crd:
-	$(CONTROLLER_GEN) object:headerFile="$(ROOT_DIR)/hack/boilerplate.go.txt" paths="./pkg/api/v1beta1"
-	$(CONTROLLER_GEN) crd paths="./pkg/api/v1beta1" output:dir="$(CRD_DIR)"
+	$(CONTROLLER_GEN) object:headerFile="$(ROOT_DIR)/hack/boilerplate.go.txt" paths="./pkg/api/..."
+	$(CONTROLLER_GEN) crd paths="./pkg/api/..." output:dir="$(CRD_DIR)"
 
 .PHONY: helm-docs
 helm-docs:

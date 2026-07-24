@@ -120,7 +120,7 @@ func (m *subscriptionManager) syncSubscriptions(ctx context.Context) error {
 	for _, sw := range switchList.Items {
 		if sw.Spec.MgmtIP == "" {
 			m.stopSubscription(sw.Name)
-			if err := m.markSwitchDisconnected(ctx, sw.Name, v1beta1.SwitchReasonDialFailed, "switch spec.mgmtIP is empty"); err != nil {
+			if err := m.clearSwitchSubscriptionStatus(ctx, sw.Name); err != nil {
 				return err
 			}
 			continue
@@ -385,6 +385,12 @@ func (m *subscriptionManager) markSwitchDisconnected(ctx context.Context, switch
 		sw.Status.Healthy = false
 		setSwitchCondition(&sw.Status, sw.Generation, v1beta1.SwitchConditionConnected, metav1.ConditionFalse, reason, message)
 		setSwitchCondition(&sw.Status, sw.Generation, v1beta1.SwitchConditionReady, metav1.ConditionFalse, v1beta1.SwitchReasonDataStale, message)
+	})
+}
+
+func (m *subscriptionManager) clearSwitchSubscriptionStatus(ctx context.Context, switchName string) error {
+	return m.mutateSwitchStatus(ctx, switchName, func(sw *v1beta1.Switch) {
+		sw.Status = v1beta1.SwitchStatus{}
 	})
 }
 

@@ -37,7 +37,7 @@ The solution has four parts.
 1. `unifabric-switch-agent` runs on each switch, periodically collects LLDP neighbor information, and exposes full snapshots through a gRPC server.
 2. The Controller acts as a gRPC client, actively subscribes to LLDP snapshots from each switch, and writes the result into `Switch.status`.
 3. `SwitchTopologyDiscoveryController` takes `FabricNode` and `Switch` as inputs, computes the leaf, spine, and core tiers for GPU nodes, and keeps the topology groups as an internal projection.
-4. The Controller writes the final topology results back to Kubernetes Node labels according to the `topologyLabels` configuration in the chart.
+4. The Controller writes the final topology results back to Kubernetes Node labels according to `topoDiscovery.scaleOut.label.keyTemplate` in the chart.
 
 Scale-out topology discovery and label reconciliation are handled by `SwitchTopologyDiscoveryController`; no leaf-group CR is installed. The Controller uses `Switch.spec` to obtain dial targets, establishes secure connections with global pinned mTLS, persists the returned `switch_name` into `Switch.status.hostname`, and uses that reported hostname as the alias source when reconciling switch-side and node-side topology data.
 
@@ -71,7 +71,7 @@ The switch-driven path is the scale-out topology implementation. The rollout seq
 1. Build or publish a matched controller image, node agent image, and switch-agent image for the same code revision.
 2. Prepare switch-side pinned mTLS materials and deploy `unifabric-switch-agent` to every scale-out switch before enabling switch-driven discovery in the cluster.
 3. Create one `Switch` resource per managed scale-out switch so the Controller has dial targets for every switch-agent endpoint.
-4. Enable `switchTopologyDiscovery.enabled=true` so the Controller starts the switch-driven scale-out path.
+4. Set `topoDiscovery.scaleOut.mode=unifabric-roce` so the Controller starts the switch-driven scale-out path.
 5. Verify that `Switch.status` becomes healthy and GPU node labels are written from the switch-driven path.
 
 ## Design details
@@ -129,30 +129,24 @@ The switch agent only sends full snapshots on the initial connection and when LL
 
 ### gRPC subscription interface
 
-The switch agent exposes a dedicated gRPC server. The Controller acts as a gRPC client and maintains long-lived connections to each switch. Global dial behavior and global pinned mTLS are configured through Helm values. Each switch only provides its dial target in `Switch.spec`.
+The switch agent exposes a dedicated gRPC server. The Controller acts as a gRPC client and maintains long-lived connections to each switch. The global fallback port, port filters, and pinned mTLS mode are configured through Helm values; transport tuning uses Controller defaults. Each switch provides its dial target in `Switch.spec`.
 
 ```yaml
-switchTopologyDiscovery:
-  enabled: true
-  dialTimeout: 5s
-  reconnectBackoff: 30s
-  maxRecvMsgSize: 4194304
-  keepaliveTime: 30s
+switchSubscription:
   defaultGrpcPort: 8090
-  mtls:
-    autoGenerate: true
-    validityDays: 36500
-    controllerSecretName: switch-controller-mtls-controller
-    switchAgentSecretName: switch-controller-mtls-agent
-  ignoreSwitchPorts:
+  ignorePortPatterns:
     - mgmt*
     - Management*
     - oob*
+  mtls:
+    mode: auto
+    controllerSecretName: switch-controller-mtls-controller
+    switchAgentSecretName: switch-controller-mtls-agent
 ```
 
 `controllerSecretName` and `switchAgentSecretName` are not two copies of the same certificate. They store the mTLS identity materials for the Controller and the switch agent separately. Technically, both private keys could be stored in one Secret, but the current design intentionally splits the certificate bundles so that exporting switch-agent certificates to a switch does not also export the Controller private key outside the cluster.
 
-`ignoreSwitchPorts` is applied by the Controller before writing `Switch.status` and before building the topology graph. The switch agent always reports full LLDP snapshots.
+`ignorePortPatterns` is applied by the Controller before writing `Switch.status` and before building the topology graph. The switch agent always reports full LLDP snapshots. Connection timeouts, reconnect backoff, keepalive, receive limits, and generated-certificate validity use Controller and chart defaults rather than public Helm values.
 
 #### Subscription service
 
@@ -207,7 +201,7 @@ The interface constraints are as follows.
 
 This proposal uses global pinned mTLS.
 
-- By default, the chart auto-generates two sets of pinned mTLS identity materials: one for the Controller as the client certificate and private key, and one for the switch agent as the server certificate and private key. The default validity period is `36500` days, about `100` years.
+- By default, the chart auto-generates two sets of pinned mTLS identity materials: one for the Controller as the client certificate and private key, and one for the switch agent as the server certificate and private key. The validity period is `106751` days, the largest whole-day value that fits the Go `time.Duration` calculation used by Helm/Sprig (about `292` years).
 - When auto-generation is enabled, the chart uses Helm certificate helpers during installation to generate the two pinned certificate bundles and uses `lookup` to reuse existing Helm-owned Secrets, so that `helm upgrade` does not reissue certificates on every render.
 - The Controller loads its own client certificate, private key, and the expected switch-agent server certificate from `mtls.controllerSecretName`. The Secret should include `tls.crt`, `tls.key`, and `peer.crt`.
 - The switch agent loads its own server certificate, private key, and the expected Controller client certificate from the bundle referenced by `mtls.switchAgentSecretName`. That bundle should also include `tls.crt`, `tls.key`, and `peer.crt`.
@@ -216,13 +210,13 @@ This proposal uses global pinned mTLS.
 - No serverName, SNI, or IP SAN is required, and the `Switch` resource does not store per-switch Secret or TLS fields.
 - In this model, all switch agents may share the same server certificate. TLS only proves that the peer is a valid switch agent or Controller. It does not prove which device it is, so the current implementation relies on the reported `switch_name` written to `Switch.status.hostname` for topology alias resolution. If stricter device identity pinning is needed later, the optional `expected_switch_name` check can be enabled.
 - If the management network is trusted and plaintext gRPC is needed temporarily for development or debugging, mTLS may be disabled, but that is not the default deployment mode.
-- If the organization already has an existing certificate infrastructure, `autoGenerate` can be disabled and existing values can be provided for `controllerSecretName` and `switchAgentSecretName`.
+- If the organization already has an existing certificate infrastructure, set `mtls.mode=existing` and provide the existing `controllerSecretName` and `switchAgentSecretName`. Use `mtls.mode=disabled` only for trusted development environments that require plaintext gRPC.
 
 If finer-grained device identity is needed later, the design can evolve to per-switch certificates or switch back to a standard CA + SAN TLS model.
 
 ### Switch resource model
 
-`Switch` is a cluster-scoped resource that represents a switch management address and the latest observed LLDP state. `spec` only describes where the Controller should connect. It does not carry per-switch authentication materials. Authentication and TLS are handled by global Controller and agent settings. `status` is refreshed continuously by the Controller based on the subscription stream, stores the reported switch hostname separately from the Kubernetes resource name, and keeps aggregated LLDP neighbors grouped by remote system. The switch agent never writes Kubernetes API objects directly.
+`Switch` is a cluster-scoped resource that represents a physical switch. `spec.mgmtIP` and `spec.grpcPort` optionally describe where the Controller should connect. A Switch without `mgmtIP` starts no subscription. It can enrich `Topology.status.domains[*].members` through a `domain` label, or supply manual switch-to-switch adjacency through the `unifabric.io/neighbors` annotation. For each effective role, annotation-key presence selects the topology source: if any Switch omits the key, discovery uses switch-reported LLDP and ignores every manual-neighbor annotation; if every Switch has the key, discovery uses those annotations together with node-discovered synthetic leaves and ignores switch-reported neighbors. Per-switch authentication materials are not stored in the resource. Authentication and TLS are handled by global Controller and agent settings. When a subscription is configured, `status` is refreshed continuously by the Controller, stores the reported switch hostname separately from the Kubernetes resource name, and keeps aggregated LLDP neighbors grouped by remote system. The switch agent never writes Kubernetes API objects directly.
 
 Example:
 
@@ -255,7 +249,8 @@ Recommended fields:
 | Field | Meaning |
 | --- | --- |
 | `metadata.name` | Switch resource name. It must be unique in the cluster, but it does not need to match the switch-reported hostname. |
-| `spec.mgmtIP` | Switch management IP, used for operator visibility, troubleshooting, and default dial target generation. |
+| `metadata.annotations[unifabric.io/neighbors]` | JSON string array of directly connected switches. When the key exists on every Switch of a role, it selects semi-automatic topology; key presence counts even when the value is empty or `[]`. |
+| `spec.mgmtIP` | Optional. Switch management IP used as the dial target. When omitted, no switch-agent subscription is started. |
 | `spec.grpcPort` | Optional. If the switch gRPC server port is not set, the global `defaultGrpcPort` is used. |
 | `status.hostname` | The switch-reported hostname from the latest accepted snapshot. It is used as the alias source when matching switch-side data with node-side LLDP hostnames. |
 | `status.healthy` | Whether the current observed switch state is healthy, based on connection state, authentication result, and snapshot freshness. |
@@ -264,6 +259,25 @@ Recommended fields:
 | `status.lldpNeighbors` | Unique remote neighbors observed for this switch. |
 | `status.lldpNeighbors[*].remoteSystemType` | Whether the remote system resolves to a Kubernetes Node or another switch. |
 | `status.lldpNeighbors[*].remoteSystemName` | The remote host or switch name for this neighbor entry. |
+
+A label-only Switch uses `unifabric.io/domain: <domain-name>`. The value must exactly match a Domain already produced from Node topology labels. Leaf, spine, and core all use this same key; `spec.role: ScaleOut` selects the fabric and the Controller infers the tier from the matched Domain.
+
+#### Manual switch adjacency without switch-side LLDP
+
+In the built-in RoCE discovery mode, host LLDP supplies Node-to-leaf links. For semi-automatic discovery, operators create only the higher-layer Switch resources and put the `unifabric.io/neighbors` key on every one of them. Node LLDP creates synthetic leaf switches, and annotations connect those leaves to the declared upper layer. If any Switch of the same effective role omits the key, the Controller instead selects fully automatic switch discovery and ignores all neighbor annotations.
+
+```yaml
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: spine1
+  annotations:
+    unifabric.io/neighbors: '["leaf1", "leaf2"]'
+spec:
+  role: ScaleOut
+```
+
+The annotation is a quoted JSON string array because Kubernetes annotations are strings. A neighbor may name either a synthetic leaf discovered from FabricNode LLDP or another annotated Switch with the same effective role. One endpoint is sufficient because discovery treats the link as undirected; duplicate declarations are deduplicated. Empty names, self-references, malformed JSON, and unresolved references stop that reconciliation and preserve the existing topology labels. The annotation key itself selects semi-automatic mode, so an empty value and `[]` still count as present. `spec.mgmtIP`, gRPC fields, and `status.lldpNeighbors` are not required or used for topology input in this mode.
 
 ### Topology computation flow
 
@@ -294,25 +308,21 @@ Each reconcile performs the following steps.
 
 ### Topology label value naming
 
-Writing results back to Kubernetes Nodes has two parts: the label key and the label value. The label key is configurable through the chart-level `topologyLabels` fields. The scale-out-related configuration is:
+Writing results back to Kubernetes Nodes has two parts: the label key and the label value. The scale-out writer and label key template are configured together:
 
 ```yaml
-topologyLabels:
-  scaleOutLeaf: unifabric.io/scale-out-leaf
-  scaleOutSpine: unifabric.io/scale-out-spine
-  scaleOutCore: unifabric.io/scale-out-core
+topoDiscovery:
+  scaleOut:
+    mode: unifabric-roce
+    label:
+      keyTemplate: "scale-out.unifabric.io/tier-{{ .Tier }}"
 ```
 
-These label keys may be customized for each cluster during deployment. The Controller must read those values and write the leaf, spine, and core topology results back to the corresponding configurable Node labels.
+The template may be customized for each cluster. Tier 1 is closest to the Node, and higher tiers increment without a fixed maximum.
 
-The label value must be stable, comparable, compliant with Kubernetes label value limits, and support two formats.
+Built-in discovery assigns stable values in `tier${N}-group${M}` form. Existing assignments are locked during ordinary reconciliation; the Controller fills missing labels and does not rename or remove an existing assignment.
 
-- The name format sorts the switch names in a stable order and joins them with `-`. If the group contains only one switch, the switch name is used directly, for example `leaf1`. If the group contains multiple switches, `-group` is appended, for example `leaf1-leaf2-leaf3-leaf4-group`.
-- The hash format generates a short hash from the same normalized input, similar to a git short SHA such as `7f3a9c2`. The normalized input should be the sorted switch names joined into one string.
-
-Regardless of which format is chosen, the leaf, spine, and core label values should be generated from the same switch set and remain stable and reproducible. The Controller writes the selected value directly to the Node label.
-
-At the same time, logs and metrics should include the switch set behind each group so operators can trace a label value back to the actual switches.
+Logs, metrics, and the `Topology/scaleout` status retain the relationship between each performance domain and its Switch members.
 
 ### RBAC and permissions
 
@@ -360,7 +370,7 @@ Logs should include the following information.
 - Verify that when switch-driven discovery is enabled, leaf labels are generated by the switch-driven path.
 - Verify that the Controller can establish a gRPC stream with the switch agent and write the initial full snapshot into `Switch.status`.
 - Verify that Helm-generated pinned mTLS Secrets do not rotate unexpectedly after `helm upgrade` because of template re-rendering.
-- Verify that leaf, spine, and core GPU Node topology labels are correct. The label keys must come from `topologyLabels.scaleOutLeaf`, `topologyLabels.scaleOutSpine`, and `topologyLabels.scaleOutCore`, and the label values must follow the selected format, either the name format or the short-hash format.
+- Verify that GPU Node topology labels are rendered from `topoDiscovery.scaleOut.label.keyTemplate` and use stable `tier${N}-group${M}` values.
 - Simulate a switch-agent stop or gRPC stream disconnection and verify that reconnect behavior and topology result updates are correct.
 
 ### Acceptance criteria

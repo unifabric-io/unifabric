@@ -5,8 +5,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -33,8 +31,9 @@ const (
 )
 
 var (
-	useColor  = stdoutIsTerminal() || forceColorEnabled()
-	ansiCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	useColor              = stdoutIsTerminal() || forceColorEnabled()
+	ansiCodes             = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	autoTopologyGroupName = regexp.MustCompile(`^tier([1-9][0-9]*)-group([1-9][0-9]*)$`)
 )
 
 type config struct {
@@ -42,7 +41,6 @@ type config struct {
 	sleepSeconds        int
 	expectedFabricNodes int
 	expectedSwitches    int
-	groupHashLength     int
 	topologyDir         string
 }
 
@@ -88,12 +86,31 @@ type switchList struct {
 
 type switchResource struct {
 	Metadata struct {
-		Name string `json:"name"`
+		Name   string            `json:"name"`
+		Labels map[string]string `json:"labels"`
 	} `json:"metadata"`
 	Status struct {
 		Hostname          string `json:"hostname"`
 		Healthy           bool   `json:"healthy"`
 		LLDPNeighborCount int32  `json:"lldpNeighborCount"`
+	} `json:"status"`
+}
+
+type topologyResource struct {
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
+	Status struct {
+		Domains []struct {
+			Name    string   `json:"name"`
+			Tier    int      `json:"tier"`
+			Parent  string   `json:"parent"`
+			Members []string `json:"members"`
+		} `json:"domains"`
+		Nodes []struct {
+			Nodes      []string `json:"nodes"`
+			DomainPath []string `json:"domainPath"`
+		} `json:"nodes"`
 	} `json:"status"`
 }
 
@@ -109,9 +126,10 @@ type kubernetesNode struct {
 }
 
 const (
-	defaultScaleOutLeafLabelKey  = "unifabric.io/scale-out-leaf"
-	defaultScaleOutSpineLabelKey = "unifabric.io/scale-out-spine"
-	defaultScaleOutCoreLabelKey  = "unifabric.io/scale-out-core"
+	defaultScaleOutTier1LabelKey = "scale-out.unifabric.io/tier-1"
+	defaultScaleOutTier2LabelKey = "scale-out.unifabric.io/tier-2"
+	defaultScaleOutTier3LabelKey = "scale-out.unifabric.io/tier-3"
+	switchDomainLabelKey         = "unifabric.io/domain"
 )
 
 func main() {
@@ -141,7 +159,6 @@ func parseFlags() config {
 	flag.IntVar(&cfg.sleepSeconds, "sleep-seconds", 20, "sleep seconds between check attempts")
 	flag.IntVar(&cfg.expectedFabricNodes, "expected-fabricnodes", 4, "expected FabricNode resource count")
 	flag.IntVar(&cfg.expectedSwitches, "expected-switches", 5, "expected Switch resource count")
-	flag.IntVar(&cfg.groupHashLength, "group-hash-length", 7, "expected hash length for switch-derived node labels")
 	flag.StringVar(&cfg.topologyDir, "topology-dir", "e2e/topology", "topology directory containing node-gpu-*.yaml")
 	flag.Parse()
 	return cfg
@@ -205,16 +222,26 @@ func runChecks(cfg config, deadline time.Time, rows *[]row) error {
 	stageLog("check_node_topology_labels", colorize("start", colorBold))
 	labelDetail, err := waitForCheckPass(
 		"check_node_topology_labels",
-		func() (bool, string) {
-			return validateNodeTopologyLabels(cfg.groupHashLength)
-		},
+		func() (bool, string) { return validateNodeTopologyLabels() },
 		deadline,
 		time.Duration(cfg.sleepSeconds)*time.Second,
 	)
 	if err != nil {
 		return err
 	}
-	*rows = append(*rows, row{"node topology labels", "leaf/spine labels match expected switch topology", labelDetail, "PASS"})
+	*rows = append(*rows, row{"node topology labels", "tier labels match expected switch topology", labelDetail, "PASS"})
+
+	stageLog("check_topology_status", colorize("start", colorBold))
+	topologyDetail, err := waitForCheckPass(
+		"check_topology_status",
+		validateScaleOutTopologyStatus,
+		deadline,
+		time.Duration(cfg.sleepSeconds)*time.Second,
+	)
+	if err != nil {
+		return err
+	}
+	*rows = append(*rows, row{"scaleout Topology status", "domains, parents, members, nodes, and paths match", topologyDetail, "PASS"})
 
 	return nil
 }
@@ -587,7 +614,7 @@ func validateSwitchStatuses(topologyDir string) (bool, string) {
 	return true, fmt.Sprintf("validated %d switches with hostname and LLDP status", len(expectedNames))
 }
 
-func validateNodeTopologyLabels(groupHashLength int) (bool, string) {
+func validateNodeTopologyLabels() (bool, string) {
 	var nodes kubernetesNodeList
 	if err := fetchResourceJSON("nodes", &nodes); err != nil {
 		return false, fmt.Sprintf("failed to read kubernetes nodes: %v", err)
@@ -598,75 +625,172 @@ func validateNodeTopologyLabels(groupHashLength int) (bool, string) {
 		actualByName[node.Metadata.Name] = node
 	}
 
-	leafGroupA := topologyGroupLabelValue(1, []string{"switch-gpu-leaf1", "switch-gpu-leaf2"}, groupHashLength)
-	leafGroupB := topologyGroupLabelValue(1, []string{"switch-gpu-leaf3", "switch-gpu-leaf4"}, groupHashLength)
-	spineGroup := topologyGroupLabelValue(2, []string{"switch-gpu-spine1"}, groupHashLength)
-
-	type expectedNodeLabels struct {
-		leaf  string
-		spine string
-		core  string
+	groups, errs := observeScaleOutGroups(actualByName)
+	if len(errs) > 0 {
+		return false, strings.Join(errs, "; ")
 	}
 
-	expected := map[string]expectedNodeLabels{
-		"node-gpu-1": {leaf: leafGroupA, spine: spineGroup},
-		"node-gpu-2": {leaf: leafGroupA, spine: spineGroup},
-		"node-gpu-3": {leaf: leafGroupB, spine: spineGroup},
-		"node-gpu-4": {leaf: leafGroupB, spine: spineGroup},
-	}
+	return true, fmt.Sprintf(
+		"validated topology labels for 4 GPU nodes: nodes 1/2=%s, nodes 3/4=%s, parent=%s",
+		groups.nodes12Tier1,
+		groups.nodes34Tier1,
+		groups.tier2,
+	)
+}
 
+type observedScaleOutGroups struct {
+	nodes12Tier1 string
+	nodes34Tier1 string
+	tier2        string
+}
+
+func observeScaleOutGroups(actualByName map[string]kubernetesNode) (observedScaleOutGroups, []string) {
+	groups := observedScaleOutGroups{}
 	errs := []string{}
-	for nodeName, expectedLabels := range expected {
+	nodeNames := []string{"node-gpu-1", "node-gpu-2", "node-gpu-3", "node-gpu-4"}
+	tier1ByNode := map[string]string{}
+	tier2ByNode := map[string]string{}
+
+	for _, nodeName := range nodeNames {
 		node, ok := actualByName[nodeName]
 		if !ok {
 			errs = append(errs, fmt.Sprintf("%s: kubernetes node missing", nodeName))
 			continue
 		}
 		labels := node.Metadata.Labels
-		if labels[defaultScaleOutLeafLabelKey] != expectedLabels.leaf {
-			errs = append(errs, fmt.Sprintf("%s: leaf label expected %s, got %s", nodeName, expectedLabels.leaf, labels[defaultScaleOutLeafLabelKey]))
+		tier1ByNode[nodeName] = labels[defaultScaleOutTier1LabelKey]
+		tier2ByNode[nodeName] = labels[defaultScaleOutTier2LabelKey]
+		if !isAutoTopologyGroupForTier(tier1ByNode[nodeName], 1) {
+			errs = append(errs, fmt.Sprintf("%s: tier 1 label has invalid value %q", nodeName, tier1ByNode[nodeName]))
 		}
-		if labels[defaultScaleOutSpineLabelKey] != expectedLabels.spine {
-			errs = append(errs, fmt.Sprintf("%s: spine label expected %s, got %s", nodeName, expectedLabels.spine, labels[defaultScaleOutSpineLabelKey]))
+		if !isAutoTopologyGroupForTier(tier2ByNode[nodeName], 2) {
+			errs = append(errs, fmt.Sprintf("%s: tier 2 label has invalid value %q", nodeName, tier2ByNode[nodeName]))
 		}
-		if actualCore := labels[defaultScaleOutCoreLabelKey]; expectedLabels.core == "" && actualCore != "" {
-			errs = append(errs, fmt.Sprintf("%s: expected empty core label, got %s", nodeName, actualCore))
+		if actualTier3 := labels[defaultScaleOutTier3LabelKey]; actualTier3 != "" {
+			errs = append(errs, fmt.Sprintf("%s: expected empty tier 3 label, got %s", nodeName, actualTier3))
 		}
 	}
 
-	if len(errs) > 0 {
+	groups.nodes12Tier1 = tier1ByNode["node-gpu-1"]
+	groups.nodes34Tier1 = tier1ByNode["node-gpu-3"]
+	groups.tier2 = tier2ByNode["node-gpu-1"]
+	if groups.nodes12Tier1 != tier1ByNode["node-gpu-2"] {
+		errs = append(errs, fmt.Sprintf("nodes 1/2 have different tier 1 groups: %q and %q", groups.nodes12Tier1, tier1ByNode["node-gpu-2"]))
+	}
+	if groups.nodes34Tier1 != tier1ByNode["node-gpu-4"] {
+		errs = append(errs, fmt.Sprintf("nodes 3/4 have different tier 1 groups: %q and %q", groups.nodes34Tier1, tier1ByNode["node-gpu-4"]))
+	}
+	if groups.nodes12Tier1 != "" && groups.nodes12Tier1 == groups.nodes34Tier1 {
+		errs = append(errs, fmt.Sprintf("both leaf domains unexpectedly use tier 1 group %q", groups.nodes12Tier1))
+	}
+	for _, nodeName := range nodeNames[1:] {
+		if groups.tier2 != tier2ByNode[nodeName] {
+			errs = append(errs, fmt.Sprintf("%s: tier 2 group expected %q, got %q", nodeName, groups.tier2, tier2ByNode[nodeName]))
+		}
+	}
+
+	sort.Strings(errs)
+	return groups, errs
+}
+
+func isAutoTopologyGroupForTier(value string, tier int) bool {
+	match := autoTopologyGroupName.FindStringSubmatch(value)
+	return len(match) == 3 && match[1] == strconv.Itoa(tier)
+}
+
+func validateScaleOutTopologyStatus() (bool, string) {
+	var nodes kubernetesNodeList
+	if err := fetchResourceJSON("nodes", &nodes); err != nil {
+		return false, fmt.Sprintf("failed to read kubernetes nodes: %v", err)
+	}
+	actualNodesByName := make(map[string]kubernetesNode, len(nodes.Items))
+	for _, node := range nodes.Items {
+		actualNodesByName[node.Metadata.Name] = node
+	}
+	groups, nodeErrs := observeScaleOutGroups(actualNodesByName)
+	if len(nodeErrs) != 0 {
+		return false, "node topology labels: " + strings.Join(nodeErrs, "; ")
+	}
+
+	var topology topologyResource
+	if err := fetchResourceJSON("topologies.unifabric.io/scaleout", &topology); err != nil {
+		return false, fmt.Sprintf("failed to read Topology/scaleout: %v", err)
+	}
+	type expectedDomain struct {
+		tier    int
+		parent  string
+		members []string
+	}
+	expectedDomains := map[string]expectedDomain{
+		groups.tier2:        {tier: 2, members: []string{"switch-gpu-spine1"}},
+		groups.nodes12Tier1: {tier: 1, parent: groups.tier2, members: []string{"switch-gpu-leaf1", "switch-gpu-leaf2"}},
+		groups.nodes34Tier1: {tier: 1, parent: groups.tier2, members: []string{"switch-gpu-leaf3", "switch-gpu-leaf4"}},
+	}
+	errs := []string{}
+	if len(topology.Status.Domains) != len(expectedDomains) {
+		errs = append(errs, fmt.Sprintf("domain count expected %d, got %d", len(expectedDomains), len(topology.Status.Domains)))
+	}
+	for _, domain := range topology.Status.Domains {
+		expected, ok := expectedDomains[domain.Name]
+		if !ok {
+			errs = append(errs, fmt.Sprintf("unexpected domain %s", domain.Name))
+			continue
+		}
+		if domain.Tier != expected.tier || domain.Parent != expected.parent || strings.Join(sortedUnique(domain.Members), ",") != strings.Join(expected.members, ",") {
+			errs = append(errs, fmt.Sprintf("domain %s expected tier=%d parent=%s members=%v, got tier=%d parent=%s members=%v", domain.Name, expected.tier, expected.parent, expected.members, domain.Tier, domain.Parent, domain.Members))
+		}
+	}
+	expectedPaths := map[string]string{
+		groups.tier2 + "/" + groups.nodes12Tier1: "node-gpu-1,node-gpu-2",
+		groups.tier2 + "/" + groups.nodes34Tier1: "node-gpu-3,node-gpu-4",
+	}
+	if len(topology.Status.Nodes) != len(expectedPaths) {
+		errs = append(errs, fmt.Sprintf("node group count expected %d, got %d", len(expectedPaths), len(topology.Status.Nodes)))
+	}
+	for _, nodeGroup := range topology.Status.Nodes {
+		path := strings.Join(nodeGroup.DomainPath, "/")
+		if strings.Join(sortedUnique(nodeGroup.Nodes), ",") != expectedPaths[path] {
+			errs = append(errs, fmt.Sprintf("path %s has unexpected nodes %v", path, nodeGroup.Nodes))
+		}
+	}
+
+	var switches switchList
+	if err := fetchResourceJSON("switches.unifabric.io", &switches); err != nil {
+		return false, fmt.Sprintf("failed to read Switch labels: %v", err)
+	}
+	expectedSwitchDomains := map[string]string{
+		"switch-gpu-leaf1":  groups.nodes12Tier1,
+		"switch-gpu-leaf2":  groups.nodes12Tier1,
+		"switch-gpu-leaf3":  groups.nodes34Tier1,
+		"switch-gpu-leaf4":  groups.nodes34Tier1,
+		"switch-gpu-spine1": groups.tier2,
+	}
+	errs = append(errs, validateSwitchDomainLabels(switches.Items, expectedSwitchDomains)...)
+	if len(errs) != 0 {
 		sort.Strings(errs)
 		return false, strings.Join(errs, "; ")
 	}
-
-	return true, fmt.Sprintf("validated topology labels for %d GPU nodes", len(expected))
+	return true, fmt.Sprintf("validated %d domains and %d Node paths", len(expectedDomains), len(expectedPaths))
 }
 
-func topologyGroupLabelValue(tier int, switchNames []string, hashLength int) string {
-	names := sortedUnique(switchNames)
-	return topologyGroupNamePrefix(tier) + shortHash(strings.Join(names, ","), hashLength)
-}
-
-func topologyGroupNamePrefix(tier int) string {
-	switch tier {
-	case 1:
-		return "leaf-"
-	case 2:
-		return "spine-"
-	case 3:
-		return "core-"
-	default:
-		return ""
+func validateSwitchDomainLabels(switches []switchResource, expectedDomains map[string]string) []string {
+	actualByName := make(map[string]switchResource, len(switches))
+	for _, sw := range switches {
+		actualByName[sw.Metadata.Name] = sw
 	}
-}
 
-func shortHash(value string, length int) string {
-	sum := sha1.Sum([]byte(value))
-	encoded := hex.EncodeToString(sum[:])
-	if length <= 0 || length > len(encoded) {
-		length = 7
+	errs := []string{}
+	for name, expectedDomain := range expectedDomains {
+		sw, ok := actualByName[name]
+		if !ok {
+			errs = append(errs, fmt.Sprintf("Switch %s missing", name))
+			continue
+		}
+		if actualDomain := sw.Metadata.Labels[switchDomainLabelKey]; actualDomain != expectedDomain {
+			errs = append(errs, fmt.Sprintf("Switch %s label %s expected %s, got %s", name, switchDomainLabelKey, expectedDomain, actualDomain))
+		}
 	}
-	return encoded[:length]
+	return errs
 }
 
 func sortedUnique(values []string) []string {
