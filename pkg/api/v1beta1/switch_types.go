@@ -62,6 +62,12 @@ type SwitchNeighbor struct {
 	RemoteSystemType SwitchLLDPRemoteSystemType `json:"remoteSystemType,omitempty"`
 	// RemoteSystemName identifies the remote system for this LLDP entry.
 	RemoteSystemName string `json:"remoteSystemName"`
+	// LinkCount reports the number of physical links (local ports) observed
+	// to this remote system. Multiple links to the same remote system are
+	// deduplicated into this single entry.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	LinkCount int32 `json:"linkCount,omitempty"`
 }
 
 type SwitchStatus struct {

@@ -1,6 +1,6 @@
 {
     "format": "JSON",
-    "title": "unifable-e2e-topology",
+    "name": "unifable-e2e-topology",
     "ztp": null,
     "content": {
         "nodes": {

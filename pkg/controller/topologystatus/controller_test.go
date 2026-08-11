@@ -55,11 +55,11 @@ func TestReconcileAtomicallyPublishesStatus(t *testing.T) {
 	if len(stored.Status.Domains) != 2 || len(stored.Status.Nodes) != 1 {
 		t.Fatalf("status = %#v", stored.Status)
 	}
-	if len(stored.Status.Domains[0].Members) != 1 || stored.Status.Domains[0].Members[0] != "spine-a" {
-		t.Fatalf("tier 2 members = %#v", stored.Status.Domains[0].Members)
+	if len(stored.Status.Domains[0].SwitchMember) != 1 || stored.Status.Domains[0].SwitchMember[0] != "spine-a" {
+		t.Fatalf("tier 2 members = %#v", stored.Status.Domains[0].SwitchMember)
 	}
-	if len(stored.Status.Domains[1].Members) != 1 || stored.Status.Domains[1].Members[0] != "leaf-a" {
-		t.Fatalf("tier 1 members = %#v", stored.Status.Domains[1].Members)
+	if len(stored.Status.Domains[1].SwitchMember) != 1 || stored.Status.Domains[1].SwitchMember[0] != "leaf-a" {
+		t.Fatalf("tier 1 members = %#v", stored.Status.Domains[1].SwitchMember)
 	}
 	for _, name := range []string{v1beta1.TopologyScaleUp, v1beta1.TopologyStorage} {
 		if _, err := r.Reconcile(context.Background(), reconcile.Request{NamespacedName: types.NamespacedName{Name: name}}); err != nil {
@@ -112,7 +112,7 @@ func TestReconcileRetainsExistingTopologyWhenDataBecomesEmpty(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: v1beta1.TopologyScaleOut},
 		Status: v1beta1.TopologyStatus{
 			Domains: []v1beta1.TopologyDomain{{Name: "rack-a", Tier: 1}},
-			Nodes:   []v1beta1.TopologyNodeGroup{{Nodes: []string{"node-a"}, DomainPath: []string{"rack-a"}}},
+			Nodes:   []v1beta1.TopologyNodeGroup{{Nodes: []string{"node-a"}, SwitchDomainPath: []string{"rack-a"}}},
 		},
 	}
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(object).WithStatusSubresource(&v1beta1.Topology{}).Build()

@@ -40,7 +40,7 @@ func addSwitchSubscriptionManager(mgr manager.Manager, cfg *config.ControllerCon
 		return nil
 	}
 
-	subscriptionManager, err := newSubscriptionManager(mgr.GetClient(), cfg, log)
+	subscriptionManager, err := newSubscriptionManager(mgr.GetClient(), cfg, log, mgr.GetEventRecorderFor("SwitchTopologyDiscovery")) //nolint:staticcheck
 	if err != nil {
 		return err
 	}

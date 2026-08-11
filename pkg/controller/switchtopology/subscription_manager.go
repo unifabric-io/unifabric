@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -52,6 +53,7 @@ type subscriptionManager struct {
 	client           client.Client
 	cfg              *config.ControllerConfig
 	log              *slog.Logger
+	recorder         record.EventRecorder
 	dialTimeout      time.Duration
 	reconnectBackoff time.Duration
 	keepaliveTime    time.Duration
@@ -60,7 +62,7 @@ type subscriptionManager struct {
 	subscriptions map[string]switchSubscription
 }
 
-func newSubscriptionManager(client client.Client, cfg *config.ControllerConfig, logger *slog.Logger) (*subscriptionManager, error) {
+func newSubscriptionManager(client client.Client, cfg *config.ControllerConfig, logger *slog.Logger, recorder record.EventRecorder) (*subscriptionManager, error) {
 	dialTimeout, err := time.ParseDuration(cfg.ScaleOutDiscovery.Switches.DialTimeout)
 	if err != nil {
 		return nil, err
@@ -78,6 +80,7 @@ func newSubscriptionManager(client client.Client, cfg *config.ControllerConfig, 
 		client:           client,
 		cfg:              cfg,
 		log:              logger.With("component", "switch-subscription"),
+		recorder:         recorder,
 		dialTimeout:      dialTimeout,
 		reconnectBackoff: reconnectBackoff,
 		keepaliveTime:    keepaliveTime,
@@ -284,7 +287,13 @@ func (m *subscriptionManager) handleSnapshot(ctx context.Context, switchName str
 		hostname = switchName
 	}
 
+	var (
+		previousNeighbors []v1beta1.SwitchNeighbor
+		mutatedSwitch     *v1beta1.Switch
+	)
 	if err := m.mutateSwitchStatus(ctx, switchName, func(sw *v1beta1.Switch) {
+		previousNeighbors = sw.Status.LLDPNeighbors
+		mutatedSwitch = sw
 		sw.Status.Hostname = hostname
 		sw.Status.Healthy = true
 		sw.Status.LLDPNeighborCount = int32(len(neighbors))
@@ -294,6 +303,7 @@ func (m *subscriptionManager) handleSnapshot(ctx context.Context, switchName str
 	}); err != nil {
 		return false, err
 	}
+	m.recordNeighborChanges(mutatedSwitch, previousNeighbors, neighbors)
 	observeLLDPParseSuccess()
 	m.log.Debug(
 		"accepted switch snapshot",
@@ -307,14 +317,65 @@ func (m *subscriptionManager) handleSnapshot(ctx context.Context, switchName str
 	return true, nil
 }
 
+// recordNeighborChanges emits a Normal event on sw summarizing how many LLDP
+// neighbors were added or removed compared to the previous snapshot. It is a
+// no-op if the neighbor set is unchanged, sw is nil (e.g. the switch object
+// was not found), or no recorder is configured.
+func (m *subscriptionManager) recordNeighborChanges(sw *v1beta1.Switch, previous, current []v1beta1.SwitchNeighbor) {
+	if m.recorder == nil || sw == nil {
+		return
+	}
+
+	added, removed := diffNeighborKeys(previous, current)
+	if added == 0 && removed == 0 {
+		return
+	}
+
+	m.recorder.Eventf(sw, corev1.EventTypeNormal, "NeighborsChanged", "LLDP neighbors changed: %d added, %d removed", added, removed)
+}
+
+// diffNeighborKeys compares two neighbor lists by (remoteSystemType,
+// remoteSystemName) identity and returns the number of neighbors present only
+// in current (added) and only in previous (removed). Changes to LinkCount
+// alone for a neighbor present in both lists are not counted.
+func diffNeighborKeys(previous, current []v1beta1.SwitchNeighbor) (added int, removed int) {
+	previousKeys := make(map[neighborKey]bool, len(previous))
+	for _, n := range previous {
+		previousKeys[neighborKey{remoteSystemType: n.RemoteSystemType, remoteSystemName: n.RemoteSystemName}] = true
+	}
+	currentKeys := make(map[neighborKey]bool, len(current))
+	for _, n := range current {
+		currentKeys[neighborKey{remoteSystemType: n.RemoteSystemType, remoteSystemName: n.RemoteSystemName}] = true
+	}
+
+	for key := range currentKeys {
+		if !previousKeys[key] {
+			added++
+		}
+	}
+	for key := range previousKeys {
+		if !currentKeys[key] {
+			removed++
+		}
+	}
+	return added, removed
+}
+
+// neighborKey identifies an LLDP neighbor by its remote system identity,
+// ignoring which local port(s) it was observed on.
+type neighborKey struct {
+	remoteSystemType v1beta1.SwitchLLDPRemoteSystemType
+	remoteSystemName string
+}
+
 func normalizeSnapshotNeighbors(
 	snapshot *switchagent.LLDPNeighborSnapshot,
 	ignoreSwitchPorts []string,
 	nodeNames map[string]bool,
 	normalizedNodeNames map[string]bool,
 ) ([]v1beta1.SwitchNeighbor, error) {
-	neighbors := make([]v1beta1.SwitchNeighbor, 0, len(snapshot.GetLldpNeighbors()))
-	seenNeighbors := map[string]bool{}
+	order := make([]neighborKey, 0, len(snapshot.GetLldpNeighbors()))
+	linkCounts := map[neighborKey]int32{}
 
 	for _, neighbor := range snapshot.GetLldpNeighbors() {
 		if shouldIgnoreSwitchPort(neighbor.GetLocalPort(), ignoreSwitchPorts) {
@@ -325,16 +386,20 @@ func normalizeSnapshotNeighbors(
 		}
 
 		remoteSystemType := classifyRemoteSystemType(neighbor.GetRemoteSystemName(), nodeNames, normalizedNodeNames)
-		normalized := v1beta1.SwitchNeighbor{
-			RemoteSystemType: remoteSystemType,
-			RemoteSystemName: neighbor.GetRemoteSystemName(),
+		key := neighborKey{remoteSystemType: remoteSystemType, remoteSystemName: neighbor.GetRemoteSystemName()}
+		if linkCounts[key] == 0 {
+			order = append(order, key)
 		}
-		key := fmt.Sprintf("%s|%s", normalized.RemoteSystemType, normalized.RemoteSystemName)
-		if seenNeighbors[key] {
-			continue
-		}
-		seenNeighbors[key] = true
-		neighbors = append(neighbors, normalized)
+		linkCounts[key]++
+	}
+
+	neighbors := make([]v1beta1.SwitchNeighbor, 0, len(order))
+	for _, key := range order {
+		neighbors = append(neighbors, v1beta1.SwitchNeighbor{
+			RemoteSystemType: key.remoteSystemType,
+			RemoteSystemName: key.remoteSystemName,
+			LinkCount:        linkCounts[key],
+		})
 	}
 
 	sort.Slice(neighbors, func(i, j int) bool {

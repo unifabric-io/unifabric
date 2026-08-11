@@ -122,7 +122,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		snapshot.Switches = append(snapshot.Switches, LabeledResource{Name: sw.Name, Labels: sw.Labels})
 	}
 
-	result, err := BuildTopologyStatus(r.templates.ForTopology(name), snapshot)
+	result, err := BuildTopologyStatus(r.templates.ForTopology(name), snapshot, object.Status.Nodes)
 	if err != nil {
 		topologyStatusErrorTotal.WithLabelValues(name, "conflict").Inc()
 		topologyStatusStale.WithLabelValues(name).Set(1)

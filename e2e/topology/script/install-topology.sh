@@ -29,6 +29,7 @@ Options:
 Environment:
   NVAIR_BIN                Path to nvair binary (default: nvair)
   TOPOLOGY_DIR             Topology directory for nvair create (default: e2e/topology)
+  SIMULATION_NAME          Simulation name (default: unifable-e2e-topology)
   KUBECONFIG_FORWARD_OUT   External kubeconfig output path (same as --output)
   DELETE_IF_EXISTS         true|false (default: false)
   BOOTSTRAP_NODE           Same as --bootstrap-node
@@ -132,16 +133,7 @@ primary_ip_of_remote() {
   printf '%s\n' "${ip_raw}" | awk 'NF {line=$0} END {print line}'
 }
 
-if [[ ! -f "${TOPOLOGY_DIR}/topology.json" ]]; then
-  echo "topology.json not found in ${TOPOLOGY_DIR}" >&2
-  exit 1
-fi
-
-SIMULATION="$(awk -F'"' '/"title"[[:space:]]*:[[:space:]]*"/ { print $4; exit }' "${TOPOLOGY_DIR}/topology.json")"
-if [[ -z "${SIMULATION}" ]]; then
-  echo "failed to parse simulation title from ${TOPOLOGY_DIR}/topology.json" >&2
-  exit 1
-fi
+SIMULATION="${SIMULATION_NAME:-unifable-e2e-topology}"
 SIM_ARGS=(-s "${SIMULATION}")
 
 if [[ -z "${KUBECONFIG_FORWARD_OUT}" ]]; then

@@ -103,6 +103,25 @@ Known condition types and reasons:
 | --- | --- | --- | --- |
 | `remoteSystemType` | string | No | Neighbor type: `KubernetesNode` or `Switch` |
 | `remoteSystemName` | string | Yes | Neighbor Node or switch name |
+| `linkCount` | int32 | No | Number of physical links (local ports) to this remote system; multiple links to the same remote system are deduplicated into one entry |
+
+## Events
+
+The controller emits a `Normal` Kubernetes event of reason `NeighborsChanged`
+on the `Switch` object whenever the set of LLDP neighbors changes between two
+accepted snapshots (a neighbor is identified by `remoteSystemType` +
+`remoteSystemName`). The event message reports how many neighbors were added
+and removed, for example:
+
+```text
+LLDP neighbors changed: 1 added, 1 removed
+```
+
+A `linkCount` change alone (e.g. a second physical link to an already-known
+neighbor appears or disappears) does not trigger this event; only the
+appearance or disappearance of a neighbor itself does. Use
+`kubectl describe switch <name>` or `kubectl get events --field-selector
+involvedObject.name=<name>` to see these events.
 
 ## Labels and annotations
 

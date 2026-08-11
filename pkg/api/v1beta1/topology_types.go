@@ -29,21 +29,28 @@ type TopologyDomain struct {
 	// +optional
 	Parent string `json:"parent,omitempty"`
 
-	// Members contains the names of Switch resources carrying this domain.
+	// SwitchMember contains the names of Switch resources carrying this domain.
 	// +optional
 	// +listType=set
-	Members []string `json:"members,omitempty"`
+	SwitchMember []string `json:"switchMember,omitempty"`
 }
 
 type TopologyNodeGroup struct {
+	// Name is a stable identifier for this group of Nodes, in the form
+	// node-group<N>. Existing groups keep their assigned name across
+	// reconciles; new groups receive the smallest number not currently in
+	// use.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
 	// Nodes contains Kubernetes Nodes that have the same domain path.
 	// +listType=set
 	// +kubebuilder:validation:MinItems=1
 	Nodes []string `json:"nodes"`
 
-	// DomainPath is ordered from the highest tier to the tier nearest to a Node.
+	// SwitchDomainPath is ordered from the highest tier to the tier nearest to a Node.
 	// +kubebuilder:validation:MinItems=1
-	DomainPath []string `json:"domainPath"`
+	SwitchDomainPath []string `json:"switchDomainPath"`
 }
 
 type TopologyStatus struct {

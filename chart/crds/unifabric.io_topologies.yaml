@@ -47,13 +47,6 @@ spec:
                   labels.
                 items:
                   properties:
-                    members:
-                      description: Members contains the names of Switch resources
-                        carrying this domain.
-                      items:
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: set
                     name:
                       description: Name is the value stored in the corresponding Kubernetes
                         topology label.
@@ -63,6 +56,13 @@ spec:
                     parent:
                       description: Parent is the directly enclosing performance domain.
                       type: string
+                    switchMember:
+                      description: SwitchMember contains the names of Switch resources
+                        carrying this domain.
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
                     tier:
                       description: Tier starts at one for the domain nearest to a
                         Kubernetes Node.
@@ -82,13 +82,14 @@ spec:
                   path.
                 items:
                   properties:
-                    domainPath:
-                      description: DomainPath is ordered from the highest tier to
-                        the tier nearest to a Node.
-                      items:
-                        type: string
-                      minItems: 1
-                      type: array
+                    name:
+                      description: |-
+                        Name is a stable identifier for this group of Nodes, in the form
+                        node-group<N>. Existing groups keep their assigned name across
+                        reconciles; new groups receive the smallest number not currently in
+                        use.
+                      minLength: 1
+                      type: string
                     nodes:
                       description: Nodes contains Kubernetes Nodes that have the same
                         domain path.
@@ -97,9 +98,17 @@ spec:
                       minItems: 1
                       type: array
                       x-kubernetes-list-type: set
+                    switchDomainPath:
+                      description: SwitchDomainPath is ordered from the highest tier
+                        to the tier nearest to a Node.
+                      items:
+                        type: string
+                      minItems: 1
+                      type: array
                   required:
-                  - domainPath
+                  - name
                   - nodes
+                  - switchDomainPath
                   type: object
                 type: array
             type: object

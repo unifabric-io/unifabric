@@ -20,7 +20,7 @@ Examples:
 Notes:
   - If you pass a comma-separated node list, this script uses it directly.
   - If you omit the node list, GPU nodes are discovered from the simulation.
-  - Simulation defaults to SIMULATION_NAME or topology.json title under TOPOLOGY_DIR.
+  - Simulation defaults to SIMULATION_NAME or unifable-e2e-topology.
   - This script runs commands non-interactively with:
       nvair exec <node> --simulation <simulation> -- bash -lc '<script>'
 EOF
@@ -34,24 +34,7 @@ require_command() {
 }
 
 resolve_simulation_name() {
-  if [[ -n "${SIMULATION_NAME}" ]]; then
-    printf '%s\n' "${SIMULATION_NAME}"
-    return
-  fi
-
-  if [[ ! -f "${TOPOLOGY_DIR}/topology.json" ]]; then
-    echo "topology.json not found in ${TOPOLOGY_DIR}" >&2
-    exit 2
-  fi
-
-  local resolved
-  resolved="$(awk -F'"' '/"title"[[:space:]]*:[[:space:]]*"/ { print $4; exit }' "${TOPOLOGY_DIR}/topology.json")"
-  if [[ -z "${resolved}" ]]; then
-    echo "failed to parse simulation title from ${TOPOLOGY_DIR}/topology.json" >&2
-    exit 2
-  fi
-
-  printf '%s\n' "${resolved}"
+  printf '%s\n' "${SIMULATION_NAME:-unifable-e2e-topology}"
 }
 
 discover_gpu_nodes() {
@@ -142,27 +125,23 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 running_kernel="$(uname -r)"
+sudo -n apt-get update
 if [[ "${running_kernel}" == "6.8.0-90-generic" ]]; then
+  # linux-modules-extra for this kernel is absent from the archive; pull the
+  # last published build directly from Launchpad and let apt resolve the rest.
   download_dir="$(mktemp -d)"
   cleanup() {
     rm -rf "${download_dir}"
   }
   trap cleanup EXIT
 
-  curl -fsSL --retry 5 --retry-delay 2 -o "${download_dir}/wireless-regdb.deb" "http://archive.ubuntu.com/ubuntu/pool/main/w/wireless-regdb/wireless-regdb_2025.10.07-0ubuntu1~24.04.1_all.deb"
   curl -fsSL --retry 5 --retry-delay 2 -o "${download_dir}/linux-modules-extra.deb" "https://launchpadlibrarian.net/832146409/linux-modules-extra-6.8.0-90-generic_6.8.0-90.91_amd64.deb"
-  sudo -n dpkg -i "${download_dir}/wireless-regdb.deb" "${download_dir}/linux-modules-extra.deb"
-  sudo -n modprobe rdma_rxe
-
-  if ! command -v rdma >/dev/null 2>&1; then
-    sudo -n apt-get update
-    sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y rdma-core
-  fi
+  sudo -n apt-get install -y wireless-regdb rdma-core
+  sudo -n dpkg -i "${download_dir}/linux-modules-extra.deb"
 else
-  sudo -n apt-get update
-  sudo -n apt-get install -y "linux-modules-extra-$(uname -r)" rdma-core
-  sudo -n modprobe rdma_rxe
+  sudo -n apt-get install -y "linux-modules-extra-${running_kernel}" rdma-core
 fi
+sudo -n modprobe rdma_rxe
 
 for i in $(seq 1 13); do
   dev="eth${i}"

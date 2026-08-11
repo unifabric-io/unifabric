@@ -51,24 +51,7 @@ resolve_bootstrap_node() {
 }
 
 resolve_simulation_name() {
-  if [[ -n "${SIMULATION_NAME:-}" ]]; then
-    printf '%s\n' "${SIMULATION_NAME}"
-    return
-  fi
-
-  if [[ ! -f "${TOPOLOGY_DIR}/topology.json" ]]; then
-    echo "topology.json not found in ${TOPOLOGY_DIR}" >&2
-    exit 2
-  fi
-
-  local simulation_name
-  simulation_name="$(awk -F'"' '/"title"[[:space:]]*:[[:space:]]*"/ { print $4; exit }' "${TOPOLOGY_DIR}/topology.json")"
-  if [[ -z "${simulation_name}" ]]; then
-    echo "failed to parse simulation title from ${TOPOLOGY_DIR}/topology.json" >&2
-    exit 2
-  fi
-
-  printf '%s\n' "${simulation_name}"
+  printf '%s\n' "${SIMULATION_NAME:-unifable-e2e-topology}"
 }
 
 run_step() {

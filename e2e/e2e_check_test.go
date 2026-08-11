@@ -72,8 +72,8 @@ func TestValidateTopologyStatusAcceptsArbitraryDepthAndStableGroups(t *testing.T
 			{Name: "tier1-clique", Tier: 1, Parent: "tier2-leaf"},
 		},
 		Nodes: []topologyNodeGroup{{
-			Nodes:      []string{"node-gpu-2", "node-gpu-1"},
-			DomainPath: []string{"tier4-root", "tier3-spine", "tier2-leaf", "tier1-clique"},
+			Nodes:            []string{"node-gpu-2", "node-gpu-1"},
+			SwitchDomainPath: []string{"tier4-root", "tier3-spine", "tier2-leaf", "tier1-clique"},
 		}},
 	}
 	expectedDomains := map[string]topologyDomain{
@@ -98,8 +98,8 @@ func TestValidateTopologyStatusRejectsWrongParentAndNodePath(t *testing.T) {
 			{Name: "tier1-leaf", Tier: 1, Parent: "wrong-root"},
 		},
 		Nodes: []topologyNodeGroup{{
-			Nodes:      []string{"node-gpu-1"},
-			DomainPath: []string{"tier2-root", "unexpected-leaf"},
+			Nodes:            []string{"node-gpu-1"},
+			SwitchDomainPath: []string{"tier2-root", "unexpected-leaf"},
 		}},
 	}
 	expectedDomains := map[string]topologyDomain{
