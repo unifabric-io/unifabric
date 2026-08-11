@@ -99,6 +99,22 @@ spec:
 | --- | --- | --- | --- |
 | `remoteSystemType` | string | 否 | 邻居类型：`KubernetesNode` 或 `Switch` |
 | `remoteSystemName` | string | 是 | 邻居的 Node 名称或交换机名称 |
+| `linkCount` | int32 | 否 | 与该邻居之间的物理链路(本地端口)数量；同一邻居的多条链路会合并为一条记录 |
+
+## Events（事件）
+
+当两次接受的快照之间 LLDP 邻居集合发生变化时（邻居以 `remoteSystemType` +
+`remoteSystemName` 标识），控制器会在对应的 `Switch` 对象上记录一条
+`reason` 为 `NeighborsChanged` 的 `Normal` 事件，内容会汇总新增/消失的邻居数量，例如：
+
+```text
+LLDP neighbors changed: 1 added, 1 removed
+```
+
+如果只是某个已知邻居的 `linkCount`（物理链路数）发生变化（例如新增/断开了到同一邻居的第二条链路），
+不会触发该事件；只有邻居本身的出现或消失才会触发。可以通过
+`kubectl describe switch <name>` 或
+`kubectl get events --field-selector involvedObject.name=<name>` 查看这些事件。
 
 ## Labels 和 annotations
 

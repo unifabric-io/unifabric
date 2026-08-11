@@ -96,6 +96,7 @@ jobs:
     timeout-minutes: 360
     env:
       TOPOLOGY_DIR: ${{ inputs.topology_dir }}
+      SIMULATION_NAME: unifable-e2e-topology
       BOOTSTRAP_NODE: ${{ inputs.bootstrap_node }}
       IMAGE_REGISTRY: ${{ inputs.image_registry }}
       IMAGE_NAMESPACE_INPUT: ${{ inputs.image_namespace }}
@@ -134,12 +135,6 @@ jobs:
             exit 1
           fi
 
-          SIMULATION_NAME="$(awk -F'"' '/"title"[[:space:]]*:[[:space:]]*"/ { print $4; exit }' "${TOPOLOGY_DIR}/topology.json")"
-          if [[ -z "${SIMULATION_NAME}" ]]; then
-            echo "failed to parse simulation title from ${TOPOLOGY_DIR}/topology.json" >&2
-            exit 1
-          fi
-
           IMAGE_NAMESPACE="${IMAGE_NAMESPACE_INPUT:-}"
           if [[ -z "${IMAGE_NAMESPACE}" ]]; then
             IMAGE_NAMESPACE="${GITHUB_REPOSITORY_OWNER,,}"
@@ -148,7 +143,6 @@ jobs:
           IMAGE_TAG="${IMAGE_TAG_INPUT:-latest}"
           KUBECONFIG_PATH="${RUNNER_TEMP}/kubeconfig-${SIMULATION_NAME}-external.yaml"
 
-          echo "simulation_name=${SIMULATION_NAME}" >> "${GITHUB_OUTPUT}"
           echo "image_namespace=${IMAGE_NAMESPACE}" >> "${GITHUB_OUTPUT}"
           echo "image_tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "kubeconfig_path=${KUBECONFIG_PATH}" >> "${GITHUB_OUTPUT}"
@@ -327,8 +321,6 @@ jobs:
       - name: Cleanup simulation
         if: always() && inputs.run_cleanup
         shell: bash
-        env:
-          SIMULATION_NAME: ${{ steps.vars.outputs.simulation_name }}
         run: |
           set +e
           nvair delete simulation "${SIMULATION_NAME}"

@@ -12,7 +12,7 @@ English version: [topology-crd.md](./topology-crd.md)
 
 最终 API 采用只读状态模型。`Topology` 不定义 `spec`，也不主动匹配资源。
 性能域、父子关系和 Node 路径统一由 Controller 从 Kubernetes Node labels 汇总到 `status`。
-Switch CR 通过共用的 `unifabric.io/domain` label 补充 `members`，并由 `spec.role` 选择拓扑。内置发现会自动写入该 label；NVIDIA Topograph 和用户自定义模式可以保持 `members` 为空，也可以由管理员创建只带 label 的 Switch 资源进行补全。
+Switch CR 通过共用的 `unifabric.io/domain` label 补充 `switchMember`，并由 `spec.role` 选择拓扑。内置发现会自动写入该 label；NVIDIA Topograph 和用户自定义模式可以保持 `switchMember` 为空，也可以由管理员创建只带 label 的 Switch 资源进行补全。
 
 本文定义目标 API 契约和协调语义。
 
@@ -21,7 +21,7 @@ Switch CR 通过共用的 `unifabric.io/domain` label 补充 `members`，并由 
 ### 目标
 
 - 用统一的只读 API 表达 scale-out、scale-up 和 storage 拓扑。
-- 以 Node labels 作为 `domains` 和 `nodes` 的唯一事实来源，只使用固定的 Switch `domain` label 补充 `members`。
+- 以 Node labels 作为 `domains` 和 `nodes` 的唯一事实来源，只使用固定的 Switch `domain` label 补充 `switchMember`。
 - 同时表达性能域层级、性能域内的网络设备以及 Node 的完整性能域路径。
 - 兼容 Unifabric 交换机自动发现、NVIDIA Topograph 和用户手工打的 labels。
 - 保证已分配的性能域名称在普通协调、设备断连、Controller 重启和 Leader 切换时保持不变。
@@ -47,34 +47,36 @@ status:
   domains:
     - name: tier3-group1
       tier: 3
-      members:
+      switchMember:
         - core
     - name: tier2-group1
       tier: 2
       parent: tier3-group1
-      members:
+      switchMember:
         - spine1
         - spine2
     - name: tier1-group1
       tier: 1
       parent: tier2-group1
-      members:
+      switchMember:
         - leaf1
         - leaf2
     - name: tier1-group2
       tier: 1
       parent: tier2-group1
-      members:
+      switchMember:
         - leaf3
         - leaf4
   nodes:
-    - nodes: [node1, node2]
-      domainPath:
+    - name: node-group1
+      nodes: [node1, node2]
+      switchDomainPath:
         - tier3-group1
         - tier2-group1
         - tier1-group1
-    - nodes: [node3, node4]
-      domainPath:
+    - name: node-group2
+      nodes: [node3, node4]
+      switchDomainPath:
         - tier3-group1
         - tier2-group1
         - tier1-group2
@@ -88,14 +90,15 @@ status:
 | `status.domains[*].name` | 性能域名称。 |
 | `status.domains[*].tier` | 从 topology label key 中 Go 模板 `.Tier` 对应的位置解析出的层级编号。所有拓扑都从最靠近 Node 的 `1` 开始向上递增。 |
 | `status.domains[*].parent` | 可选的直接上级性能域名称，根性能域不设置。 |
-| `status.domains[*].members` | 承载这个性能域的 Switch CR 名称列表。 |
-| `status.nodes` | 按相同 `domainPath` 合并后的 Kubernetes Node 集合。 |
+| `status.domains[*].switchMember` | 承载这个性能域的 Switch CR 名称列表。 |
+| `status.nodes` | 按相同 `switchDomainPath` 合并后的 Kubernetes Node 集合。 |
 | `status.nodes[*].nodes` | 具有相同路径的 Node 名称，按字典序排列。 |
-| `status.nodes[*].domainPath` | 从最高层到最低层排列的性能域名称。 |
+| `status.nodes[*].name` | 分组的稳定标识，形如 `node-group<N>`。 |
+| `status.nodes[*].switchDomainPath` | 从最高层到最低层排列的性能域名称。 |
 
 上面的 status 只是一个三层 scale-out 示例，不表示 scale-out 固定为三层。内置 LLDP 自动发现使用 `tier${N}-group${M}` 命名性能域。其中 `N` 是层级，`M` 是该拓扑、该层级内的组序号。两层、四层或更深的路径使用相同数据结构和命名规则。
 
-`parent` 已显式表达性能域关系，Kubernetes Node 统一放在 `status.nodes`。`members` 只保存 Switch CR 名称字符串，不包含 `kind`，也不包含性能域或 Node 引用。
+`parent` 已显式表达性能域关系，Kubernetes Node 统一放在 `status.nodes`。`switchMember` 只保存 Switch CR 名称字符串，不包含 `kind`，也不包含性能域或 Node 引用。
 
 ## Label 契约
 
@@ -188,20 +191,20 @@ metadata:
 
 这些名称由内置 LLDP 自动发现在首次分配时生成。后续成员或观测输入变化不会改写已有值。
 
-Controller 按 label key 中解析出的 tier 从高到低生成 `domainPath`，再把路径完全相同的 Node 合并为一个 `status.nodes` 条目。Node 名称和条目都稳定排序。
+Controller 按 label key 中解析出的 tier 从高到低生成 `switchDomainPath`，再把路径完全相同的 Node 合并为一个 `status.nodes` 条目。Node 名称和条目都稳定排序。每个条目的 `name` 只分配一次并在多次协调间保持稳定：仍然存在的分组沿用之前的 `name`，新出现的分组会分配当前未被占用的最小 `node-group<N>` 编号。
 
 ### Switch label 补充成员
 
-只读取 Node labels 无法知道 `tier1-group1` 内实际包含 `leaf1` 和 `leaf2`。因此所有 fabric 共用一个固定的 Switch membership key：`unifabric.io/domain`，由 `Switch.spec.role` 选择 scale-out、scale-up 或 storage。内置发现会自动写入该 key，`TopologyStatusController` watch 该 label、按 role 过滤 Switch，并用其 value 补全 `status.domains[*].members`。
+只读取 Node labels 无法知道 `tier1-group1` 内实际包含 `leaf1` 和 `leaf2`。因此所有 fabric 共用一个固定的 Switch membership key：`unifabric.io/domain`，由 `Switch.spec.role` 选择 scale-out、scale-up 或 storage。内置发现会自动写入该 key，`TopologyStatusController` watch 该 label、按 role 过滤 Switch，并用其 value 补全 `status.domains[*].switchMember`。
 
 成员补充遵循以下规则：
 
 1. Node 表达从最高层到最低层的完整路径，因此同一 Node 可以同时携带多个 tier labels。
 2. Switch 只携带固定的 `unifabric.io/domain` label，并通过 `spec.role` 选择 fabric；不携带 tier key，也不携带上级或下级性能域 labels。
 3. `domain` value 必须与 Node labels 已生成的某个 Domain 名称完全一致。Domain 名称不能跨 tier 重复，因此 Controller 可以从该 Domain 自动推断 Switch tier。
-4. 找不到同名 Domain 时进入 pending，匹配的 Node Domain 出现前不把该 Switch 加入 members。
-5. `members` 中的 Switch CR 名称按字典序去重并排序。
-6. NVIDIA Topograph 和用户自定义模式可以保持 `members` 为空。如果需要补全，用户创建不含 `spec.mgmtIP` 的 Switch，设置 `spec.role`，并只添加共用的 `unifabric.io/domain` label；不需要 annotation、tier 或 switch-agent 连接。
+4. 找不到同名 Domain 时进入 pending，匹配的 Node Domain 出现前不把该 Switch 加入 switchMember。
+5. `switchMember` 中的 Switch CR 名称按字典序去重并排序。
+6. NVIDIA Topograph 和用户自定义模式可以保持 `switchMember` 为空。如果需要补全，用户创建不含 `spec.mgmtIP` 的 Switch，设置 `spec.role`，并只添加共用的 `unifabric.io/domain` label；不需要 annotation、tier 或 switch-agent 连接。
 
 例如只带 label 的 Switch 可以加入 `tier1-group1`，无需声明 tier：
 
@@ -259,10 +262,10 @@ leaf、spine、core 都使用同一个 label key，只有 value 不同。`Topolo
 2. 读取所有 Node 的相关 labels。
 3. 删除空值并校验路径连续性，按 tier 生成性能域。
 4. 从每条路径的相邻值生成 `parent`。同一 child 对应不同 parent 时判定为冲突。
-5. 按完整 `domainPath` 对 Kubernetes Node 分组，生成 `status.nodes`。
-6. 读取每个 Switch 上固定的 `domain` label，将 value 与 Node 生成的 Domain 匹配，再使用该 Domain 推断出的 tier 补全 members。没有 Switch label 时保持 members 为空。
+5. 按完整 `switchDomainPath` 对 Kubernetes Node 分组，生成 `status.nodes`，并为每个分组分配稳定的 `name`。
+6. 读取每个 Switch 上固定的 `domain` label，将 value 与 Node 生成的 Domain 匹配，再使用该 Domain 推断出的 tier 补全 switchMember。没有 Switch label 时保持 switchMember 为空。
 7. 校验性能域名称、tier、成员唯一性和引用完整性。
-8. 对 domains、members、node groups 和 nodes 稳定排序。与当前 status 无差异时不写 API。
+8. 对 domains、switchMember、node groups 和 nodes 稳定排序。与当前 status 无差异时不写 API。
 
 性能域引用构成一棵树或由多棵树构成的森林。每个非根性能域只能有一个 parent，不得引用自身，也不得形成环。同一层中一个 Node 或 Switch 不能属于多个性能域。
 
@@ -288,7 +291,7 @@ leaf、spine 和 core 只是常见三层网络中的设备角色，不是 label 
 
 ### Scale-up
 
-当 `scaleUp.mode=nv-topograph` 时，NVIDIA Topograph 写入的 Node labels 直接形成 scale-up 性能域和 Node 分组。例如具有相同 `scale-up.unifabric.io/tier-1` label value 的 Node 属于同一 tier 1 性能域。这个例子只使用 tier 1，不构成 Unifabric API 的层数限制，更高层可以继续使用同一模板。该来源通常没有 Switch labels，因此 `members` 为空是正常状态。Scale-out 只有在 `scaleOut.mode=nv-topograph` 时才独立使用 NVIDIA labels。
+当 `scaleUp.mode=nv-topograph` 时，NVIDIA Topograph 写入的 Node labels 直接形成 scale-up 性能域和 Node 分组。例如具有相同 `scale-up.unifabric.io/tier-1` label value 的 Node 属于同一 tier 1 性能域。这个例子只使用 tier 1，不构成 Unifabric API 的层数限制，更高层可以继续使用同一模板。该来源通常没有 Switch labels，因此 `switchMember` 为空是正常状态。Scale-out 只有在 `scaleOut.mode=nv-topograph` 时才独立使用 NVIDIA labels。
 
 ### Storage
 
@@ -312,7 +315,7 @@ Node 和 Switch 上的相关 labels 全部删除是一个合法的空结果：�
 - 一个成员资源在同一拓扑只能有一个 `domain` 归属。同一路径中的 Node 天然每层只有一个 label value。
 - Switch `domain` label 找不到对应的 Node 性能域时不创建孤立性能域，并报告待补全信息。
 - 自动发现只补充缺失的受管 labels。普通协调不替换、迁移或删除已有受管 labels。已锁定归属与当前发现结果冲突时保留旧值并报错。
-- `status.domains[*].members` 只允许填写已存在的 Switch CR 名称，名称不得重复。
+- `status.domains[*].switchMember` 只允许填写已存在的 Switch CR 名称，名称不得重复。
 
 ## 控制器解耦设计
 

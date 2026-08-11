@@ -10,7 +10,7 @@
 - `scaleup`: high-bandwidth accelerator interconnects such as NVLink.
 - `storage`: the storage network containing compute Nodes and external storage endpoints.
 
-The final API uses a read-only status model. `Topology` has no `spec` and does not actively match resources. The Controller aggregates performance domains, parent relationships, and Node paths from Kubernetes Node labels into `status`. Switch CRs enrich `members` through the shared `unifabric.io/domain` label and select the topology through `spec.role`. Built-in discovery writes this label automatically; NVIDIA Topograph and user-defined modes may leave `members` empty or let an administrator create label-only Switch resources.
+The final API uses a read-only status model. `Topology` has no `spec` and does not actively match resources. The Controller aggregates performance domains, parent relationships, and Node paths from Kubernetes Node labels into `status`. Switch CRs enrich `switchMember` through the shared `unifabric.io/domain` label and select the topology through `spec.role`. Built-in discovery writes this label automatically; NVIDIA Topograph and user-defined modes may leave `switchMember` empty or let an administrator create label-only Switch resources.
 
 This document defines the target API contract and reconciliation semantics.
 
@@ -19,7 +19,7 @@ This document defines the target API contract and reconciliation semantics.
 ### Goals
 
 - Represent scale-out, scale-up, and storage topology through one read-only API.
-- Use Node labels as the sole source for `domains` and `nodes`; use the fixed Switch `domain` label only to enrich `members`.
+- Use Node labels as the sole source for `domains` and `nodes`; use the fixed Switch `domain` label only to enrich `switchMember`.
 - Represent performance-domain hierarchy, network devices within each performance domain, and the complete performance-domain path of each Node.
 - Support Unifabric switch discovery, NVIDIA Topograph, and administrator-managed labels.
 - Keep assigned performance-domain names stable across ordinary reconciliation, device disconnection, Controller restart, and leader transition.
@@ -42,10 +42,11 @@ This document defines the target API contract and reconciliation semantics.
 | `status.domains[*].name` | Domain name; valid as a Kubernetes label value. |
 | `status.domains[*].tier` | Tier parsed from the position corresponding to the Go-template field `.Tier` in a topology label key. Every topology starts at `1` nearest to a Node and increases upward. |
 | `status.domains[*].parent` | Optional direct parent Domain name; absent on a root. |
-| `status.domains[*].members` | Names of the Switch CRs carrying this performance domain. |
-| `status.nodes` | Kubernetes Nodes grouped by identical `domainPath`. |
+| `status.domains[*].switchMember` | Names of the Switch CRs carrying this performance domain. |
+| `status.nodes` | Kubernetes Nodes grouped by identical `switchDomainPath`. |
 | `status.nodes[*].nodes` | Node names sharing the path, sorted lexically. |
-| `status.nodes[*].domainPath` | Domain names ordered from the highest to the lowest tier. |
+| `status.nodes[*].name` | Stable identifier for the group, in the form `node-group<N>`. |
+| `status.nodes[*].switchDomainPath` | Domain names ordered from the highest to the lowest tier. |
 
 Target status example:
 
@@ -58,34 +59,36 @@ status:
   domains:
     - name: tier3-group1
       tier: 3
-      members:
+      switchMember:
         - core
     - name: tier2-group1
       tier: 2
       parent: tier3-group1
-      members:
+      switchMember:
         - spine1
         - spine2
     - name: tier1-group1
       tier: 1
       parent: tier2-group1
-      members:
+      switchMember:
         - leaf1
         - leaf2
     - name: tier1-group2
       tier: 1
       parent: tier2-group1
-      members:
+      switchMember:
         - leaf3
         - leaf4
   nodes:
-    - nodes: [node1, node2]
-      domainPath:
+    - name: node-group1
+      nodes: [node1, node2]
+      switchDomainPath:
         - tier3-group1
         - tier2-group1
         - tier1-group1
-    - nodes: [node3, node4]
-      domainPath:
+    - name: node-group2
+      nodes: [node3, node4]
+      switchDomainPath:
         - tier3-group1
         - tier2-group1
         - tier1-group2
@@ -93,7 +96,7 @@ status:
 
 The status above is only a three-tier scale-out example. It does not fix scale-out at three tiers. Built-in LLDP discovery names performance domains with `tier${N}-group${M}`, where `N` is the tier and `M` is the group sequence within that topology and tier. Two-tier, four-tier, and deeper paths use the same data structure and naming rule.
 
-Because `parent` explicitly expresses Domain relationships, Kubernetes Nodes live only in `status.nodes`. `members` contains only Switch CR name strings. It has no `kind` field and contains no Domain or Node references.
+Because `parent` explicitly expresses Domain relationships, Kubernetes Nodes live only in `status.nodes`. `switchMember` contains only Switch CR name strings. It has no `kind` field and contains no Domain or Node references.
 
 ## Label contract
 
@@ -186,11 +189,11 @@ metadata:
 
 Built-in LLDP discovery assigns these names when it first labels the performance domains. Later membership or observation changes do not rewrite the existing values.
 
-The Controller builds `domainPath` by sorting tiers parsed from label keys from highest to lowest, then combines Nodes with identical paths into one `status.nodes` entry. Node names and entries have stable ordering.
+The Controller builds `switchDomainPath` by sorting tiers parsed from label keys from highest to lowest, then combines Nodes with identical paths into one `status.nodes` entry. Node names and entries have stable ordering. Each entry's `name` is assigned once and kept stable across reconciliations: a group that still exists keeps its previous `name`, and a newly discovered group receives the smallest `node-group<N>` number not currently in use.
 
 ### Enriching members from a Switch label
 
-Node labels alone cannot reveal that `tier1-group1` contains the physical switches `leaf1` and `leaf2`. All fabrics therefore share one fixed Switch membership key: `unifabric.io/domain`. `Switch.spec.role` selects scale-out, scale-up, or storage. Built-in discovery writes the key automatically. `TopologyStatusController` watches it, filters Switches by role, and uses the label value to populate `status.domains[*].members`.
+Node labels alone cannot reveal that `tier1-group1` contains the physical switches `leaf1` and `leaf2`. All fabrics therefore share one fixed Switch membership key: `unifabric.io/domain`. `Switch.spec.role` selects scale-out, scale-up, or storage. Built-in discovery writes the key automatically. `TopologyStatusController` watches it, filters Switches by role, and uses the label value to populate `status.domains[*].switchMember`.
 
 Member enrichment follows these rules:
 
@@ -198,8 +201,8 @@ Member enrichment follows these rules:
 2. A Switch carries only the fixed `unifabric.io/domain` label and selects its fabric through `spec.role`. It does not carry a tier key or ancestor/descendant labels.
 3. The `domain` value must exactly match one Domain already built from Node labels. Because Domain names are unique across tiers, the Controller infers the Switch tier from that Domain.
 4. A missing Domain is reported as pending and the Switch is omitted until the matching Node Domain appears.
-5. Switch CR names in `members` are deduplicated and sorted lexically.
-6. NVIDIA Topograph and user-defined modes may leave `members` empty. To enrich them, an operator creates a Switch without `spec.mgmtIP`, sets `spec.role`, and adds only the shared `unifabric.io/domain` label. No annotation, tier, or switch-agent connection is required.
+5. Switch CR names in `switchMember` are deduplicated and sorted lexically.
+6. NVIDIA Topograph and user-defined modes may leave `switchMember` empty. To enrich them, an operator creates a Switch without `spec.mgmtIP`, sets `spec.role`, and adds only the shared `unifabric.io/domain` label. No annotation, tier, or switch-agent connection is required.
 
 For example, a label-only Switch can join `tier1-group1` without declaring its tier:
 
@@ -257,8 +260,8 @@ In the built-in RoCE mode, a Switch without switch-side LLDP may additionally de
 2. Read relevant labels from all Nodes.
 3. Remove empty values, validate path continuity, and create Domains at their fixed tiers.
 4. Create `parent` from adjacent values in every path. A child mapped to different parents is a conflict.
-5. Group Kubernetes Nodes by complete `domainPath` to build `status.nodes`.
-6. Read the fixed `domain` label on each Switch, match its value to a Node-derived Domain, and populate members using the Domain's inferred tier; leave members empty when no Switch label exists.
+5. Group Kubernetes Nodes by complete `switchDomainPath` to build `status.nodes`, assigning each group a stable `name`.
+6. Read the fixed `domain` label on each Switch, match its value to a Node-derived Domain, and populate `switchMember` using the Domain's inferred tier; leave `switchMember` empty when no Switch label exists.
 7. Validate Domain names, tiers, member uniqueness, and reference completeness.
 8. Stably sort Domains, members, Node groups, and Node names. Do not write the API when status is unchanged.
 
@@ -286,7 +289,7 @@ Leaf, spine, and core are device roles in a common three-tier network, not fixed
 
 ### Scale-up
 
-When `scaleUp.mode=nv-topograph`, Node labels written by NVIDIA Topograph directly form scale-up performance domains and Node groups. Nodes with the same `scale-up.unifabric.io/tier-1` label value belong to one tier 1 domain. This example uses only tier 1 and does not create a Unifabric API depth limit. Higher tiers use the same template. This source normally has no Switch labels, so empty `members` is normal. Scale-out independently uses NVIDIA labels only when `scaleOut.mode=nv-topograph`.
+When `scaleUp.mode=nv-topograph`, Node labels written by NVIDIA Topograph directly form scale-up performance domains and Node groups. Nodes with the same `scale-up.unifabric.io/tier-1` label value belong to one tier 1 domain. This example uses only tier 1 and does not create a Unifabric API depth limit. Higher tiers use the same template. This source normally has no Switch labels, so empty `switchMember` is normal. Scale-out independently uses NVIDIA labels only when `scaleOut.mode=nv-topograph`.
 
 ### Storage
 
@@ -310,7 +313,7 @@ Primary validation rules:
 - A member resource has one `domain` assignment in a topology. A Node path naturally has one label value per tier.
 - A Switch `domain` label with no corresponding Node-derived Domain does not create an orphan Domain and is reported as incomplete member data.
 - Discovery fills only missing managed labels. Ordinary reconciliation does not replace, migrate, or remove existing managed labels. A conflict between a locked assignment and current discovery retains the old labels and reports an error.
-- `status.domains[*].members` contains only names of existing Switch CRs, with no duplicate names.
+- `status.domains[*].switchMember` contains only names of existing Switch CRs, with no duplicate names.
 
 ## Decoupled controller design
 

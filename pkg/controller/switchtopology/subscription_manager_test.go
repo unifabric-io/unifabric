@@ -5,6 +5,7 @@ package switchtopology
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -15,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
@@ -438,6 +440,102 @@ func TestHandleSnapshotStoresMultipleLinksToSamePeer(t *testing.T) {
 	}
 	if neighbor.RemoteSystemName != "node-gpu-1" {
 		t.Fatalf("unexpected stored remote system name: %s", neighbor.RemoteSystemName)
+	}
+	if neighbor.LinkCount != 2 {
+		t.Fatalf("expected linkCount 2 for two physical links to the same peer, got %d", neighbor.LinkCount)
+	}
+}
+
+func TestHandleSnapshotRecordsNeighborChangeEvent(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := v1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add api scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add core scheme: %v", err)
+	}
+
+	switchObj := &v1beta1.Switch{
+		ObjectMeta: metav1.ObjectMeta{Name: "leaf1"},
+		Spec:       v1beta1.SwitchSpec{MgmtIP: "10.0.0.10"},
+	}
+	nodeA := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-a"}}
+	nodeB := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-b"}}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(switchObj, nodeA, nodeB).
+		WithStatusSubresource(&v1beta1.Switch{}).
+		Build()
+
+	recorder := record.NewFakeRecorder(10)
+	manager := &subscriptionManager{
+		client:   fakeClient,
+		cfg:      &config.ControllerConfig{},
+		log:      logger.MustNew(logger.LevelDebug),
+		recorder: recorder,
+	}
+
+	var lastGeneration uint64
+	// First snapshot: a single new neighbor should be reported as added.
+	if _, err := manager.handleSnapshot(context.Background(), "leaf1", &switchagent.LLDPNeighborSnapshot{
+		SwitchName: "leaf1",
+		Generation: 1,
+		LldpNeighbors: []*switchagent.LLDPNeighbor{
+			{LocalDeviceName: "leaf1", LocalPort: "Ethernet1", RemoteSystemName: "node-a", RemotePortId: "eth0"},
+		},
+	}, &lastGeneration); err != nil {
+		t.Fatalf("handleSnapshot returned error: %v", err)
+	}
+
+	select {
+	case event := <-recorder.Events:
+		if !strings.Contains(event, "1 added, 0 removed") {
+			t.Fatalf("unexpected event for initial snapshot: %s", event)
+		}
+	default:
+		t.Fatal("expected an event for the initial snapshot")
+	}
+
+	// Second snapshot: replace node-a with node-b, and add a second physical
+	// link to node-b. This should report 1 added, 1 removed (the linkCount
+	// change alone must not be counted).
+	if _, err := manager.handleSnapshot(context.Background(), "leaf1", &switchagent.LLDPNeighborSnapshot{
+		SwitchName: "leaf1",
+		Generation: 2,
+		LldpNeighbors: []*switchagent.LLDPNeighbor{
+			{LocalDeviceName: "leaf1", LocalPort: "Ethernet2", RemoteSystemName: "node-b", RemotePortId: "eth0"},
+			{LocalDeviceName: "leaf1", LocalPort: "Ethernet3", RemoteSystemName: "node-b", RemotePortId: "eth1"},
+		},
+	}, &lastGeneration); err != nil {
+		t.Fatalf("handleSnapshot returned error: %v", err)
+	}
+
+	select {
+	case event := <-recorder.Events:
+		if !strings.Contains(event, "1 added, 1 removed") {
+			t.Fatalf("unexpected event for changed snapshot: %s", event)
+		}
+	default:
+		t.Fatal("expected an event for the changed snapshot")
+	}
+
+	// Third snapshot: same peer (node-b), only linkCount drops back to 1.
+	// No neighbor-change event should be emitted.
+	if _, err := manager.handleSnapshot(context.Background(), "leaf1", &switchagent.LLDPNeighborSnapshot{
+		SwitchName: "leaf1",
+		Generation: 3,
+		LldpNeighbors: []*switchagent.LLDPNeighbor{
+			{LocalDeviceName: "leaf1", LocalPort: "Ethernet2", RemoteSystemName: "node-b", RemotePortId: "eth0"},
+		},
+	}, &lastGeneration); err != nil {
+		t.Fatalf("handleSnapshot returned error: %v", err)
+	}
+
+	select {
+	case event := <-recorder.Events:
+		t.Fatalf("expected no event when only linkCount changes, got: %s", event)
+	default:
 	}
 }
 

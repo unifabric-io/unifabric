@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
@@ -38,7 +39,11 @@ type domainState struct {
 // BuildTopologyStatus builds one complete status snapshot from Node and Switch
 // labels. Conflicting Node inputs return an error and no partial status. An
 // orphan Switch member is reported as pending and omitted from members.
-func BuildTopologyStatus(labelTemplate *topologylabel.Template, snapshot LabelSnapshot) (BuildResult, error) {
+// previousNodeGroups is the Topology's current status.nodes (if any) and is
+// used to keep each node group's Name stable across reconciles: groups that
+// still exist keep their previously assigned name, and newly discovered
+// groups receive the smallest name number not currently in use.
+func BuildTopologyStatus(labelTemplate *topologylabel.Template, snapshot LabelSnapshot, previousNodeGroups []v1beta1.TopologyNodeGroup) (BuildResult, error) {
 	if labelTemplate == nil {
 		return BuildResult{}, fmt.Errorf("topology label template must not be nil")
 	}
@@ -84,10 +89,10 @@ func BuildTopologyStatus(labelTemplate *topologylabel.Template, snapshot LabelSn
 		for tier := len(tiers); tier >= 1; tier-- {
 			path = append(path, valuesByTier[tier])
 		}
-		groupKey := strings.Join(path, "\x00")
+		groupKey := nodeGroupKey(path)
 		group := nodeGroups[groupKey]
 		if group == nil {
-			group = &v1beta1.TopologyNodeGroup{DomainPath: path}
+			group = &v1beta1.TopologyNodeGroup{SwitchDomainPath: path}
 			nodeGroups[groupKey] = group
 		}
 		group.Nodes = append(group.Nodes, node.Name)
@@ -120,7 +125,7 @@ func BuildTopologyStatus(labelTemplate *topologylabel.Template, snapshot LabelSn
 		if len(state.parents) == 1 {
 			state.domain.Parent = sortedSet(state.parents)[0]
 		}
-		state.domain.Members = sortedSet(state.members)
+		state.domain.SwitchMember = sortedSet(state.members)
 		status.Domains = append(status.Domains, state.domain)
 	}
 	if len(status.Domains) == 0 {
@@ -141,13 +146,14 @@ func BuildTopologyStatus(labelTemplate *topologylabel.Template, snapshot LabelSn
 		status.Nodes = nil
 	}
 	sort.Slice(status.Nodes, func(i, j int) bool {
-		left := strings.Join(status.Nodes[i].DomainPath, "\x00")
-		right := strings.Join(status.Nodes[j].DomainPath, "\x00")
+		left := strings.Join(status.Nodes[i].SwitchDomainPath, "\x00")
+		right := strings.Join(status.Nodes[j].SwitchDomainPath, "\x00")
 		if left != right {
 			return left < right
 		}
 		return strings.Join(status.Nodes[i].Nodes, "\x00") < strings.Join(status.Nodes[j].Nodes, "\x00")
 	})
+	assignNodeGroupNames(status.Nodes, previousNodeGroups)
 	sort.Strings(pending)
 
 	return BuildResult{Status: status, Pending: pending}, nil
@@ -224,4 +230,55 @@ func sortedSet(values map[string]struct{}) []string {
 	}
 	sort.Strings(result)
 	return result
+}
+
+const nodeGroupNamePrefix = "node-group"
+
+// assignNodeGroupNames assigns a stable Name to each entry in groups.
+// Groups whose SwitchDomainPath matches a previous group keep that group's
+// Name. Groups without a matching previous entry (new groups) receive the
+// smallest node-group<N> number not already in use.
+func assignNodeGroupNames(groups []v1beta1.TopologyNodeGroup, previousNodeGroups []v1beta1.TopologyNodeGroup) {
+	previousNameByKey := map[string]string{}
+	usedNumbers := map[int]struct{}{}
+	for _, previous := range previousNodeGroups {
+		previousNameByKey[nodeGroupKey(previous.SwitchDomainPath)] = previous.Name
+		if number, ok := parseNodeGroupNumber(previous.Name); ok {
+			usedNumbers[number] = struct{}{}
+		}
+	}
+
+	nextNumber := 1
+	for i := range groups {
+		key := nodeGroupKey(groups[i].SwitchDomainPath)
+		if name, ok := previousNameByKey[key]; ok && name != "" {
+			groups[i].Name = name
+			continue
+		}
+		for {
+			if _, taken := usedNumbers[nextNumber]; !taken {
+				break
+			}
+			nextNumber++
+		}
+		usedNumbers[nextNumber] = struct{}{}
+		groups[i].Name = fmt.Sprintf("%s%d", nodeGroupNamePrefix, nextNumber)
+		nextNumber++
+	}
+}
+
+func nodeGroupKey(path []string) string {
+	return strings.Join(path, "\x00")
+}
+
+func parseNodeGroupNumber(name string) (int, bool) {
+	suffix, ok := strings.CutPrefix(name, nodeGroupNamePrefix)
+	if !ok || suffix == "" {
+		return 0, false
+	}
+	number, err := strconv.Atoi(suffix)
+	if err != nil || number <= 0 {
+		return 0, false
+	}
+	return number, true
 }

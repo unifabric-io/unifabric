@@ -357,16 +357,16 @@ func validateTopologyStatus(
 		}
 		if domain.Tier != expected.Tier ||
 			domain.Parent != expected.Parent ||
-			!reflect.DeepEqual(sortedUnique(domain.Members), sortedUnique(expected.Members)) {
+			!reflect.DeepEqual(sortedUnique(domain.SwitchMember), sortedUnique(expected.SwitchMember)) {
 			errs = append(errs, fmt.Sprintf(
 				"domain %s expected tier=%d parent=%s members=%v, got tier=%d parent=%s members=%v",
 				domain.Name,
 				expected.Tier,
 				expected.Parent,
-				expected.Members,
+				expected.SwitchMember,
 				domain.Tier,
 				domain.Parent,
-				domain.Members,
+				domain.SwitchMember,
 			))
 		}
 	}
@@ -374,7 +374,7 @@ func validateTopologyStatus(
 		errs = append(errs, fmt.Sprintf("node group count expected %d, got %d", len(expectedPaths), len(status.Nodes)))
 	}
 	for _, nodeGroup := range status.Nodes {
-		path := strings.Join(nodeGroup.DomainPath, "/")
+		path := strings.Join(nodeGroup.SwitchDomainPath, "/")
 		expectedNodes, ok := expectedPaths[path]
 		if !ok {
 			errs = append(errs, fmt.Sprintf("unexpected Node path %s", path))

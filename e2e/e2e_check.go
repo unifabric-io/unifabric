@@ -116,15 +116,15 @@ type topologyStatus struct {
 }
 
 type topologyDomain struct {
-	Name    string   `json:"name"`
-	Tier    int      `json:"tier"`
-	Parent  string   `json:"parent"`
-	Members []string `json:"members"`
+	Name         string   `json:"name"`
+	Tier         int      `json:"tier"`
+	Parent       string   `json:"parent"`
+	SwitchMember []string `json:"switchMember"`
 }
 
 type topologyNodeGroup struct {
-	Nodes      []string `json:"nodes"`
-	DomainPath []string `json:"domainPath"`
+	Nodes            []string `json:"nodes"`
+	SwitchDomainPath []string `json:"switchDomainPath"`
 }
 
 type kubernetesNodeList struct {
@@ -825,8 +825,8 @@ func validateScaleOutTopologyStatusWithMembers(includePhysicalLeaves bool) (bool
 			errs = append(errs, fmt.Sprintf("unexpected domain %s", domain.Name))
 			continue
 		}
-		if domain.Tier != expected.tier || domain.Parent != expected.parent || strings.Join(sortedUnique(domain.Members), ",") != strings.Join(expected.members, ",") {
-			errs = append(errs, fmt.Sprintf("domain %s expected tier=%d parent=%s members=%v, got tier=%d parent=%s members=%v", domain.Name, expected.tier, expected.parent, expected.members, domain.Tier, domain.Parent, domain.Members))
+		if domain.Tier != expected.tier || domain.Parent != expected.parent || strings.Join(sortedUnique(domain.SwitchMember), ",") != strings.Join(expected.members, ",") {
+			errs = append(errs, fmt.Sprintf("domain %s expected tier=%d parent=%s members=%v, got tier=%d parent=%s members=%v", domain.Name, expected.tier, expected.parent, expected.members, domain.Tier, domain.Parent, domain.SwitchMember))
 		}
 	}
 	expectedPaths := map[string]string{
@@ -837,7 +837,7 @@ func validateScaleOutTopologyStatusWithMembers(includePhysicalLeaves bool) (bool
 		errs = append(errs, fmt.Sprintf("node group count expected %d, got %d", len(expectedPaths), len(topology.Status.Nodes)))
 	}
 	for _, nodeGroup := range topology.Status.Nodes {
-		path := strings.Join(nodeGroup.DomainPath, "/")
+		path := strings.Join(nodeGroup.SwitchDomainPath, "/")
 		if strings.Join(sortedUnique(nodeGroup.Nodes), ",") != expectedPaths[path] {
 			errs = append(errs, fmt.Sprintf("path %s has unexpected nodes %v", path, nodeGroup.Nodes))
 		}

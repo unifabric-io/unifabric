@@ -156,6 +156,14 @@ spec:
                   for this switch.
                 items:
                   properties:
+                    linkCount:
+                      description: |-
+                        LinkCount reports the number of physical links (local ports) observed
+                        to this remote system. Multiple links to the same remote system are
+                        deduplicated into this single entry.
+                      format: int32
+                      minimum: 1
+                      type: integer
                     remoteSystemName:
                       description: RemoteSystemName identifies the remote system for
                         this LLDP entry.
