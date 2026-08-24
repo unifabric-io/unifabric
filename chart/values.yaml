@@ -84,9 +84,15 @@ nodeMetrics:
     # -- Service port used by Prometheus to scrape agent RDMA metrics.
     port: 8086
 
-# -- Controls rendering of bundled RDMA Grafana dashboard resources.
+# -- Controls the read-only Topology HTTP API used by the Unifabric Grafana datasource plugin.
+topologyAPI:
+  # -- Enable the Topology HTTP API. Disabled by default since it has no authentication of its own.
+  enabled: false
+
+# -- Controls rendering of bundled Grafana dashboard resources (RDMA cluster/node/pod/workload,
+# plus the Unifabric Topology dashboard when topologyAPI.enabled is true).
 grafanaDashboard:
-  # -- Render the bundled RDMA cluster, node, pod, and workload dashboards.
+  # -- Render the bundled Grafana dashboards.
   enabled: true
   # -- Dashboard resource kind. Use ConfigMap for Grafana sidecar import, or GrafanaDashboard for Grafana Operator.
   kind: GrafanaDashboard
@@ -94,8 +100,22 @@ grafanaDashboard:
   labels: {}
   # -- Allow Grafana Operator to import GrafanaDashboard resources across namespaces.
   allowCrossNamespaceImport: true
-  # -- Grafana Operator instance selector for importing GrafanaDashboard resources.
+  # -- Grafana Operator instance selector for importing dashboards and the Topology datasource into an external Grafana instance. Ignored when grafanaInstance.enabled is true.
   instanceSelector: {}
+
+# -- Controls the optional Grafana instance managed by Grafana Operator. The Grafana Operator CRDs must already be installed.
+grafanaInstance:
+  # -- Create a Grafana CR for this release and, when topologyAPI.enabled is true, its Topology GrafanaDatasource.
+  enabled: false
+  image:
+    # -- Container image registry for the bundled Grafana instance.
+    registry: ghcr.io
+    # -- Container image repository containing the Unifabric Grafana plugins.
+    repository: unifabric-io/unifabric-grafana
+    # -- Container image tag. Defaults to the chart appVersion when empty.
+    tag: ""
+  # -- Extra labels added to the Grafana instance.
+  labels: {}
 
 controller:
   # -- Deploy the Unifabric controller.
@@ -165,6 +185,8 @@ controller:
     metrics: 8080
     # -- Controller health probe container port.
     health: 8081
+    # -- Controller Topology API container, Service, and datasource port. Only listened on when topologyAPI.enabled is true.
+    topologyAPI: 8082
   service:
     # -- Create a Service for the controller metrics endpoint.
     enabled: true

@@ -37,6 +37,26 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-agent" (include "unifabric.fullname" .) -}}
 {{- end -}}
 
+{{- define "unifabric.grafanaName" -}}
+{{- printf "%s-grafana" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "unifabric.topologyDatasourceName" -}}
+{{- printf "%s-topology" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "unifabric.grafanaInstanceSelector" -}}
+{{- if .Values.grafanaInstance.enabled -}}
+matchLabels:
+  app.kubernetes.io/instance: {{ .Release.Name }}
+  app.kubernetes.io/component: unifabric-grafana
+{{- else if .Values.grafanaDashboard.instanceSelector -}}
+{{- toYaml .Values.grafanaDashboard.instanceSelector -}}
+{{- else -}}
+{}
+{{- end -}}
+{{- end -}}
+
 {{- define "unifabric.controllerServiceAccountName" -}}
 {{- default (include "unifabric.controllerName" .) .Values.controller.serviceAccount.name -}}
 {{- end -}}

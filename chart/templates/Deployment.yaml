@@ -61,6 +61,11 @@ spec:
             - name: health
               containerPort: {{ .Values.controller.ports.health }}
               protocol: TCP
+            {{- if .Values.topologyAPI.enabled }}
+            - name: topology-api
+              containerPort: {{ .Values.controller.ports.topologyAPI }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

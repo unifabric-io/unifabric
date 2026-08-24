@@ -1,0 +1,129 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "showLabels": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "raw_frame",
+          "rawFrameContent": "[{\"name\": \"nodes\", \"fields\": [{\"name\": \"id\", \"type\": \"string\", \"values\": [\"scaleout/tier2-group1\", \"scaleout/tier1-group1\", \"scaleout/tier1-group2\", \"host/node1\", \"host/node2\", \"host/node3\", \"host/node4\", \"scaleup/nvlink-group1\", \"storage/storage-leaf1\"]}, {\"name\": \"title\", \"type\": \"string\", \"values\": [\"tier2-group1\", \"tier1-group1\", \"tier1-group2\", \"node1\", \"node2\", \"node3\", \"node4\", \"nvlink-group1\", \"storage-leaf1\"]}, {\"name\": \"detail\", \"type\": \"string\", \"values\": [\"scaleout: tier2-group1 \\u2014 switches: spine1\", \"scaleout: tier1-group1 \\u2014 switches: leaf1, leaf2\", \"scaleout: tier1-group2 \\u2014 switches: leaf3, leaf4\", \"node1\", \"node2\", \"node3\", \"node4\", \"scaleup: nvlink-group1 \\u2014 switches: nvswitch1, nvswitch2\", \"storage: storage-leaf1 \\u2014 switches: storage-switch1, storage-switch2\"]}, {\"name\": \"tier\", \"type\": \"number\", \"values\": [2, 1, 1, 0, 0, 0, 0, 1, 1]}, {\"name\": \"deviceType\", \"type\": \"string\", \"values\": [\"switch\", \"switch\", \"switch\", \"host\", \"host\", \"host\", \"host\", \"switch\", \"switch\"]}, {\"name\": \"nodeType\", \"type\": \"string\", \"values\": [\"domain\", \"domain\", \"domain\", \"host\", \"host\", \"host\", \"host\", \"domain\", \"domain\"]}, {\"name\": \"topology\", \"type\": \"string\", \"values\": [\"scaleout\", \"scaleout\", \"scaleout\", \"\", \"\", \"\", \"\", \"scaleup\", \"storage\"]}, {\"name\": \"members\", \"type\": \"string\", \"values\": [\"spine1\", \"leaf1, leaf2\", \"leaf3, leaf4\", \"\", \"\", \"\", \"\", \"nvswitch1, nvswitch2\", \"storage-switch1, storage-switch2\"]}]}, {\"name\": \"edges\", \"fields\": [{\"name\": \"id\", \"type\": \"string\", \"values\": [\"scaleout/tier1-group1->scaleout/tier2-group1\", \"scaleout/tier1-group2->scaleout/tier2-group1\", \"host/node1->scaleout/tier1-group1\", \"host/node2->scaleout/tier1-group1\", \"host/node3->scaleout/tier1-group2\", \"host/node4->scaleout/tier1-group2\", \"host/node1->scaleup/nvlink-group1\", \"host/node2->scaleup/nvlink-group1\", \"host/node3->scaleup/nvlink-group1\", \"host/node4->scaleup/nvlink-group1\", \"host/node1->storage/storage-leaf1\", \"host/node2->storage/storage-leaf1\"]}, {\"name\": \"source\", \"type\": \"string\", \"values\": [\"scaleout/tier1-group1\", \"scaleout/tier1-group2\", \"host/node1\", \"host/node2\", \"host/node3\", \"host/node4\", \"host/node1\", \"host/node2\", \"host/node3\", \"host/node4\", \"host/node1\", \"host/node2\"]}, {\"name\": \"target\", \"type\": \"string\", \"values\": [\"scaleout/tier2-group1\", \"scaleout/tier2-group1\", \"scaleout/tier1-group1\", \"scaleout/tier1-group1\", \"scaleout/tier1-group2\", \"scaleout/tier1-group2\", \"scaleup/nvlink-group1\", \"scaleup/nvlink-group1\", \"scaleup/nvlink-group1\", \"scaleup/nvlink-group1\", \"storage/storage-leaf1\", \"storage/storage-leaf1\"]}, {\"name\": \"kind\", \"type\": \"string\", \"values\": [\"parent\", \"parent\", \"member\", \"member\", \"member\", \"member\", \"member\", \"member\", \"member\", \"member\", \"member\", \"member\"]}]}]"
+        }
+      ],
+      "title": "Sample topology",
+      "type": "unifabric-unifabrictopology-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "showLabels": true
+      },
+      "targets": [
+        {
+          "alias": "",
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "no_data_points"
+        }
+      ],
+      "title": "Sample Panel Title",
+      "type": "unifabric-unifabrictopology-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "showLabels": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "raw_frame",
+          "rawFrameContent": "[{\"name\":\"nodes\",\"fields\":[{\"name\":\"id\",\"type\":\"string\",\"values\":[]},{\"name\":\"title\",\"type\":\"string\",\"values\":[]},{\"name\":\"detail\",\"type\":\"string\",\"values\":[]},{\"name\":\"tier\",\"type\":\"number\",\"values\":[]},{\"name\":\"deviceType\",\"type\":\"string\",\"values\":[]},{\"name\":\"nodeType\",\"type\":\"string\",\"values\":[]},{\"name\":\"topology\",\"type\":\"string\",\"values\":[]},{\"name\":\"members\",\"type\":\"string\",\"values\":[]}]},{\"name\":\"edges\",\"fields\":[{\"name\":\"id\",\"type\":\"string\",\"values\":[]},{\"name\":\"source\",\"type\":\"string\",\"values\":[]},{\"name\":\"target\",\"type\":\"string\",\"values\":[]},{\"name\":\"kind\",\"type\":\"string\",\"values\":[]}]}]"
+        }
+      ],
+      "title": "Empty topology",
+      "type": "unifabric-unifabrictopology-panel"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Provisioned unifabric-topology dashboard",
+  "uid": "a538aeff-5a8a-42a5-901c-938d896fdd6f",
+  "version": 1,
+  "weekStart": ""
+}

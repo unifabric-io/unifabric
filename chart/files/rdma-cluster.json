@@ -2366,7 +2366,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Unifabric RDMA Cluster",
-  "uid": "kangaroos",
+  "uid": "unifabric-rdma-cluster",
   "version": 4,
   "weekStart": ""
 }

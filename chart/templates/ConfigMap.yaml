@@ -19,6 +19,12 @@ data:
     {{- if hasKey .Values "fabricNode" }}
     {{- $_ := set $controllerConfig "nodeTopologyDiscovery" .Values.fabricNode }}
     {{- end }}
+    {{- if hasKey .Values "topologyAPI" }}
+    {{- $_ := set $controllerConfig "topologyAPI" (dict
+      "enabled" .Values.topologyAPI.enabled
+      "bindAddress" (printf ":%v" .Values.controller.ports.topologyAPI)
+    ) }}
+    {{- end }}
     {{- if hasKey .Values "switchSubscription" }}
     {{- $switchMTLSConfig := dict
       "enabled" (eq (include "unifabric.switchMTLS.enabled" .) "true")

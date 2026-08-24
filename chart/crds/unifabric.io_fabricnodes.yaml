@@ -33,6 +33,10 @@ spec:
       jsonPath: .status.nodeIP
       name: NodeIP
       type: string
+    - description: Fixed topologies this node belongs to
+      jsonPath: .status.topologies
+      name: Topologies
+      type: string
     name: v1beta1
     schema:
       openAPIV3Schema:
@@ -301,6 +305,15 @@ spec:
                   - state
                   type: object
                 type: array
+              topologies:
+                description: |-
+                  Topologies lists the fixed Topology names (see FixedTopologyNames) whose
+                  domain labels this Node currently carries, e.g. ["scaleout", "storage"].
+                  It is derived from the Node's own labels, not reported by the Agent.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
               totalNics:
                 type: integer
             required:

@@ -2809,7 +2809,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Unifabric RDMA Pod",
-  "uid": "adventure",
+  "uid": "unifabric-rdma-pod",
   "version": 3,
   "weekStart": ""
 }

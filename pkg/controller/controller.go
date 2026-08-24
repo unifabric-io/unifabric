@@ -10,6 +10,7 @@ import (
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
 	"github.com/unifabric-io/unifabric/pkg/config"
 	switchtopology "github.com/unifabric-io/unifabric/pkg/controller/switchtopology"
+	topologyapi "github.com/unifabric-io/unifabric/pkg/controller/topologyapi"
 	topologystatus "github.com/unifabric-io/unifabric/pkg/controller/topologystatus"
 	"github.com/unifabric-io/unifabric/pkg/logger"
 	"github.com/unifabric-io/unifabric/pkg/types"
@@ -60,6 +61,9 @@ func New(_ context.Context, cfg *config.ControllerConfig, slogger *slog.Logger) 
 		return nil, err
 	}
 	if err := topologystatus.NewTopologyStatusController(mgr, cfg, slogger); err != nil {
+		return nil, err
+	}
+	if err := topologyapi.NewTopologyAPIServer(mgr, cfg, slogger); err != nil {
 		return nil, err
 	}
 

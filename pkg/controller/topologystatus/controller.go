@@ -63,13 +63,20 @@ func NewTopologyStatusController(mgr manager.Manager, cfg *config.ControllerConf
 		return fixedTopologyRequests()
 	})
 
-	return builder.ControllerManagedBy(mgr).
+	if err := builder.ControllerManagedBy(mgr).
 		Named("TopologyStatus").
 		For(&v1beta1.Topology{}, builder.WithPredicates(fixedTopologyPredicate())).
 		Watches(&corev1.Node{}, mapAll, builder.WithPredicates(labelPredicate)).
 		Watches(&v1beta1.Switch{}, mapAll, builder.WithPredicates(labelPredicate)).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
-		Complete(reconciler)
+		Complete(reconciler); err != nil {
+		return err
+	}
+
+	// FabricNodeTopology is a separate controller (see fabricnode_controller.go):
+	// it is keyed on Node/FabricNode name rather than the fixed Topology names
+	// this Reconciler handles above.
+	return newFabricNodeTopologyController(mgr, cfg, logger)
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

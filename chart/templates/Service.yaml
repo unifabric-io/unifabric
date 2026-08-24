@@ -17,6 +17,12 @@ spec:
       port: {{ .Values.controller.service.port }}
       targetPort: metrics
       protocol: TCP
+    {{- if .Values.topologyAPI.enabled }}
+    - name: topology-api
+      port: {{ .Values.controller.ports.topologyAPI }}
+      targetPort: topology-api
+      protocol: TCP
+    {{- end }}
 {{- end }}
 ---
 {{- if and .Values.agent.enabled .Values.nodeMetrics.enabled }}

@@ -1173,7 +1173,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Unifabric RDMA AI Workload",
-  "uid": "pineapple",
+  "uid": "unifabric-rdma-ai-workload",
   "version": 1,
   "weekStart": ""
 }

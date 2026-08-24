@@ -47,6 +47,8 @@ Unifabric 使用三类逻辑拓扑：
 发现结果以 Node label 提供给调度器，并汇总到只读 `Topology` CR。可以通过
 [FabricNode、Switch、Topology API 参考](./reference/README.zh.md)查询发现结果。
 
+- [拓扑可视化使用指南](./usage/topology-visualization.zh.md)
+
 ### 拓扑感知调度
 
 拓扑发现生成的 Node label 可以被 Kueue、Volcano、KAI Scheduler 等调度系统消费，
@@ -73,3 +75,5 @@ RDMA 流量与健康问题。
 - [Topology CRD 设计](./design/topology-crd.zh.md)：了解性能域、Node 路径和拓扑数据模型。
 - [Scale-out 拓扑发现设计](./design/scaleout-topology.zh.md)：了解 Scale-out 拓扑的发现与构建过程。
 - [RDMA 指标模型与 Pod 归因设计](./design/rdma-metrics.md)：了解指标定义与工作负载归因模型。
+- [拓扑可视化设计](./design/topology-visualization.zh.md)：了解 Topology HTTP API，以及渲染它的 Grafana
+  datasource/panel 插件。
