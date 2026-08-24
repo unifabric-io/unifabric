@@ -1,0 +1,46 @@
+services:
+  mock-topology-api:
+    container_name: 'unifabric-mock-topology-api'
+    build:
+      # Repo root context: the mock builds inside the main Go module to reuse pkg/topologyapi.
+      context: ..
+      dockerfile: plugin/mock-topology-api/Dockerfile
+    ports:
+      - 8080:8080/tcp
+
+  grafana:
+    user: root
+    container_name: 'unifabric-topology-dev'
+    depends_on:
+      - mock-topology-api
+
+    build:
+      context: ./.config
+      args:
+        grafana_image: ${GRAFANA_IMAGE:-grafana}
+        grafana_version: ${GRAFANA_VERSION:-12.1.3}
+        development: ${DEVELOPMENT:-false}
+        anonymous_auth_enabled: ${ANONYMOUS_AUTH_ENABLED:-true}
+    ports:
+      - 3000:3000/tcp
+    volumes:
+      - ./unifabric-unifabrictopology-datasource/dist:/var/lib/grafana/plugins/unifabric-unifabrictopology-datasource
+      - ./unifabric-unifabrictopology-panel/dist:/var/lib/grafana/plugins/unifabric-unifabrictopology-panel
+      - ./provisioning:/etc/grafana/provisioning
+      # The panel plugin's own e2e tests (tests/panel.spec.ts) provision a separate dashboard
+      # (grafana-testdata-datasource fixture, not the real mock-topology-api pipeline) - mounted
+      # as extra files here (distinct names, no uid/name collisions with the combined ones above)
+      # since consolidating into one docker-compose.yaml dropped the panel's own compose file that
+      # used to mount its whole provisioning/ directory directly.
+      - ./unifabric-unifabrictopology-panel/provisioning/dashboards/dashboard.json:/etc/grafana/provisioning/dashboards/panel-e2e-dashboard.json
+      - ./unifabric-unifabrictopology-panel/provisioning/datasources/datasources.yml:/etc/grafana/provisioning/datasources/panel-e2e-datasources.yml
+      - ./unifabric-unifabrictopology-datasource:/root/unifabric-unifabrictopology-datasource
+      - ./unifabric-unifabrictopology-panel:/root/unifabric-unifabrictopology-panel
+
+    environment:
+      NODE_ENV: development
+      GF_LOG_FILTERS: plugin.unifabric-unifabrictopology-datasource:debug,plugin.unifabric-unifabrictopology-panel:debug
+      GF_LOG_LEVEL: debug
+      GF_DATAPROXY_LOGGING: 1
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: unifabric-unifabrictopology-datasource,unifabric-unifabrictopology-panel
+

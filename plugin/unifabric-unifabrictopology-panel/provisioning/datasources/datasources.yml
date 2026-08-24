@@ -1,0 +1,7 @@
+apiVersion: 1
+
+datasources:
+  - name: TestData DB
+    type: grafana-testdata-datasource
+    uid: trlxrdZVk
+    isDefault: true

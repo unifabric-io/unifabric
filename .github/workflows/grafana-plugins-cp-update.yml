@@ -1,0 +1,75 @@
+name: Grafana Plugins Create Plugin Update
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *' # run once a month on the 1st day
+
+# Requires a fine-grained PAT with `contents: read and write`, `pull requests: read and write`,
+# and `workflows: read and write` saved as the GH_PAT_TOKEN repository secret. The default
+# GITHUB_TOKEN can't push changes to .github/workflows/** or trigger other workflows, which is
+# why we don't rely on it for the actual commit/PR creation below.
+permissions:
+  contents: read
+
+jobs:
+  update:
+    name: Check ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: unifabric-unifabrictopology-datasource
+            directory: plugin/unifabric-unifabrictopology-datasource
+          - name: unifabric-unifabrictopology-panel
+            directory: plugin/unifabric-unifabrictopology-panel
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+
+      - name: Get latest create-plugin version
+        id: latest-version
+        run: |
+          version=$(npx -y @grafana/create-plugin@latest version | sed 's/.*@//' | sed 's/ *$//' | sed '/^$/d')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Get current create-plugin version
+        id: current-version
+        run: |
+          echo "version=$(jq -r '.version' .config/.cprc.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Update the configs
+        if: steps.latest-version.outputs.version != steps.current-version.outputs.version
+        run: |
+          npm ci
+          npx @grafana/create-plugin update
+
+      - name: Create Pull Request
+        if: steps.latest-version.outputs.version != steps.current-version.outputs.version
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GH_PAT_TOKEN }}
+          path: ${{ matrix.directory }}
+          branch: chore/create-plugin-update-${{ matrix.name }}
+          commit-message: 'chore: bump @grafana/create-plugin configuration to ${{ steps.latest-version.outputs.version }}'
+          title: '[${{ matrix.name }}] chore: bump @grafana/create-plugin configuration to ${{ steps.latest-version.outputs.version }}'
+          body: |
+            Bumps [`@grafana/create-plugin`](https://github.com/grafana/plugin-tools/tree/main/packages/create-plugin) configuration
+            for `${{ matrix.directory }}` from ${{ steps.current-version.outputs.version }} to ${{ steps.latest-version.outputs.version }}.
+
+            This is an auto-generated PR which ran `@grafana/create-plugin update` inside `${{ matrix.directory }}`.
+            Please consult the create-plugin [CHANGELOG.md](https://github.com/grafana/plugin-tools/blob/main/packages/create-plugin/CHANGELOG.md)
+            to understand what may have changed, and review the changes thoroughly before merging.
+          delete-branch: true

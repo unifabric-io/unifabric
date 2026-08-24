@@ -260,11 +260,43 @@ func (r *fabricNodeReconciler) IsStorageLeader() bool {
 	return r.fabricNode.Annotations[config.StorageNodeLeaderAnnotationKey] == "true"
 }
 
+// ensureNodeOwnerReference sets fabricNode's owner reference to its Node, so
+// Kubernetes garbage-collects the FabricNode when the Node is deleted. It is
+// skipped for storage nodes, which are cleaned up explicitly (see
+// cleanupStorageNodeFabricNode), and is a no-op once an owner reference is
+// already set. If the Node isn't found yet, it leaves fabricNode unchanged
+// rather than recording an owner reference with an empty UID, which
+// Kubernetes garbage collection would never match; a later reconcile retries
+// once the Node exists.
+func (r *fabricNodeReconciler) ensureNodeOwnerReference(ctx context.Context, fabricNode *v1beta1.FabricNode) (bool, error) {
+	if r.storageNode || len(fabricNode.OwnerReferences) != 0 {
+		return false, nil
+	}
+
+	node := &v1.Node{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: r.nodeName}, node); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return false, err
+		}
+		r.Log.Info("node not found; will retry owner reference on next reconcile", "name", r.nodeName)
+		return false, nil
+	}
+
+	fabricNode.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       r.nodeName,
+		UID:        node.UID,
+	}}
+	return true, nil
+}
+
 func (r *fabricNodeReconciler) doReconcile(ctx context.Context) error {
 	r.Log.Info("reconciling FabricNode", "NodeName", r.nodeName)
 
 	fabricNode := &v1beta1.FabricNode{}
 	err := r.client.Get(ctx, types.NamespacedName{Name: r.nodeName}, fabricNode)
+	fabricNodeExists := err == nil
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			r.Log.Error("failed to get FabricNode", "error", err)
@@ -275,28 +307,21 @@ func (r *fabricNodeReconciler) doReconcile(ctx context.Context) error {
 				Name: r.nodeName,
 			},
 		}
+	}
 
-		if !r.storageNode {
-			node := &v1.Node{}
-			err := r.client.Get(ctx, types.NamespacedName{Name: r.nodeName}, node)
-			if err != nil {
-				if client.IgnoreNotFound(err) != nil {
-					r.Log.Error("failed to get Node", "error", err)
-					return err
-				}
-				r.Log.Info("node not found", "name", r.nodeName)
-			}
+	ownerRefAdded, err := r.ensureNodeOwnerReference(ctx, fabricNode)
+	if err != nil {
+		r.Log.Error("failed to look up owning Node", "error", err, "name", r.nodeName)
+	}
 
-			fabricNode.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion: "v1",
-				Kind:       "Node",
-				Name:       r.nodeName,
-				UID:        node.UID,
-			}}
-		}
-
+	if !fabricNodeExists {
 		if err := r.client.Create(ctx, fabricNode); err != nil {
 			r.Log.Error("failed to create FabricNode", "error", err)
+			return err
+		}
+	} else if ownerRefAdded {
+		if err := r.client.Update(ctx, fabricNode); err != nil {
+			r.Log.Error("failed to backfill FabricNode owner reference", "error", err)
 			return err
 		}
 	}
