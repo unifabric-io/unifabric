@@ -73,6 +73,8 @@ jobs:
             dockerfile: image/agent/Dockerfile
           - name: unifabric-switch-agent
             dockerfile: image/switch-agent/Dockerfile
+          - name: unifabric-grafana
+            dockerfile: image/grafana-plugins/Dockerfile
     
     steps:
       - name: Checkout code

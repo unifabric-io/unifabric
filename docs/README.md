@@ -67,6 +67,7 @@ attribute traffic to Pods, namespaces, and top-level workloads. Grafana dashboar
 diagnose RDMA traffic and health by cluster, Node, and workload.
 
 - [RDMA observability usage guide](./usage/rdma-metrics.md)
+- [Topology visualization usage guide](./usage/topology-visualization.md)
 
 ## Development
 
@@ -82,3 +83,5 @@ diagnose RDMA traffic and health by cluster, Node, and workload.
   topologies are discovered and constructed.
 - [RDMA metric model and Pod attribution design](./design/rdma-metrics.md): Understand metric
   definitions and workload attribution.
+- [Topology visualization design](./design/topology-visualization.md): Understand the Topology
+  HTTP API and the Grafana datasource/panel plugins that render it.

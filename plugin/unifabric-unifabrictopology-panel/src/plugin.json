@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Unifabric-Topology",
+  "id": "unifabric-unifabrictopology-panel",
+  "info": {
+    "keywords": ["panel", "topology"],
+    "description": "Visualizes a Unifabric topology (hosts, switches, tiers) queried from the Unifabric-Topology datasource.",
+    "author": {
+      "name": "Unifabric"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=12.1.0",
+    "plugins": [
+      {
+        "id": "unifabric-unifabrictopology-datasource",
+        "type": "datasource",
+        "name": "Unifabric-Topology",
+        "version": "*"
+      }
+    ]
+  }
+}

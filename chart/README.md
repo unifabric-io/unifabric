@@ -59,11 +59,17 @@ auto-generated, existing, or disabled mTLS.
 | nodeMetrics.serviceMonitor.labels | object | `{}` | Extra labels added to the ServiceMonitor for Prometheus selection. |
 | nodeMetrics.serviceMonitor.path | string | `"/metrics"` | HTTP path scraped by the ServiceMonitor. |
 | nodeMetrics.serviceMonitor.scrapeTimeout | string | `"10s"` | Prometheus scrape timeout for agent RDMA metrics. |
+| topologyAPI.enabled | bool | `false` | Enable the Topology HTTP API. Disabled by default since it has no authentication of its own. |
 | grafanaDashboard.allowCrossNamespaceImport | bool | `true` | Allow Grafana Operator to import GrafanaDashboard resources across namespaces. |
-| grafanaDashboard.enabled | bool | `true` | Render the bundled RDMA cluster, node, pod, and workload dashboards. |
-| grafanaDashboard.instanceSelector | object | `{}` | Grafana Operator instance selector for importing GrafanaDashboard resources. |
+| grafanaDashboard.enabled | bool | `true` | Render the bundled Grafana dashboards. |
+| grafanaDashboard.instanceSelector | object | `{}` | Grafana Operator instance selector for importing dashboards and the Topology datasource into an external Grafana instance. Ignored when grafanaInstance.enabled is true. |
 | grafanaDashboard.kind | string | `"GrafanaDashboard"` | Dashboard resource kind. Use ConfigMap for Grafana sidecar import, or GrafanaDashboard for Grafana Operator. |
 | grafanaDashboard.labels | object | `{}` | Extra labels added to rendered dashboard resources. |
+| grafanaInstance.enabled | bool | `false` | Create a Grafana CR for this release and, when topologyAPI.enabled is true, its Topology GrafanaDatasource. |
+| grafanaInstance.image.registry | string | `"ghcr.io"` | Container image registry for the bundled Grafana instance. |
+| grafanaInstance.image.repository | string | `"unifabric-io/unifabric-grafana"` | Container image repository containing the Unifabric Grafana plugins. |
+| grafanaInstance.image.tag | string | `""` | Container image tag. Defaults to the chart appVersion when empty. |
+| grafanaInstance.labels | object | `{}` | Extra labels added to the Grafana instance. |
 
 ## Controller and Agent
 
@@ -95,6 +101,7 @@ auto-generated, existing, or disabled mTLS.
 | controller.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | Seccomp profile applied to controller pods. |
 | controller.ports.health | int | `8081` | Controller health probe container port. |
 | controller.ports.metrics | int | `8080` | Controller metrics container port. |
+| controller.ports.topologyAPI | int | `8082` | Controller Topology API container, Service, and datasource port. Only listened on when topologyAPI.enabled is true. |
 | controller.replicaCount | int | `1` | Number of controller replicas. |
 | controller.resources.limits.cpu | string | `"500m"` | Controller CPU limit. |
 | controller.resources.limits.memory | string | `"512Mi"` | Controller memory limit. |

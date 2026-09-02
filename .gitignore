@@ -13,6 +13,9 @@ build/
 # Dependencies
 vendor/
 
+# Lint caches
+.eslintcache
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -43,3 +46,34 @@ coverage.out
 !.specify/
 !.specify/memory/
 !.specify/memory/**
+
+# Node.js (Grafana plugins under plugin/)
+node_modules/
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+pids
+*.pid
+*.seed
+*.pid.lock
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+lib-cov
+coverage
+artifacts/
+work/
+ci/
+test-results/
+playwright-report/
+**/playwright/.auth/
+
+# Grafana plugin dev binaries
+/plugin/mock-topology-api/mock-topology-api

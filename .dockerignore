@@ -19,6 +19,7 @@ coverage.out
 *.exe
 *.test
 *.out
+node_modules/
 
 # Local configuration
 .env

@@ -16,18 +16,19 @@ import (
 )
 
 const (
-	defaultControllerMetricsBindAddress       = ":8080"
-	defaultControllerHealthBindAddress        = ":8081"
-	defaultLeaderElectionID                   = "unifabric-controller"
-	defaultSwitchDialTimeout                  = "5s"
-	defaultSwitchReconnectBackoff             = "30s"
-	defaultSwitchKeepaliveTime                = "30s"
-	defaultSwitchMaxRecvMsgSize               = 4 * 1024 * 1024
-	defaultSwitchGrpcPort               int32 = 8090
-	defaultSwitchMTLSControllerSecret         = "switch-controller-mtls-controller"
-	defaultSwitchMTLSServerSecret             = "switch-controller-mtls-agent"
-	defaultSwitchLabelValueFormat             = "hash"
-	defaultSwitchHashLength                   = 7
+	defaultControllerMetricsBindAddress           = ":8080"
+	defaultControllerHealthBindAddress            = ":8081"
+	defaultControllerTopologyAPIBindAddress       = ":8082"
+	defaultLeaderElectionID                       = "unifabric-controller"
+	defaultSwitchDialTimeout                      = "5s"
+	defaultSwitchReconnectBackoff                 = "30s"
+	defaultSwitchKeepaliveTime                    = "30s"
+	defaultSwitchMaxRecvMsgSize                   = 4 * 1024 * 1024
+	defaultSwitchGrpcPort                   int32 = 8090
+	defaultSwitchMTLSControllerSecret             = "switch-controller-mtls-controller"
+	defaultSwitchMTLSServerSecret                 = "switch-controller-mtls-agent"
+	defaultSwitchLabelValueFormat                 = "hash"
+	defaultSwitchHashLength                       = 7
 
 	DefaultLabelScaleUpTemplate  = "scale-up.unifabric.io/tier-{{ .Tier }}"
 	DefaultLabelScaleOutTemplate = "scale-out.unifabric.io/tier-{{ .Tier }}"
@@ -44,6 +45,14 @@ const (
 var defaultIgnoredSwitchPorts = []string{"mgmt*", "Management*", "oob*"}
 
 type BindAddressConfig struct {
+	BindAddress string `json:"bindAddress" yaml:"bindAddress"`
+}
+
+// TopologyAPIConfig controls the read-only HTTP API that exposes the fixed
+// Topology objects (scaleout/scaleup/storage) as JSON, e.g. for the Unifabric
+// Grafana datasource plugin. Disabled by default.
+type TopologyAPIConfig struct {
+	Enabled     bool   `json:"enabled" yaml:"enabled"`
 	BindAddress string `json:"bindAddress" yaml:"bindAddress"`
 }
 
@@ -107,6 +116,7 @@ type ControllerConfig struct {
 	Metrics                     BindAddressConfig                 `json:"metrics" yaml:"metrics"`
 	HealthProbe                 BindAddressConfig                 `json:"healthProbe" yaml:"healthProbe"`
 	Pprof                       BindAddressConfig                 `json:"pprof" yaml:"pprof"`
+	TopologyAPI                 TopologyAPIConfig                 `json:"topologyAPI" yaml:"topologyAPI"`
 	LeaderElection              LeaderElectionConfig              `json:"leaderElection" yaml:"leaderElection"`
 	TopologyLabels              TopologyLabelsConfig              `json:"topologyLabels" yaml:"topologyLabels"`
 	InternalTopologyLabelWriter InternalTopologyLabelWriterConfig `json:"-" yaml:"-"`
@@ -141,6 +151,9 @@ func ReadControllerConfig(filename string) (*ControllerConfig, error) {
 	}
 	if cfg.HealthProbe.BindAddress == "" {
 		cfg.HealthProbe.BindAddress = defaultControllerHealthBindAddress
+	}
+	if cfg.TopologyAPI.BindAddress == "" {
+		cfg.TopologyAPI.BindAddress = defaultControllerTopologyAPIBindAddress
 	}
 	if cfg.LeaderElection.ID == "" {
 		cfg.LeaderElection.ID = defaultLeaderElectionID

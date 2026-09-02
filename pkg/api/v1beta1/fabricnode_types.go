@@ -119,6 +119,13 @@ type FabricNodeStatus struct {
 	// +kubebuilder:validation:Enum=GPU;Storage
 	NodeRole NodeRole `json:"nodeRole,omitempty"`
 	NodeIP   string   `json:"nodeIP,omitempty"`
+
+	// Topologies lists the fixed Topology names (see FixedTopologyNames) whose
+	// domain labels this Node currently carries, e.g. ["scaleout", "storage"].
+	// It is derived from the Node's own labels, not reported by the Agent.
+	// +optional
+	// +listType=set
+	Topologies []string `json:"topologies,omitempty"`
 }
 
 // FabricNode represents a node in the cluster.
@@ -131,6 +138,7 @@ type FabricNodeStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Role",type="string",JSONPath=".status.nodeRole",description="Node role"
 // +kubebuilder:printcolumn:name="NodeIP",type="string",JSONPath=".status.nodeIP",description="Node IP"
+// +kubebuilder:printcolumn:name="Topologies",type="string",JSONPath=".status.topologies",description="Fixed topologies this node belongs to"
 type FabricNode struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
