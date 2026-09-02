@@ -71,6 +71,10 @@ jobs:
             dockerfile: image/controller/Dockerfile
           - name: unifabric-agent
             dockerfile: image/agent/Dockerfile
+          - name: unifabric-sflow
+            dockerfile: image/sflow/Dockerfile
+          - name: unifabric-hsflowd
+            dockerfile: image/hsflowd/Dockerfile
           - name: unifabric-switch-agent
             dockerfile: image/switch-agent/Dockerfile
     
@@ -210,7 +214,10 @@ jobs:
               .controller.image.tag = strenv(IMAGE_VERSION) |
               .agent.image.registry = "ghcr.io" |
               .agent.image.repository = strenv(IMAGE_NAMESPACE) + "/unifabric-agent" |
-              .agent.image.tag = strenv(IMAGE_VERSION)
+              .agent.image.tag = strenv(IMAGE_VERSION) |
+              .sflow.image.registry = "ghcr.io" |
+              .sflow.image.repository = strenv(IMAGE_NAMESPACE) + "/unifabric-sflow" |
+              .sflow.image.tag = strenv(IMAGE_VERSION)
             ' ./chart/values.yaml
 
       - name: Package Helm Chart

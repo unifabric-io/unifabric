@@ -65,6 +65,90 @@ auto-generated, existing, or disabled mTLS.
 | grafanaDashboard.kind | string | `"GrafanaDashboard"` | Dashboard resource kind. Use ConfigMap for Grafana sidecar import, or GrafanaDashboard for Grafana Operator. |
 | grafanaDashboard.labels | object | `{}` | Extra labels added to rendered dashboard resources. |
 
+## sFlow Processing
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| sflow.affinity | object | `{}` | Affinity rules applied to the sFlow collector Pod. |
+| sflow.clickhouse.address | string | `""` | ClickHouse native protocol address used by the sFlow collector. |
+| sflow.clickhouse.database | string | `"default"` | ClickHouse database containing the flows_raw table. |
+| sflow.clickhouse.managed.affinity | object | `{}` | Affinity rules applied to the managed ClickHouse Pod. |
+| sflow.clickhouse.managed.containerSecurityContext | object | `{}` | Container security context applied to the managed ClickHouse container. |
+| sflow.clickhouse.managed.enabled | bool | `false` | Deploy a single-node ClickHouse instance for sFlow flow records. |
+| sflow.clickhouse.managed.image.pullPolicy | string | `"IfNotPresent"` | Container image pull policy for the managed ClickHouse server. |
+| sflow.clickhouse.managed.image.registry | string | `"docker.io"` | Container image registry for the managed ClickHouse server. |
+| sflow.clickhouse.managed.image.repository | string | `"clickhouse/clickhouse-server"` | Container image repository for the managed ClickHouse server. |
+| sflow.clickhouse.managed.image.tag | string | `"26.3"` | Container image tag for the managed ClickHouse server. |
+| sflow.clickhouse.managed.nodeSelector | object | `{}` | Node selector applied to the managed ClickHouse Pod. |
+| sflow.clickhouse.managed.persistence.accessModes | list | `["ReadWriteOnce"]` | Access modes for the managed ClickHouse PVC. |
+| sflow.clickhouse.managed.persistence.enabled | bool | `true` | Persist managed ClickHouse data. When false, data uses emptyDir. |
+| sflow.clickhouse.managed.persistence.hostPath.path | string | `""` | Host path used when persistence.type=hostPath. The ClickHouse Pod must stay on a node that has this path. |
+| sflow.clickhouse.managed.persistence.hostPath.type | string | `"DirectoryOrCreate"` | Kubernetes hostPath type used when persistence.type=hostPath. |
+| sflow.clickhouse.managed.persistence.size | string | `"20Gi"` | Requested size for managed ClickHouse data. |
+| sflow.clickhouse.managed.persistence.storageClassName | string | `""` | StorageClass for the managed ClickHouse PVC. Empty uses the cluster default. |
+| sflow.clickhouse.managed.persistence.type | string | `"pvc"` | Persistence backend for managed ClickHouse data when enabled. Supported values: pvc, hostPath. |
+| sflow.clickhouse.managed.podAnnotations | object | `{}` | Additional annotations added to the managed ClickHouse Pod. |
+| sflow.clickhouse.managed.podLabels | object | `{}` | Additional labels added to the managed ClickHouse Pod. |
+| sflow.clickhouse.managed.podSecurityContext | object | `{}` | Pod security context applied to the managed ClickHouse Pod. |
+| sflow.clickhouse.managed.resources.limits.cpu | string | `"2"` | CPU limit for the managed ClickHouse container. |
+| sflow.clickhouse.managed.resources.limits.memory | string | `"4Gi"` | Memory limit for the managed ClickHouse container. |
+| sflow.clickhouse.managed.resources.requests.cpu | string | `"500m"` | CPU requested by the managed ClickHouse container. |
+| sflow.clickhouse.managed.resources.requests.memory | string | `"1Gi"` | Memory requested by the managed ClickHouse container. |
+| sflow.clickhouse.managed.service.httpPort | int | `8123` | HTTP port exposed by the managed ClickHouse Service. |
+| sflow.clickhouse.managed.service.nativePort | int | `9000` | Native protocol port exposed by the managed ClickHouse Service. |
+| sflow.clickhouse.managed.tolerations | list | `[]` | Tolerations applied to the managed ClickHouse Pod. |
+| sflow.clickhouse.password | string | `""` | Inline ClickHouse password. Prefer passwordSecret for production installs. |
+| sflow.clickhouse.passwordSecret.key | string | `""` | Secret key containing the ClickHouse password. Defaults to "password" when a Secret name is provided. |
+| sflow.clickhouse.passwordSecret.name | string | `""` | Secret name containing the ClickHouse password. |
+| sflow.clickhouse.schema.lock.leaseDuration | string | `"10s"` | Duration before another sFlow replica can take over a stale schema migration Lease. |
+| sflow.clickhouse.schema.lock.name | string | `"unifabric-sflow-clickhouse-schema"` | Kubernetes Lease name used to serialize ClickHouse schema migrations across sFlow replicas. |
+| sflow.clickhouse.schema.lock.namespace | string | `""` | Kubernetes namespace for the schema migration Lease. Defaults to the chart release namespace in rendered config. |
+| sflow.clickhouse.schema.lock.retryInterval | string | `"2s"` | Retry interval used while waiting for the schema migration Lease. |
+| sflow.clickhouse.schema.retentionDays | int | `3` | Retention window in days for the flows_raw table. Must be at least 1. The collector reconciles this table TTL during startup. |
+| sflow.clickhouse.table | string | `"flows_raw"` | ClickHouse table that stores enriched sFlow rows. |
+| sflow.clickhouse.username | string | `"default"` | ClickHouse username used by the sFlow collector. |
+| sflow.config.logLevel | string | `"info"` | Log level used by the sFlow collector. |
+| sflow.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Allow privilege escalation in the sFlow collector container. |
+| sflow.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Linux capabilities dropped from the sFlow collector container. |
+| sflow.containerSecurityContext.readOnlyRootFilesystem | bool | `true` | Mount the sFlow collector root filesystem as read-only. |
+| sflow.enabled | bool | `false` | Enable the sFlow collector deployment and UDP service. |
+| sflow.healthProbe.bindAddress | string | `":8085"` | Health probe bind address used by the sFlow collector. |
+| sflow.healthProbe.port | int | `8085` | Health probe container port exposed by the sFlow collector. |
+| sflow.image.pullPolicy | string | `"IfNotPresent"` | Container image pull policy for the sFlow collector. |
+| sflow.image.registry | string | `"ghcr.io"` | Container image registry for the sFlow collector. |
+| sflow.image.repository | string | `"unifabric-io/unifabric-sflow"` | Container image repository for the sFlow collector. |
+| sflow.image.tag | string | `""` | Container image tag for the sFlow collector. Defaults to the chart appVersion when empty. |
+| sflow.listen.bindAddress | string | `":6343"` | UDP bind address used by the sFlow collector container. |
+| sflow.listen.port | int | `6343` | UDP container port used by the sFlow collector. |
+| sflow.metrics.bindAddress | string | `":8084"` | Metrics bind address used by the sFlow collector. |
+| sflow.metrics.path | string | `"/metrics"` | Metrics path exposed by the sFlow collector. |
+| sflow.metrics.port | int | `8084` | Metrics container port exposed by the sFlow collector. |
+| sflow.nodeSelector | object | `{}` | Node selector applied to the sFlow collector Pod. |
+| sflow.podAnnotations | object | `{}` | Additional annotations added to the sFlow collector Pod. |
+| sflow.podLabels | object | `{}` | Additional labels added to the sFlow collector Pod. |
+| sflow.podSecurityContext.fsGroup | int | `65532` | Filesystem group ID used by the sFlow collector Pod. |
+| sflow.podSecurityContext.runAsGroup | int | `65532` | Group ID used by the sFlow collector container. |
+| sflow.podSecurityContext.runAsNonRoot | bool | `true` | Run the sFlow collector as a non-root user. |
+| sflow.podSecurityContext.runAsUser | int | `65532` | User ID used by the sFlow collector container. |
+| sflow.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | Seccomp profile type applied to the sFlow collector Pod. |
+| sflow.replicaCount | int | `1` | Number of sFlow collector replicas to run. |
+| sflow.resources.limits.cpu | string | `"500m"` | CPU limit for the sFlow collector container. |
+| sflow.resources.limits.memory | string | `"512Mi"` | Memory limit for the sFlow collector container. |
+| sflow.resources.requests.cpu | string | `"100m"` | CPU requested by the sFlow collector container. |
+| sflow.resources.requests.memory | string | `"128Mi"` | Memory requested by the sFlow collector container. |
+| sflow.service.annotations | object | `{}` | Additional annotations added to the sFlow UDP Service. |
+| sflow.service.enabled | bool | `true` | Enable the UDP Service for switch sFlow exporters. |
+| sflow.service.nodePort | int | `0` | Optional UDP nodePort used by switch sFlow exporters. Set to 0 to let Kubernetes allocate one. |
+| sflow.service.port | int | `6343` | UDP Service port used by switch sFlow exporters. |
+| sflow.service.type | string | `"NodePort"` | Service type used for switch sFlow exporters. NodePort is the default because sFlow datagrams usually arrive from switches outside the cluster. |
+| sflow.serviceAccount.annotations | object | `{}` | Additional annotations added to the sFlow collector ServiceAccount. |
+| sflow.serviceAccount.create | bool | `true` | Create a dedicated ServiceAccount for the sFlow collector. |
+| sflow.serviceAccount.name | string | `""` | ServiceAccount name for the sFlow collector. Defaults to the release-derived name when empty. |
+| sflow.tolerations | list | `[]` | Tolerations applied to the sFlow collector Pod. |
+| sflow.writer.batchSize | int | `2000` | Maximum sFlow records per ClickHouse write batch. |
+| sflow.writer.flushInterval | string | `"2s"` | Maximum delay before flushing a non-empty write batch. |
+| sflow.writer.queueSize | int | `65536` | Maximum records buffered before overload drops begin. |
+
 ## Controller and Agent
 
 | Key | Type | Default | Description |
