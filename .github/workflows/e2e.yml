@@ -270,6 +270,9 @@ jobs:
           AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
           AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SFLOW_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          SFLOW_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-sflow
+          SFLOW_TAG: ${{ steps.vars.outputs.image_tag }}
           SWITCH_MTLS_MODE: disabled
         run: |
           set -euo pipefail
@@ -300,6 +303,9 @@ jobs:
           AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
           AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SFLOW_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          SFLOW_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-sflow
+          SFLOW_TAG: ${{ steps.vars.outputs.image_tag }}
           SWITCH_MTLS_MODE: disabled
         run: |
           set -euo pipefail
