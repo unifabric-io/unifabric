@@ -157,7 +157,7 @@ jobs:
         id: resolve-versions
         # grafana-dependency is passed explicitly because this action has no working-directory
         # input and always looks for src/plugin.json at the repo root, which doesn't exist here.
-        uses: grafana/plugin-actions/e2e-version@e2e-version/v3.0.1
+        uses: grafana/plugin-actions/e2e-version@e2e-version/v3.0.2
         with:
           grafana-dependency: ">=12.3.0"
 
