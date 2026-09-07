@@ -6,6 +6,9 @@ updates:
       - '/plugin/unifabric-unifabrictopology-panel'
     schedule:
       interval: 'weekly'
+    labels:
+      - 'release/dependencies'
+      - 'javascript'
     # Wait 5 days before updating to help circumvent supply chain attacks
     cooldown:
       default-days: 5
@@ -49,6 +52,9 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    labels:
+      - 'release/dependencies'
+      - 'github_actions'
     commit-message:
       prefix: 'chore(ci)'
     open-pull-requests-limit: 5
