@@ -55,7 +55,7 @@
     "grafanaInstance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "image", "labels"],
+      "required": ["enabled", "image", "serviceType", "labels"],
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -77,6 +77,10 @@
               "type": "string"
             }
           }
+        },
+        "serviceType": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
         },
         "labels": {
           "type": "object",
