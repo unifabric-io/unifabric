@@ -21,4 +21,7 @@ metadata:
     {{- end }}
 spec:
   version: {{ include "unifabric.image" (dict "root" . "image" .Values.grafanaInstance.image) | quote }}
+  service:
+    spec:
+      type: {{ .Values.grafanaInstance.serviceType }}
 {{- end }}

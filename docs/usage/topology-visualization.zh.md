@@ -23,7 +23,7 @@ storage    4h27m
 
 ### 使用内置 Grafana 实例
 
-执行以下 Helm upgrade，在保留现有 values 的同时启用 Topology API 和附带的 Grafana 实例：
+执行以下 `helm upgrade` 命令，在保留现有 values 配置的同时，启用 Topology API 和 Grafana 实例：
 
 ```bash
 helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
@@ -34,16 +34,36 @@ helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --wait
 ```
 
-Chart 会创建 `Grafana`、`GrafanaDatasource` 和 `GrafanaDashboard`。Topology datasource 会自动
-连接当前 release 的 Controller Topology API。设置生效后访问 Grafana，搜索并打开
-**Unifabric Topology** dashboard。
+部署完成后，系统会自动创建 Grafana 实例，并配置 Topology API 数据源。
 
-内置 Grafana 使用 `ghcr.io/unifabric-io/unifabric-grafana:<version>` 镜像。镜像已包含拓扑
-datasource 和 panel 插件；默认 tag 跟随 Chart 的 `appVersion`。
+Grafana 默认通过 NodePort 方式对外提供访问。你可以通过 `grafanaInstance.serviceType` 修改 Service 类型。使用 NodePort 时，节点端口将自动随机分配。
+
+Grafana 的登录用户名和密码保存在自动生成的 Secret 中。
+
+请执行以下命令获取以下信息：
+
+* 节点端口（NodePort）
+* 登录用户名
+* 登录密码
+
+
+```bash
+# 获取 Grafana NodePort
+kubectl get service -n unifabric-system unifabric-grafana-service \
+  -o jsonpath='{.spec.ports[0].nodePort}{"\n"}'
+
+# 获取 Grafana 登录凭据
+kubectl get secret -n unifabric-system unifabric-grafana-admin-credentials \
+  -o go-template='{{range $k, $v := .data}}{{$k}}: {{$v | base64decode}}{{"\n"}}{{end}}'
+```
+
+在浏览器中访问 `http://<节点 IP>:<NodePort>`，使用上述凭据登录 Grafana，
+然后搜索并打开 `Unifabric Topology` Dashboard。
+
 
 ### 使用外部 Grafana 实例
 
-使用由其他 Chart 或组件管理的 Grafana 实例时，只需开启 Topology API：
+如果使用由其他 Chart 或组件管理的 Grafana 实例，只需启用 Topology API：
 
 ```bash
 helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
@@ -53,10 +73,9 @@ helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --wait
 ```
 
-`grafanaInstance.enabled` 默认为 `false`。使用默认的 Grafana dashboard 配置时，Chart 会创建
-`GrafanaDatasource` 和 `GrafanaDashboard`，并通过 `grafanaDashboard.instanceSelector` 选择外部
-Grafana 实例。默认 selector 为 `{}`；集群中存在多个 Grafana 实例时，请配置 selector 以匹配
-目标实例。
+使用默认的 Grafana Dashboard 配置时，Chart 会创建 `GrafanaDatasource` 和 `GrafanaDashboard`，并通过 `grafanaDashboard.instanceSelector` 选择目标 Grafana 实例。
+
+`grafanaDashboard.instanceSelector` 默认为 `{}`。如果集群中存在多个 Grafana 实例，请配置 selector 以匹配目标实例。
 
 例如，外部 `Grafana` CR 包含 `dashboards: grafana` label 时，可以设置：
 
@@ -146,7 +165,7 @@ Node 归属。选择 domain、交换机或 Node 后，面板会突出显示与�
 ### Dashboard 没有被导入
 
 - 确认 `topologyAPI.enabled=true`。
-- `grafanaDashboard.enabled` 默认为 `true`；如果安装时显式关闭了该设置，需要重新开启。
+- `grafanaDashboard.enabled` 默认为 `true`。如果安装时显式关闭了该设置，需要重新开启。
 - 确认 `grafanaDashboard.kind=GrafanaDashboard`，并且实例选择条件与
   `grafanaDashboard.instanceSelector` 一致。
 
