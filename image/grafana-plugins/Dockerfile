@@ -25,5 +25,9 @@ FROM grafana/grafana:${GRAFANA_VERSION}
 # Both plugins are unsigned (no Grafana access policy token configured for signing yet).
 ENV GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS="unifabric-unifabrictopology-datasource,unifabric-unifabrictopology-panel"
 
+# Signed by Grafana Labs, so no unsigned allowlist entry is needed.
+ARG CLICKHOUSE_DATASOURCE_VERSION=4.21.1
+RUN grafana cli plugins install grafana-clickhouse-datasource ${CLICKHOUSE_DATASOURCE_VERSION}
+
 COPY --chown=grafana:grafana --from=datasource-build /build/unifabric-unifabrictopology-datasource/dist /var/lib/grafana/plugins/unifabric-unifabrictopology-datasource
 COPY --chown=grafana:grafana --from=panel-build /build/unifabric-unifabrictopology-panel/dist /var/lib/grafana/plugins/unifabric-unifabrictopology-panel

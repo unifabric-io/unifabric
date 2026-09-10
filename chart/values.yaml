@@ -114,6 +114,8 @@ grafanaInstance:
     repository: unifabric-io/unifabric-grafana
     # -- Container image tag. Defaults to the chart appVersion when empty.
     tag: ""
+  # -- Kubernetes Service type for the bundled Grafana instance.
+  serviceType: NodePort
   # -- Extra labels added to the Grafana instance.
   labels: {}
 

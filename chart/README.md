@@ -70,6 +70,7 @@ auto-generated, existing, or disabled mTLS.
 | grafanaInstance.image.repository | string | `"unifabric-io/unifabric-grafana"` | Container image repository containing the Unifabric Grafana plugins. |
 | grafanaInstance.image.tag | string | `""` | Container image tag. Defaults to the chart appVersion when empty. |
 | grafanaInstance.labels | object | `{}` | Extra labels added to the Grafana instance. |
+| grafanaInstance.serviceType | string | `"NodePort"` | Kubernetes Service type for the bundled Grafana instance. |
 
 ## Controller and Agent
 

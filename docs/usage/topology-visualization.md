@@ -37,11 +37,24 @@ helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 ```
 
 The Chart creates a `Grafana`, `GrafanaDatasource`, and `GrafanaDashboard`. The Topology datasource
-automatically connects to the Controller Topology API from the same release. After the settings
-take effect, open Grafana and search for the **Unifabric Topology** dashboard.
+automatically connects to the Controller Topology API from the same release.
 
 The bundled instance uses the `ghcr.io/unifabric-io/unifabric-grafana:<version>` image. It contains
 both the topology datasource and panel plugins; its tag follows the Chart `appVersion` by default.
+
+Grafana Operator creates a Service for the bundled instance. The Service type is controlled by
+`grafanaInstance.serviceType` and defaults to NodePort with a randomly assigned node port. The
+login username and password are stored in an auto-generated Secret. Run the following commands to
+get the node port and login credentials:
+
+```bash
+kubectl get service -n unifabric-system unifabric-grafana-service
+kubectl get secret -n unifabric-system unifabric-grafana-admin-credentials \
+  -o go-template='{{range $k, $v := .data}}{{$k}}: {{$v | base64decode}}{{"\n"}}{{end}}'
+```
+
+Open `http://<node IP>:<NodePort>` in a browser, log in, then search for and open the
+**Unifabric Topology** dashboard.
 
 ### Use an External Grafana Instance
 
