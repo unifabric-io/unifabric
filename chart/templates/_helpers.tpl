@@ -314,3 +314,130 @@ app.kubernetes.io/part-of: {{ include "unifabric.name" .root }}
 true
 {{- end -}}
 {{- end -}}
+
+{{- define "unifabric.ebpfFlowEventCollectorName" -}}
+{{- printf "%s-ebpf-flow-event-collector" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+memory_limiter limit derived from the container memory limit, 75 percent
+of it in MiB, falling back to 1500 when no limit is set.
+*/}}
+{{- define "unifabric.ebpfFlowEventCollector.memoryLimitMib" -}}
+{{- $limit := dig "limits" "memory" "" .Values.ebpfFlowEventCollector.resources -}}
+{{- if $limit -}}
+{{- $bytes := $limit | toString | trimSuffix "i" -}}
+{{- $mib := 1500 -}}
+{{- if hasSuffix "G" $bytes -}}
+{{- $mib = mul ($bytes | trimSuffix "G" | int) 1024 -}}
+{{- else if hasSuffix "M" $bytes -}}
+{{- $mib = $bytes | trimSuffix "M" | int -}}
+{{- end -}}
+{{- div (mul $mib 3) 4 -}}
+{{- else -}}
+1500
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.ebpfFlowEventCollector.exporters" -}}
+{{- $exporters := list -}}
+{{- if .Values.ebpfFlowEventCollector.clickhouse.enabled -}}
+{{- $exporters = append $exporters "clickhouse" -}}
+{{- end -}}
+{{- if .Values.ebpfFlowEventCollector.elasticsearch.enabled -}}
+{{- $exporters = append $exporters "elasticsearch" -}}
+{{- end -}}
+{{- join ", " $exporters -}}
+{{- end -}}
+
+{{/*
+OTLP endpoint the agents send flow events to: the explicit value, else the
+in-release Collector when it is enabled, else empty which disables the
+stream.
+*/}}
+{{- define "unifabric.ebpfFlow.otlpEndpoint" -}}
+{{- if not .Values.agent.ebpfFlow.flowEvents.enabled -}}
+{{- "" -}}
+{{- else if .Values.agent.ebpfFlow.otlp.endpoint -}}
+{{- .Values.agent.ebpfFlow.otlp.endpoint -}}
+{{- else if .Values.ebpfFlowEventCollector.enabled -}}
+{{- printf "%s.%s.svc:4317" (include "unifabric.ebpfFlowEventCollectorName" .) .Release.Namespace -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.ebpfFlowClickHouseName" -}}
+{{- printf "%s-ebpf-flow-clickhouse" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "unifabric.elasticsearchName" -}}
+{{- printf "%s-elasticsearch" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The bundled test backends are deployed only while the Collector writes to
+that backend and no external endpoint is configured.
+*/}}
+{{- define "unifabric.ebpfFlow.clickhouseBundled" -}}
+{{- $ch := .Values.ebpfFlowEventCollector.clickhouse -}}
+{{- if and .Values.ebpfFlowEventCollector.enabled $ch.enabled (not $ch.endpoint) -}}true{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.ebpfFlow.elasticsearchBundled" -}}
+{{- $es := .Values.ebpfFlowEventCollector.elasticsearch -}}
+{{- if and .Values.ebpfFlowEventCollector.enabled $es.enabled (not $es.endpoints) -}}true{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.ebpfFlow.clickhouseEndpoint" -}}
+{{- $ch := .Values.ebpfFlowEventCollector.clickhouse -}}
+{{- if $ch.endpoint -}}
+{{- $ch.endpoint -}}
+{{- else -}}
+{{- printf "tcp://%s.%s.svc:9000" (include "unifabric.ebpfFlowClickHouseName" .) .Release.Namespace -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Returns the endpoint list as JSON so it can be pasted into the config. */}}
+{{- define "unifabric.ebpfFlow.elasticsearchEndpoints" -}}
+{{- $es := .Values.ebpfFlowEventCollector.elasticsearch -}}
+{{- if $es.endpoints -}}
+{{- toJson $es.endpoints -}}
+{{- else -}}
+{{- list (printf "http://%s.%s.svc:9200" (include "unifabric.elasticsearchName" .) .Release.Namespace) | toJson -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Passwords fall back to a fixed test value only for the bundled instances,
+an external backend must provide password or existingSecret.
+*/}}
+{{- define "unifabric.ebpfFlow.clickhousePassword" -}}
+{{- $ch := .Values.ebpfFlowEventCollector.clickhouse -}}
+{{- if $ch.password -}}
+{{- $ch.password -}}
+{{- else if include "unifabric.ebpfFlow.clickhouseBundled" . -}}
+rdma-flow
+{{- end -}}
+{{- end -}}
+
+{{- define "unifabric.ebpfFlow.elasticsearchPassword" -}}
+{{- $es := .Values.ebpfFlowEventCollector.elasticsearch -}}
+{{- if $es.password -}}
+{{- $es.password -}}
+{{- else if include "unifabric.ebpfFlow.elasticsearchBundled" . -}}
+rdma-flow
+{{- end -}}
+{{- end -}}
+
+{{/* Secret name and key holding a backend password. */}}
+{{- define "unifabric.ebpfFlow.clickhouseSecretName" -}}
+{{- .Values.ebpfFlowEventCollector.clickhouse.existingSecret | default (include "unifabric.ebpfFlowEventCollectorName" .) -}}
+{{- end -}}
+{{- define "unifabric.ebpfFlow.clickhouseSecretKey" -}}
+{{- ternary "password" "clickhouse-password" (ne .Values.ebpfFlowEventCollector.clickhouse.existingSecret "") -}}
+{{- end -}}
+{{- define "unifabric.ebpfFlow.elasticsearchSecretName" -}}
+{{- .Values.ebpfFlowEventCollector.elasticsearch.existingSecret | default (include "unifabric.ebpfFlowEventCollectorName" .) -}}
+{{- end -}}
+{{- define "unifabric.ebpfFlow.elasticsearchSecretKey" -}}
+{{- ternary "password" "elasticsearch-password" (ne .Values.ebpfFlowEventCollector.elasticsearch.existingSecret "") -}}
+{{- end -}}

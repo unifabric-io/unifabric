@@ -64,6 +64,8 @@ Pod、namespace 和顶层 workload。Grafana dashboard 用于按集群、节点�
 RDMA 流量与健康问题。
 
 - [RDMA 可观测性使用指南](./usage/rdma-metrics.zh.md)
+- [eBPF RDMA 流归属使用指南](./usage/rdma-flow.zh.md)：把 RDMA 发送归属到 Pod 到 Pod 的流，
+  发布 `RDMAEndpoint`，并存储逐条发送事件。
 
 ## 开发
 
@@ -71,9 +73,12 @@ RDMA 流量与健康问题。
 
 ## 设计
 
-- [Unifabric API 参考](./reference/README.zh.md)：查询 `FabricNode`、`Switch` 和 `Topology`。
+- [Unifabric API 参考](./reference/README.zh.md)：查询 `FabricNode`、`Switch`、`Topology` 和
+  `RDMAEndpoint`。
 - [Topology CRD 设计](./design/topology-crd.zh.md)：了解性能域、Node 路径和拓扑数据模型。
 - [Scale-out 拓扑发现设计](./design/scaleout-topology.zh.md)：了解 Scale-out 拓扑的发现与构建过程。
 - [RDMA 指标模型与 Pod 归因设计](./design/rdma-metrics.md)：了解指标定义与工作负载归因模型。
+- [eBPF RDMA 流归属设计](./design/rdma-flow.zh.md)：了解 `libibverbs` uprobe、`RDMAEndpoint`
+  与发送事件管线如何归属 Pod 之间的流量。
 - [拓扑可视化设计](./design/topology-visualization.zh.md)：了解 Topology HTTP API，以及渲染它的 Grafana
   datasource/panel 插件。

@@ -65,6 +65,7 @@ auto-generated, existing, or disabled mTLS.
 | grafanaDashboard.instanceSelector | object | `{}` | Grafana Operator instance selector for importing dashboards and the Topology datasource into an external Grafana instance. Ignored when grafanaInstance.enabled is true. |
 | grafanaDashboard.kind | string | `"GrafanaDashboard"` | Dashboard resource kind. Use ConfigMap for Grafana sidecar import, or GrafanaDashboard for Grafana Operator. |
 | grafanaDashboard.labels | object | `{}` | Extra labels added to rendered dashboard resources. |
+| grafanaDashboard.language | string | `"en"` | Dashboard language to install. en installs the English dashboards, zh the Chinese ones with a -zh suffix on their uid and resource name, all installs both. |
 | grafanaInstance.enabled | bool | `false` | Create a Grafana CR for this release and, when topologyAPI.enabled is true, its Topology GrafanaDatasource. |
 | grafanaInstance.image.registry | string | `"ghcr.io"` | Container image registry for the bundled Grafana instance. |
 | grafanaInstance.image.repository | string | `"unifabric-io/unifabric-grafana"` | Container image repository containing the Unifabric Grafana plugins. |
@@ -123,6 +124,27 @@ auto-generated, existing, or disabled mTLS.
 | agent.config.node.name | string | `""` | Kubernetes node name override. Leave empty to use the pod NODE_NAME environment value. |
 | agent.config.node.role | string | `"gpu"` | Agent node role. Valid values are gpu and storage. |
 | agent.containerSecurityContext.privileged | bool | `true` | Run the agent container as privileged so it can inspect host RDMA and network state. |
+| agent.ebpfFlow.bpfObject | string | `"/usr/lib/unifabric/rdma_flow.bpf.o"` | Path of the compiled BPF program inside the agent image. |
+| agent.ebpfFlow.bpffsPath | string | `"/sys/fs/bpf"` | Host bpffs mount holding the pinned qp_infos and qp_stats maps. |
+| agent.ebpfFlow.discoveryInterval | string | `"5s"` | Fallback interval for scanning new processes and libibverbs libraries. |
+| agent.ebpfFlow.enabled | bool | `false` | Enable the eBPF flow component that attributes RDMA sends to Pod-to-Pod flows, publishes RDMAEndpoint objects and exports rdma_flow_* metrics. Requires a kernel with BPF ring buffer and uprobe support. |
+| agent.ebpfFlow.endpoint.allPods | bool | `false` | Also publish Pods with their own network namespace. Required on InfiniBand fabrics where peers are addressed by LID. |
+| agent.ebpfFlow.endpoint.enabled | bool | `true` | Publish one RDMAEndpoint per Pod that holds an RDMA device. |
+| agent.ebpfFlow.endpoint.interval | string | `"30s"` | Fallback publish interval covering lost events. |
+| agent.ebpfFlow.endpoint.minInterval | string | `"3s"` | Minimum spacing between event driven RDMAEndpoint updates. |
+| agent.ebpfFlow.flowEvents.aggregate | string | `"0s"` | Merge identical submissions of a QP inside this window into one row with a count. 0s stores every submission. |
+| agent.ebpfFlow.flowEvents.batch | int | `10000` | Send event rows per export batch. |
+| agent.ebpfFlow.flowEvents.enabled | bool | `true` | Emit per-send ring buffer events, send-size metrics, and OTLP rows. Disable to keep only cumulative bytes, WR, and QP flow metrics. |
+| agent.ebpfFlow.flowEvents.flush | string | `"1s"` | Maximum time a partial batch waits before export. |
+| agent.ebpfFlow.flowEvents.queue | int | `200000` | Send event rows buffered per sink before new rows are dropped. |
+| agent.ebpfFlow.flowEvents.sample | int | `1` | Store one send event in every N, metrics still count every event. |
+| agent.ebpfFlow.hostStateDir | string | `"/var/lib/unifabric"` | Host directory persisting learned provider callback offsets across agent restarts. |
+| agent.ebpfFlow.offsetCache | string | `"/var/lib/unifabric/ebpf-flow/callback-offsets.json"` | File persisting learned provider callback offsets, under hostStateDir. |
+| agent.ebpfFlow.otlp.endpoint | string | `""` | OTLP gRPC host:port of an OpenTelemetry Collector receiving send events as log records. Empty disables the stream. |
+| agent.ebpfFlow.otlp.insecure | bool | `true` | Use plaintext gRPC for the OTLP endpoint. |
+| agent.ebpfFlow.otlp.timeout | string | `"10s"` | Per export timeout for the OTLP exporter. |
+| agent.ebpfFlow.pinDir | string | `"/sys/fs/bpf/unifabric"` | bpffs directory for pinned maps so a restarted agent keeps learned QP state. Empty disables pinning. |
+| agent.ebpfFlow.reportInterval | string | `"5s"` | Interval for joining the BPF maps into flow metrics. |
 | agent.enabled | bool | `true` | Deploy the Unifabric node agent DaemonSet. |
 | agent.hostNetwork | bool | `true` | Run agent pods in the host network namespace. |
 | agent.hostPID | bool | `true` | Run agent pods in the host PID namespace. |
@@ -146,14 +168,101 @@ auto-generated, existing, or disabled mTLS.
 | agent.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | Seccomp profile applied to agent pods. |
 | agent.ports.health | int | `8083` | Agent health probe container port. |
 | agent.ports.metrics | int | `8082` | Agent metrics container port. |
-| agent.resources.limits.cpu | string | `"500m"` | Agent CPU limit. |
-| agent.resources.limits.memory | string | `"512Mi"` | Agent memory limit. |
+| agent.resources.limits.cpu | string | `"2"` | Agent CPU limit. |
+| agent.resources.limits.memory | string | `"1Gi"` | Agent memory limit. |
 | agent.resources.requests.cpu | string | `"100m"` | Agent CPU request. |
-| agent.resources.requests.memory | string | `"128Mi"` | Agent memory request. |
+| agent.resources.requests.memory | string | `"256Mi"` | Agent memory request. |
 | agent.serviceAccount.annotations | object | `{}` | Annotations added to the agent ServiceAccount. |
 | agent.serviceAccount.create | bool | `true` | Create a ServiceAccount for the agent. |
 | agent.serviceAccount.name | string | `""` | Agent ServiceAccount name. Defaults to the generated agent name when empty. |
 | agent.tolerations | list | `[]` | Tolerations for scheduling agent pods. |
+| agent.workloadOwnerRules | object | `{"batch.volcano.sh":["jobs"],"jobset.x-k8s.io":["jobsets"],"kubeflow.org":["mpijobs","pytorchjobs","tfjobs","xgboostjobs","paddlejobs","jaxjobs"],"leaderworkerset.x-k8s.io":["leaderworkersets"],"ray.io":["rayclusters","rayjobs","rayservices"],"sparkoperator.k8s.io":["sparkapplications"],"trainer.kubeflow.org":["trainjobs"]}` | Third-party workload kinds the agent may read while walking a Pod's ownerReferences to its top-level owner, rendered into the agent-workload-owners ClusterRole with the get verb. Keys are API groups, values their plural resources, user values merge with these defaults so a new controller is one extra key. Kubernetes built-in kinds and unifabric.io resources are covered by the generated agent role. |
+
+## eBPF RDMA Flow Collector
+
+Optional OpenTelemetry Collector that stores the per-send events produced by
+`agent.ebpfFlow` in ClickHouse and/or Elasticsearch. Point `clickhouse.endpoint`
+or `elasticsearch.endpoints` at your own servers. When they are left empty the
+chart deploys the single replica instances described under `bundled`, which are
+meant for testing only. See [docs/usage/rdma-flow.md](../docs/usage/rdma-flow.md).
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| ebpfFlowEventCollector.batch.sendBatchMaxSize | int | `20000` | Upper bound of a batch. |
+| ebpfFlowEventCollector.batch.sendBatchSize | int | `10000` | Records per batch sent to the backends. |
+| ebpfFlowEventCollector.batch.timeout | string | `"1s"` | Maximum time a partial batch waits. |
+| ebpfFlowEventCollector.clickhouse.bundled.image.pullPolicy | string | `"IfNotPresent"` | Bundled ClickHouse image pull policy. |
+| ebpfFlowEventCollector.clickhouse.bundled.image.registry | string | `"docker.io"` | Bundled ClickHouse image registry. |
+| ebpfFlowEventCollector.clickhouse.bundled.image.repository | string | `"clickhouse/clickhouse-server"` | Bundled ClickHouse image repository. |
+| ebpfFlowEventCollector.clickhouse.bundled.image.tag | string | `"24.8"` | Bundled ClickHouse image tag. |
+| ebpfFlowEventCollector.clickhouse.bundled.nodeSelector | object | `{}` | Node selector for the bundled ClickHouse Pod. |
+| ebpfFlowEventCollector.clickhouse.bundled.persistence.enabled | bool | `true` | Keep the data directory on a PersistentVolumeClaim so tables survive Pod recreation. false uses an emptyDir. |
+| ebpfFlowEventCollector.clickhouse.bundled.persistence.existingClaim | string | `""` | Existing PersistentVolumeClaim to mount instead of creating one. |
+| ebpfFlowEventCollector.clickhouse.bundled.persistence.size | string | `"20Gi"` | Size of the claim, or of the emptyDir limit when persistence is disabled. |
+| ebpfFlowEventCollector.clickhouse.bundled.persistence.storageClassName | string | `""` | StorageClass of the claim. Empty uses the cluster default class. |
+| ebpfFlowEventCollector.clickhouse.bundled.resources | object | `{"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"1Gi"}}` | Bundled ClickHouse container resources. max_server_memory_usage follows the memory limit. |
+| ebpfFlowEventCollector.clickhouse.bundled.tolerations | list | `[]` | Tolerations for the bundled ClickHouse Pod. |
+| ebpfFlowEventCollector.clickhouse.database | string | `"rdma"` | ClickHouse database holding the send events table. |
+| ebpfFlowEventCollector.clickhouse.enabled | bool | `false` | Write send events to ClickHouse. |
+| ebpfFlowEventCollector.clickhouse.endpoint | string | `""` | Native protocol endpoint of an external ClickHouse, for example tcp://clickhouse.data.svc:9000. Leave empty to deploy the bundled test instance described under bundled instead. |
+| ebpfFlowEventCollector.clickhouse.existingSecret | string | `""` | Existing Secret with a password key used instead of password. |
+| ebpfFlowEventCollector.clickhouse.password | string | `""` | ClickHouse password. Defaults to rdma-flow for the bundled test instance. Prefer existingSecret for an external server. |
+| ebpfFlowEventCollector.clickhouse.schema.create | bool | `true` | Create the database and the strongly typed table with an init container before the Collector starts. The exporter never creates the schema itself. |
+| ebpfFlowEventCollector.clickhouse.schema.image.registry | string | `"docker.io"` | ClickHouse client image used by the schema init container. |
+| ebpfFlowEventCollector.clickhouse.schema.image.repository | string | `"clickhouse/clickhouse-server"` | ClickHouse client image repository. |
+| ebpfFlowEventCollector.clickhouse.schema.image.tag | string | `"24.8"` | ClickHouse client image tag. |
+| ebpfFlowEventCollector.clickhouse.table | string | `"rdma_sends"` | ClickHouse table name. |
+| ebpfFlowEventCollector.clickhouse.ttlDays | int | `3` | Row retention applied by the table TTL. |
+| ebpfFlowEventCollector.clickhouse.username | string | `"rdma"` | ClickHouse user. |
+| ebpfFlowEventCollector.elasticsearch.bundled.exporter.enabled | bool | `true` | Run the elasticsearch-exporter sidecar exposing elasticsearch_* metrics on port 9114 for the dashboards. |
+| ebpfFlowEventCollector.elasticsearch.bundled.exporter.image.registry | string | `"quay.io"` | elasticsearch-exporter image registry. |
+| ebpfFlowEventCollector.elasticsearch.bundled.exporter.image.repository | string | `"prometheuscommunity/elasticsearch-exporter"` | elasticsearch-exporter image repository. |
+| ebpfFlowEventCollector.elasticsearch.bundled.exporter.image.tag | string | `"v1.7.0"` | elasticsearch-exporter image tag. |
+| ebpfFlowEventCollector.elasticsearch.bundled.image.pullPolicy | string | `"IfNotPresent"` | Bundled Elasticsearch image pull policy. |
+| ebpfFlowEventCollector.elasticsearch.bundled.image.registry | string | `"docker.elastic.co"` | Bundled Elasticsearch image registry. |
+| ebpfFlowEventCollector.elasticsearch.bundled.image.repository | string | `"elasticsearch/elasticsearch"` | Bundled Elasticsearch image repository. |
+| ebpfFlowEventCollector.elasticsearch.bundled.image.tag | string | `"8.15.3"` | Bundled Elasticsearch image tag. |
+| ebpfFlowEventCollector.elasticsearch.bundled.javaHeap | string | `"2g"` | JVM heap passed as -Xms and -Xmx. Keep it at half of the memory limit or less. |
+| ebpfFlowEventCollector.elasticsearch.bundled.nodeSelector | object | `{}` | Node selector for the bundled Elasticsearch Pod. |
+| ebpfFlowEventCollector.elasticsearch.bundled.persistence.enabled | bool | `false` | Keep the data directory on a PersistentVolumeClaim. false uses an emptyDir and loses data on Pod recreation. |
+| ebpfFlowEventCollector.elasticsearch.bundled.persistence.existingClaim | string | `""` | Existing PersistentVolumeClaim to mount instead of creating one. |
+| ebpfFlowEventCollector.elasticsearch.bundled.persistence.size | string | `"20Gi"` | Size of the claim, or of the emptyDir limit when persistence is disabled. |
+| ebpfFlowEventCollector.elasticsearch.bundled.persistence.storageClassName | string | `""` | StorageClass of the claim. Empty uses the cluster default class. |
+| ebpfFlowEventCollector.elasticsearch.bundled.resources | object | `{"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"1","memory":"3Gi"}}` | Bundled Elasticsearch container resources. |
+| ebpfFlowEventCollector.elasticsearch.bundled.sysctlImage.registry | string | `"docker.io"` | busybox image used by the privileged init container raising vm.max_map_count. |
+| ebpfFlowEventCollector.elasticsearch.bundled.sysctlImage.repository | string | `"library/busybox"` | busybox image repository. |
+| ebpfFlowEventCollector.elasticsearch.bundled.sysctlImage.tag | string | `"1.36"` | busybox image tag. |
+| ebpfFlowEventCollector.elasticsearch.bundled.tolerations | list | `[]` | Tolerations for the bundled Elasticsearch Pod. |
+| ebpfFlowEventCollector.elasticsearch.enabled | bool | `false` | Write send events to Elasticsearch as a data stream. |
+| ebpfFlowEventCollector.elasticsearch.endpoints | list | `[]` | HTTP endpoints of an external Elasticsearch, for example http://elasticsearch.data.svc:9200. Leave empty to deploy the bundled test instance described under bundled instead. |
+| ebpfFlowEventCollector.elasticsearch.existingSecret | string | `""` | Existing Secret with a password key used instead of password. |
+| ebpfFlowEventCollector.elasticsearch.grafanaDatasource.enabled | bool | `true` | Create a GrafanaDatasource for the data stream so the flow-sends-es dashboard works. Requires grafanaDashboard.kind GrafanaDashboard. |
+| ebpfFlowEventCollector.elasticsearch.index | string | `"rdma-sends"` | Data stream receiving the documents. |
+| ebpfFlowEventCollector.elasticsearch.password | string | `""` | Elasticsearch password. Defaults to rdma-flow for the bundled test instance. Prefer existingSecret for an external cluster. |
+| ebpfFlowEventCollector.elasticsearch.schema.create | bool | `true` | Write the index template and ILM policy of the data stream before the Collector starts. The template maps every attribute as keyword or number, disables dynamic mapping and uses date_nanos timestamps. |
+| ebpfFlowEventCollector.elasticsearch.schema.ilm.deleteMinAge | string | `"3d"` | Delete backing indices this long after rollover. |
+| ebpfFlowEventCollector.elasticsearch.schema.ilm.rolloverMaxAge | string | `"1d"` | Roll the write index over after this age. |
+| ebpfFlowEventCollector.elasticsearch.schema.ilm.rolloverMaxPrimaryShardSize | string | `"10gb"` | Roll the write index over when a primary shard reaches this size. |
+| ebpfFlowEventCollector.elasticsearch.schema.image.registry | string | `"docker.io"` | curl image used by the schema init container against an external Elasticsearch. The bundled instance applies the schema from its own Pod. |
+| ebpfFlowEventCollector.elasticsearch.schema.image.repository | string | `"curlimages/curl"` | curl image repository. |
+| ebpfFlowEventCollector.elasticsearch.schema.image.tag | string | `"8.10.1"` | curl image tag. |
+| ebpfFlowEventCollector.elasticsearch.schema.refreshInterval | string | `"30s"` | Refresh interval of the backing indices. |
+| ebpfFlowEventCollector.elasticsearch.user | string | `"elastic"` | Elasticsearch user. |
+| ebpfFlowEventCollector.enabled | bool | `false` | Deploy the Collector. Requires agent.ebpfFlow.enabled and at least one backend enabled. |
+| ebpfFlowEventCollector.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
+| ebpfFlowEventCollector.image.registry | string | `"docker.io"` | OpenTelemetry Collector contrib image registry. Only the contrib distribution ships the clickhouse and elasticsearch exporters. |
+| ebpfFlowEventCollector.image.repository | string | `"otel/opentelemetry-collector-contrib"` | OpenTelemetry Collector contrib image repository. |
+| ebpfFlowEventCollector.image.tag | string | `"0.137.0"` | OpenTelemetry Collector contrib image tag. |
+| ebpfFlowEventCollector.nodeSelector | object | `{}` | Node selector for the Collector Pod. |
+| ebpfFlowEventCollector.replicas | int | `1` | Collector replicas. Agents hold one gRPC connection each, so more replicas than agents stay idle. |
+| ebpfFlowEventCollector.resources.limits.cpu | string | `"2"` | Collector CPU limit. |
+| ebpfFlowEventCollector.resources.limits.memory | string | `"2Gi"` | Collector memory limit. memory_limiter is derived from it. |
+| ebpfFlowEventCollector.resources.requests.cpu | string | `"500m"` | Collector CPU request. |
+| ebpfFlowEventCollector.resources.requests.memory | string | `"512Mi"` | Collector memory request. |
+| ebpfFlowEventCollector.serviceMonitor.enabled | bool | `true` | Create a ServiceMonitor for the Collector's own metrics on port 8888. |
+| ebpfFlowEventCollector.serviceMonitor.interval | string | `"15s"` | Scrape interval for the Collector metrics. |
+| ebpfFlowEventCollector.serviceMonitor.labels | object | `{}` | Extra labels added to the ServiceMonitor. |
+| ebpfFlowEventCollector.tolerations | list | `[]` | Tolerations for the Collector Pod. |
 
 ## NVIDIA Topograph
 

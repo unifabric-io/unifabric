@@ -57,6 +57,9 @@ data:
     {{- if hasKey .Values "fabricNode" }}
     {{- $_ := set $agentConfig "nodeTopologyDiscovery" .Values.fabricNode }}
     {{- end }}
+    {{- $ebpfFlowConfig := omit (deepCopy .Values.agent.ebpfFlow) "hostStateDir" "bpffsPath" }}
+    {{- $_ := set $ebpfFlowConfig.otlp "endpoint" (include "unifabric.ebpfFlow.otlpEndpoint" .) }}
+    {{- $_ := set $agentConfig "ebpfFlow" $ebpfFlowConfig }}
     {{- include "unifabric.render" (dict "value" $agentConfig "context" $) | nindent 4 }}
 {{- end }}
 ---
