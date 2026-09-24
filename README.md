@@ -18,12 +18,14 @@ Key features:
 - Switch: Records switch dial targets and observed LLDP neighbor snapshots used by switch-driven scale-out topology discovery.
 - SwitchTopologyDiscovery: Computes scale-out leaf, spine, and core domains from FabricNode and Switch data, then writes Node topology labels.
 - Node RDMA observability: Exposes Node RDMA metrics for monitoring device, port, and workload traffic.
+- RDMAEndpoint and eBPF flow attribution: Optionally attributes RDMA send traffic to Pod-to-Pod flows with `libibverbs` uprobes and records each RDMA Pod's addresses and queue pairs.
 
 ## Next Steps
 
 - Read the getting started deployment guide in [docs/getting-started.md](./docs/getting-started.md).
 - Read the Helm values reference in [chart/README.md](./chart/README.md).
 - Read the RDMA observability usage guide in [docs/usage/rdma-metrics.md](./docs/usage/rdma-metrics.md).
+- Read the eBPF RDMA flow attribution guide in [docs/usage/rdma-flow.md](./docs/usage/rdma-flow.md).
 - Read the Kueue TAS workload example in [docs/usage/workload-tas.md](./docs/usage/workload-tas.md).
 
 ## License

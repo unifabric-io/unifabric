@@ -94,6 +94,8 @@ topologyAPI:
 grafanaDashboard:
   # -- Render the bundled Grafana dashboards.
   enabled: true
+  # -- Dashboard language to install. en installs the English dashboards, zh the Chinese ones with a -zh suffix on their uid and resource name, all installs both.
+  language: en
   # -- Dashboard resource kind. Use ConfigMap for Grafana sidecar import, or GrafanaDashboard for Grafana Operator.
   kind: GrafanaDashboard
   # -- Extra labels added to rendered dashboard resources.
@@ -268,12 +270,12 @@ agent:
       # -- Agent CPU request.
       cpu: 100m
       # -- Agent memory request.
-      memory: 128Mi
+      memory: 256Mi
     limits:
       # -- Agent CPU limit.
-      cpu: 500m
+      cpu: "2"
       # -- Agent memory limit.
-      memory: 512Mi
+      memory: 1Gi
   ports:
     # -- Agent metrics container port.
     metrics: 8082
@@ -295,6 +297,61 @@ agent:
       role: gpu
       # -- host:port used to infer the default route when classifying local interfaces.
       defaultRouteProbe: "8.8.8.8:53"
+  # -- Third-party workload kinds the agent may read while walking a Pod's ownerReferences to its top-level owner, rendered into the agent-workload-owners ClusterRole with the get verb. Keys are API groups, values their plural resources, user values merge with these defaults so a new controller is one extra key. Kubernetes built-in kinds and unifabric.io resources are covered by the generated agent role.
+  workloadOwnerRules:
+    kubeflow.org: [mpijobs, pytorchjobs, tfjobs, xgboostjobs, paddlejobs, jaxjobs]
+    trainer.kubeflow.org: [trainjobs]
+    jobset.x-k8s.io: [jobsets]
+    leaderworkerset.x-k8s.io: [leaderworkersets]
+    ray.io: [rayclusters, rayjobs, rayservices]
+    sparkoperator.k8s.io: [sparkapplications]
+    batch.volcano.sh: [jobs]
+  ebpfFlow:
+    # -- Enable the eBPF flow component that attributes RDMA sends to Pod-to-Pod flows, publishes RDMAEndpoint objects and exports rdma_flow_* metrics. Requires a kernel with BPF ring buffer and uprobe support.
+    enabled: false
+    flowEvents:
+      # -- Emit per-send ring buffer events, send-size metrics, and OTLP rows. Disable to keep only cumulative bytes, WR, and QP flow metrics.
+      enabled: true
+      # -- Send event rows buffered per sink before new rows are dropped.
+      queue: 200000
+      # -- Send event rows per export batch.
+      batch: 10000
+      # -- Maximum time a partial batch waits before export.
+      flush: 1s
+      # -- Store one send event in every N, metrics still count every event.
+      sample: 1
+      # -- Merge identical submissions of a QP inside this window into one row with a count. 0s stores every submission.
+      aggregate: 0s
+    # -- Host directory persisting learned provider callback offsets across agent restarts.
+    hostStateDir: /var/lib/unifabric
+    # -- Host bpffs mount holding the pinned qp_infos and qp_stats maps.
+    bpffsPath: /sys/fs/bpf
+    # -- Path of the compiled BPF program inside the agent image.
+    bpfObject: /usr/lib/unifabric/rdma_flow.bpf.o
+    # -- bpffs directory for pinned maps so a restarted agent keeps learned QP state. Empty disables pinning.
+    pinDir: /sys/fs/bpf/unifabric
+    # -- File persisting learned provider callback offsets, under hostStateDir.
+    offsetCache: /var/lib/unifabric/ebpf-flow/callback-offsets.json
+    # -- Fallback interval for scanning new processes and libibverbs libraries.
+    discoveryInterval: 5s
+    # -- Interval for joining the BPF maps into flow metrics.
+    reportInterval: 5s
+    endpoint:
+      # -- Publish one RDMAEndpoint per Pod that holds an RDMA device.
+      enabled: true
+      # -- Fallback publish interval covering lost events.
+      interval: 30s
+      # -- Minimum spacing between event driven RDMAEndpoint updates.
+      minInterval: 3s
+      # -- Also publish Pods with their own network namespace. Required on InfiniBand fabrics where peers are addressed by LID.
+      allPods: false
+    otlp:
+      # -- OTLP gRPC host:port of an OpenTelemetry Collector receiving send events as log records. Empty disables the stream.
+      endpoint: ""
+      # -- Use plaintext gRPC for the OTLP endpoint.
+      insecure: true
+      # -- Per export timeout for the OTLP exporter.
+      timeout: 10s
   lldp:
     # -- Run the lldpd sidecar used by the agent to collect LLDP neighbors.
     enabled: true
@@ -320,6 +377,196 @@ agent:
         cpu: 100m
         # -- lldpd sidecar memory limit.
         memory: 128Mi
+
+# -- Optional OpenTelemetry Collector receiving the eBPF flow send events from the agents over OTLP and writing them to ClickHouse and/or Elasticsearch. The agents point at it automatically when agent.ebpfFlow.otlp.endpoint is empty.
+ebpfFlowEventCollector:
+  # -- Deploy the Collector. Requires agent.ebpfFlow.enabled and at least one backend enabled.
+  enabled: false
+  # -- Collector replicas. Agents hold one gRPC connection each, so more replicas than agents stay idle.
+  replicas: 1
+  image:
+    # -- OpenTelemetry Collector contrib image registry. Only the contrib distribution ships the clickhouse and elasticsearch exporters.
+    registry: docker.io
+    # -- OpenTelemetry Collector contrib image repository.
+    repository: otel/opentelemetry-collector-contrib
+    # -- OpenTelemetry Collector contrib image tag.
+    tag: 0.137.0
+    # -- Image pull policy.
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      # -- Collector CPU request.
+      cpu: 500m
+      # -- Collector memory request.
+      memory: 512Mi
+    limits:
+      # -- Collector CPU limit.
+      cpu: "2"
+      # -- Collector memory limit. memory_limiter is derived from it.
+      memory: 2Gi
+  # -- Node selector for the Collector Pod.
+  nodeSelector: {}
+  # -- Tolerations for the Collector Pod.
+  tolerations: []
+  batch:
+    # -- Records per batch sent to the backends.
+    sendBatchSize: 10000
+    # -- Upper bound of a batch.
+    sendBatchMaxSize: 20000
+    # -- Maximum time a partial batch waits.
+    timeout: 1s
+  serviceMonitor:
+    # -- Create a ServiceMonitor for the Collector's own metrics on port 8888.
+    enabled: true
+    # -- Scrape interval for the Collector metrics.
+    interval: 15s
+    # -- Extra labels added to the ServiceMonitor.
+    labels: {}
+  clickhouse:
+    # -- Write send events to ClickHouse.
+    enabled: false
+    # -- Native protocol endpoint of an external ClickHouse, for example tcp://clickhouse.data.svc:9000. Leave empty to deploy the bundled test instance described under bundled instead.
+    endpoint: ""
+    # -- ClickHouse database holding the send events table.
+    database: rdma
+    # -- ClickHouse table name.
+    table: rdma_sends
+    # -- ClickHouse user.
+    username: rdma
+    # -- ClickHouse password. Defaults to rdma-flow for the bundled test instance. Prefer existingSecret for an external server.
+    password: ""
+    # -- Existing Secret with a password key used instead of password.
+    existingSecret: ""
+    # -- Row retention applied by the table TTL.
+    ttlDays: 3
+    schema:
+      # -- Create the database and the strongly typed table with an init container before the Collector starts. The exporter never creates the schema itself.
+      create: true
+      image:
+        # -- ClickHouse client image used by the schema init container.
+        registry: docker.io
+        # -- ClickHouse client image repository.
+        repository: clickhouse/clickhouse-server
+        # -- ClickHouse client image tag.
+        tag: "24.8"
+    # -- Bundled single replica ClickHouse deployed only when endpoint is empty. FOR TESTING ONLY: no replication, no backups, fixed credentials, sized for a few nodes of traffic.
+    bundled:
+      image:
+        # -- Bundled ClickHouse image registry.
+        registry: docker.io
+        # -- Bundled ClickHouse image repository.
+        repository: clickhouse/clickhouse-server
+        # -- Bundled ClickHouse image tag.
+        tag: "24.8"
+        # -- Bundled ClickHouse image pull policy.
+        pullPolicy: IfNotPresent
+      persistence:
+        # -- Keep the data directory on a PersistentVolumeClaim so tables survive Pod recreation. false uses an emptyDir.
+        enabled: true
+        # -- Size of the claim, or of the emptyDir limit when persistence is disabled.
+        size: 20Gi
+        # -- StorageClass of the claim. Empty uses the cluster default class.
+        storageClassName: ""
+        # -- Existing PersistentVolumeClaim to mount instead of creating one.
+        existingClaim: ""
+      # -- Bundled ClickHouse container resources. max_server_memory_usage follows the memory limit.
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+      # -- Node selector for the bundled ClickHouse Pod.
+      nodeSelector: {}
+      # -- Tolerations for the bundled ClickHouse Pod.
+      tolerations: []
+  elasticsearch:
+    # -- Write send events to Elasticsearch as a data stream.
+    enabled: false
+    # -- HTTP endpoints of an external Elasticsearch, for example http://elasticsearch.data.svc:9200. Leave empty to deploy the bundled test instance described under bundled instead.
+    endpoints: []
+    # -- Elasticsearch user.
+    user: elastic
+    # -- Elasticsearch password. Defaults to rdma-flow for the bundled test instance. Prefer existingSecret for an external cluster.
+    password: ""
+    # -- Existing Secret with a password key used instead of password.
+    existingSecret: ""
+    # -- Data stream receiving the documents.
+    index: rdma-sends
+    schema:
+      # -- Write the index template and ILM policy of the data stream before the Collector starts. The template maps every attribute as keyword or number, disables dynamic mapping and uses date_nanos timestamps.
+      create: true
+      image:
+        # -- curl image used by the schema init container against an external Elasticsearch. The bundled instance applies the schema from its own Pod.
+        registry: docker.io
+        # -- curl image repository.
+        repository: curlimages/curl
+        # -- curl image tag.
+        tag: 8.10.1
+      # -- Refresh interval of the backing indices.
+      refreshInterval: 30s
+      ilm:
+        # -- Roll the write index over after this age.
+        rolloverMaxAge: 1d
+        # -- Roll the write index over when a primary shard reaches this size.
+        rolloverMaxPrimaryShardSize: 10gb
+        # -- Delete backing indices this long after rollover.
+        deleteMinAge: 3d
+    grafanaDatasource:
+      # -- Create a GrafanaDatasource for the data stream so the flow-sends-es dashboard works. Requires grafanaDashboard.kind GrafanaDashboard.
+      enabled: true
+    # -- Bundled single node Elasticsearch deployed only when endpoints is empty. FOR TESTING ONLY: single node, security without TLS, fixed credentials, disk watermarks disabled.
+    bundled:
+      image:
+        # -- Bundled Elasticsearch image registry.
+        registry: docker.elastic.co
+        # -- Bundled Elasticsearch image repository.
+        repository: elasticsearch/elasticsearch
+        # -- Bundled Elasticsearch image tag.
+        tag: 8.15.3
+        # -- Bundled Elasticsearch image pull policy.
+        pullPolicy: IfNotPresent
+      sysctlImage:
+        # -- busybox image used by the privileged init container raising vm.max_map_count.
+        registry: docker.io
+        # -- busybox image repository.
+        repository: library/busybox
+        # -- busybox image tag.
+        tag: "1.36"
+      exporter:
+        # -- Run the elasticsearch-exporter sidecar exposing elasticsearch_* metrics on port 9114 for the dashboards.
+        enabled: true
+        image:
+          # -- elasticsearch-exporter image registry.
+          registry: quay.io
+          # -- elasticsearch-exporter image repository.
+          repository: prometheuscommunity/elasticsearch-exporter
+          # -- elasticsearch-exporter image tag.
+          tag: v1.7.0
+      # -- JVM heap passed as -Xms and -Xmx. Keep it at half of the memory limit or less.
+      javaHeap: 2g
+      persistence:
+        # -- Keep the data directory on a PersistentVolumeClaim. false uses an emptyDir and loses data on Pod recreation.
+        enabled: false
+        # -- Size of the claim, or of the emptyDir limit when persistence is disabled.
+        size: 20Gi
+        # -- StorageClass of the claim. Empty uses the cluster default class.
+        storageClassName: ""
+        # -- Existing PersistentVolumeClaim to mount instead of creating one.
+        existingClaim: ""
+      # -- Bundled Elasticsearch container resources.
+      resources:
+        requests:
+          cpu: "1"
+          memory: 3Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+      # -- Node selector for the bundled Elasticsearch Pod.
+      nodeSelector: {}
+      # -- Tolerations for the bundled Elasticsearch Pod.
+      tolerations: []
 
 nvidiaTopograph:
   # -- Topology provider settings passed to NVIDIA Topograph.

@@ -76,6 +76,12 @@ The chart includes these RDMA dashboard files:
 - `rdma-pod.json`
 - `rdma-workload.json`
 
+Each dashboard exists in English under `chart/files/dashboard-en/` and in
+Chinese under `chart/files/dashboard-zh/`. `grafanaDashboard.language`
+selects what is installed: `en` (default) installs the English dashboards,
+`zh` the Chinese ones, whose uid and resource name carry a `-zh` suffix, and
+`all` installs both side by side.
+
 When `grafanaDashboard.enabled=true`, the chart renders these files as
 `ConfigMap` or `GrafanaDashboard` resources depending on
 `grafanaDashboard.kind`.

@@ -67,6 +67,10 @@ Chart 内置以下 RDMA dashboard 文件：
 - `rdma-pod.json`
 - `rdma-workload.json`
 
+每个 dashboard 都有英文版（`chart/files/dashboard-en/`）和中文版（`chart/files/dashboard-zh/`）。
+`grafanaDashboard.language` 决定安装哪一种：`en`（默认）安装英文版，`zh` 安装中文版，
+其 uid 与资源名带 `-zh` 后缀，`all` 同时安装两种。
+
 当 `grafanaDashboard.enabled=true` 时，chart 会根据 `grafanaDashboard.kind` 将这些文件渲染为 `ConfigMap` 或 `GrafanaDashboard`。
 
 验证 dashboard 资源：

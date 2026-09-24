@@ -23,6 +23,18 @@ const (
 	defaultNodeTopologyInitialScanDelay = "1m"
 	defaultRouteProbeAddress            = "1.1.1.1:53"
 
+	defaultEBPFFlowBPFObject           = "/usr/lib/unifabric/rdma_flow.bpf.o"
+	defaultEBPFFlowPinDir              = "/sys/fs/bpf/unifabric"
+	defaultEBPFFlowOffsetCache         = "/var/lib/unifabric/ebpf-flow/callback-offsets.json"
+	defaultEBPFFlowDiscoveryInterval   = "5s"
+	defaultEBPFFlowReportInterval      = "5s"
+	defaultEBPFFlowEndpointInterval    = "30s"
+	defaultEBPFFlowEndpointMinInterval = "3s"
+	defaultEBPFFlowSendQueue           = 200000
+	defaultEBPFFlowSendBatch           = 10000
+	defaultEBPFFlowSendFlush           = "1s"
+	defaultEBPFFlowOTLPTimeout         = "10s"
+
 	StorageNodeLeaderAnnotationKey = "unifabric.io/storage-node-leader"
 )
 
@@ -48,12 +60,69 @@ type NodeTopologyDiscoveryConfig struct {
 	ScaleUpInterfaceSelector  string `json:"scaleUpInterfaceSelector" yaml:"scaleUpInterfaceSelector"`
 }
 
+// EBPFFlowEndpointConfig controls RDMAEndpoint publishing.
+type EBPFFlowEndpointConfig struct {
+	// Enabled publishes one RDMAEndpoint per Pod holding an RDMA device. Defaults to true.
+	Enabled *bool `json:"enabled" yaml:"enabled"`
+	// Interval is the fallback publish period covering lost events.
+	Interval string `json:"interval" yaml:"interval"`
+	// MinInterval is the minimum spacing between event driven updates.
+	MinInterval string `json:"minInterval" yaml:"minInterval"`
+	// AllPods also publishes Pods with their own network namespace.
+	AllPods bool `json:"allPods" yaml:"allPods"`
+}
+
+// EBPFFlowFlowEventsConfig controls per-send ring-buffer events and their storage path.
+type EBPFFlowFlowEventsConfig struct {
+	// Enabled emits per-send events and defaults to true.
+	Enabled *bool `json:"enabled" yaml:"enabled"`
+	// Queue is the number of rows buffered per sink before new rows are dropped.
+	Queue int `json:"queue" yaml:"queue"`
+	// Batch is the number of rows per sink export.
+	Batch int `json:"batch" yaml:"batch"`
+	// Flush is the maximum time a partial batch waits.
+	Flush string `json:"flush" yaml:"flush"`
+	// Sample stores one event in every N, metrics still see every event.
+	Sample uint64 `json:"sample" yaml:"sample"`
+	// Aggregate merges identical submissions of a QP inside the window into one row.
+	Aggregate string `json:"aggregate" yaml:"aggregate"`
+}
+
+// EBPFFlowOTLPConfig points the send event stream at an OpenTelemetry Collector.
+type EBPFFlowOTLPConfig struct {
+	// Endpoint is the OTLP gRPC host:port, empty disables the stream.
+	Endpoint string `json:"endpoint" yaml:"endpoint"`
+	// Insecure uses plaintext gRPC. Defaults to true.
+	Insecure *bool `json:"insecure" yaml:"insecure"`
+	// Timeout bounds one export.
+	Timeout string `json:"timeout" yaml:"timeout"`
+}
+
+// EBPFFlowConfig enables and tunes the eBPF RDMA flow attribution component.
+type EBPFFlowConfig struct {
+	Enabled bool `json:"enabled" yaml:"enabled"`
+	// BPFObject is the path of the compiled BPF program.
+	BPFObject string `json:"bpfObject" yaml:"bpfObject"`
+	// PinDir is the bpffs directory for pinned maps, empty disables pinning.
+	PinDir string `json:"pinDir" yaml:"pinDir"`
+	// OffsetCache is the host file persisting learned provider callback offsets.
+	OffsetCache string `json:"offsetCache" yaml:"offsetCache"`
+	// DiscoveryInterval is the fallback period for scanning new processes and libraries.
+	DiscoveryInterval string `json:"discoveryInterval" yaml:"discoveryInterval"`
+	// ReportInterval is the period for joining BPF maps into metrics.
+	ReportInterval string                   `json:"reportInterval" yaml:"reportInterval"`
+	Endpoint       EBPFFlowEndpointConfig   `json:"endpoint" yaml:"endpoint"`
+	FlowEvents     EBPFFlowFlowEventsConfig `json:"flowEvents" yaml:"flowEvents"`
+	OTLP           EBPFFlowOTLPConfig       `json:"otlp" yaml:"otlp"`
+}
+
 type AgentConfig struct {
 	LogLevel              string                      `json:"logLevel" yaml:"logLevel"`
 	Metrics               BindAddressConfig           `json:"metrics" yaml:"metrics"`
 	HealthProbe           BindAddressConfig           `json:"healthProbe" yaml:"healthProbe"`
 	Node                  AgentNodeConfig             `json:"node" yaml:"node"`
 	NodeTopologyDiscovery NodeTopologyDiscoveryConfig `json:"nodeTopologyDiscovery" yaml:"nodeTopologyDiscovery"`
+	EBPFFlow              EBPFFlowConfig              `json:"ebpfFlow" yaml:"ebpfFlow"`
 	KubeConfig            *rest.Config                `json:"-" yaml:"-"`
 }
 
@@ -92,6 +161,9 @@ func ReadAgentConfig(filename string) (*AgentConfig, error) {
 	}
 
 	if err := normalizeNodeTopologyDiscoveryConfig(&cfg.NodeTopologyDiscovery); err != nil {
+		return nil, err
+	}
+	if err := normalizeEBPFFlowConfig(&cfg.EBPFFlow); err != nil {
 		return nil, err
 	}
 
@@ -133,6 +205,66 @@ func normalizeNodeTopologyDiscoveryConfig(cfg *NodeTopologyDiscoveryConfig) erro
 		return fmt.Errorf("%s: %s is invalid, expect format like 1m or 30s", initialScanDelayField, cfg.InitialScanDelay)
 	}
 	return nil
+}
+
+// normalizeEBPFFlowConfig fills defaults and validates durations. Defaults
+// are applied even when the component is disabled so a later enable through
+// the same file behaves the same as a fresh config.
+func normalizeEBPFFlowConfig(cfg *EBPFFlowConfig) error {
+	setDefault(&cfg.BPFObject, defaultEBPFFlowBPFObject)
+	setDefault(&cfg.PinDir, defaultEBPFFlowPinDir)
+	setDefault(&cfg.OffsetCache, defaultEBPFFlowOffsetCache)
+	setDefault(&cfg.DiscoveryInterval, defaultEBPFFlowDiscoveryInterval)
+	setDefault(&cfg.ReportInterval, defaultEBPFFlowReportInterval)
+	setDefaultBool(&cfg.Endpoint.Enabled, true)
+	setDefault(&cfg.Endpoint.Interval, defaultEBPFFlowEndpointInterval)
+	setDefault(&cfg.Endpoint.MinInterval, defaultEBPFFlowEndpointMinInterval)
+	setDefaultBool(&cfg.FlowEvents.Enabled, true)
+	if cfg.FlowEvents.Queue == 0 {
+		cfg.FlowEvents.Queue = defaultEBPFFlowSendQueue
+	}
+	if cfg.FlowEvents.Batch == 0 {
+		cfg.FlowEvents.Batch = defaultEBPFFlowSendBatch
+	}
+	setDefault(&cfg.FlowEvents.Flush, defaultEBPFFlowSendFlush)
+	if cfg.FlowEvents.Sample == 0 {
+		cfg.FlowEvents.Sample = 1
+	}
+	setDefault(&cfg.FlowEvents.Aggregate, "0s")
+	setDefaultBool(&cfg.OTLP.Insecure, true)
+	setDefault(&cfg.OTLP.Timeout, defaultEBPFFlowOTLPTimeout)
+
+	durations := map[string]string{
+		"ebpfFlow.discoveryInterval":    cfg.DiscoveryInterval,
+		"ebpfFlow.reportInterval":       cfg.ReportInterval,
+		"ebpfFlow.endpoint.interval":    cfg.Endpoint.Interval,
+		"ebpfFlow.endpoint.minInterval": cfg.Endpoint.MinInterval,
+		"ebpfFlow.flowEvents.flush":     cfg.FlowEvents.Flush,
+		"ebpfFlow.flowEvents.aggregate": cfg.FlowEvents.Aggregate,
+		"ebpfFlow.otlp.timeout":         cfg.OTLP.Timeout,
+	}
+	for field, value := range durations {
+		if _, err := time.ParseDuration(value); err != nil {
+			return fmt.Errorf("%s: %s is invalid, expect format like 5s or 100ms", field, value)
+		}
+	}
+	if cfg.FlowEvents.Queue < 0 || cfg.FlowEvents.Batch < 0 {
+		return fmt.Errorf("ebpfFlow.flowEvents.queue and ebpfFlow.flowEvents.batch must not be negative")
+	}
+	return nil
+}
+
+func setDefault(field *string, value string) {
+	if *field == "" {
+		*field = value
+	}
+}
+
+func setDefaultBool(field **bool, value bool) {
+	if *field == nil {
+		v := value
+		*field = &v
+	}
 }
 
 func validateInterfaceSelector(field, selector string) error {
