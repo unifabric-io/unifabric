@@ -270,8 +270,8 @@ agent:
       # -- Agent memory request.
       memory: 128Mi
     limits:
-      # -- Agent CPU limit.
-      cpu: 500m
+      # -- Agent CPU limit. Keep it generous: the agent issues one ethtool ioctl per RDMA interface (PFs and every SR-IOV VF) while holding the kernel rtnl lock, and CFS throttling mid-ioctl stalls other network operations on the node.
+      cpu: "2"
       # -- Agent memory limit.
       memory: 512Mi
   ports:

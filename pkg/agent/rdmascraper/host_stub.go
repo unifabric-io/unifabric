@@ -5,7 +5,14 @@
 
 package rdmascraper
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+func readEthtoolStats(string, []string) (map[string]ethtoolStatsResult, error) {
+	return nil, errors.New("ethtool stats are only supported on linux")
+}
 
 func (s *RuntimeScraper) collectHost(ctx context.Context, snapshot *ScrapeSnapshot) hostCollection {
 	if err := ctx.Err(); err != nil {

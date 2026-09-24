@@ -109,6 +109,42 @@ func TestCollectPodSysfsAddsWorkloadSamples(t *testing.T) {
 	}
 }
 
+func TestCollectPodEthtoolKeysCacheByContainerID(t *testing.T) {
+	scraper := NewRuntimeScraper(fakeFabricNodeClient{}, discardLogger(), config.NodeTopologyDiscoveryConfig{})
+	scraper.paths.hostProcPath = "/host/proc"
+	fetcher := &fakeEthtoolFetcher{value: 7}
+	scraper.ethtoolStats.fetch = fetcher.fetch
+
+	pod := v1beta1.RdmaPod{Namespace: "workloads", Name: "sriov-rdma-app"}
+	workload := workloadLabelsForPod(pod)
+	ifNameToDevice := map[string]string{"net1": "mlx5_7"}
+
+	var snapshot ScrapeSnapshot
+	scraper.collectPodEthtool(&snapshot, workload, "containerd://container-a", 4242, ifNameToDevice)
+	if len(snapshot.Warnings) != 0 {
+		t.Fatalf("warnings = %#v, want none", snapshot.Warnings)
+	}
+	if fetcher.paths[0] != "/host/proc/4242/ns/net" {
+		t.Fatalf("fetch path = %q, want the container init pid net namespace", fetcher.paths[0])
+	}
+	if _, ok := scraper.ethtoolStats.entries[ethtoolStatsKey{netnsID: "containerd://container-a", ifname: "net1"}]; !ok {
+		t.Fatalf("cache entries = %#v, want net1 keyed by the container ID", scraper.ethtoolStats.entries)
+	}
+	sample := findPodSample(snapshot, "rx_pause", MetricSourceEthtool, "workloads", "sriov-rdma-app")
+	if sample == nil || sample.Value != 7 || sample.Priority != "3" || sample.Device != "mlx5_7" || sample.Ifname != "net1" {
+		t.Fatalf("ethtool sample = %#v, want rx_pause priority 3 value 7 for mlx5_7/net1", sample)
+	}
+
+	// A new container that inherited the PID must not see the old container's counters.
+	fetcher.value = 9
+	snapshot = ScrapeSnapshot{}
+	scraper.collectPodEthtool(&snapshot, workload, "containerd://container-b", 4242, ifNameToDevice)
+	sample = findPodSample(snapshot, "rx_pause", MetricSourceEthtool, "workloads", "sriov-rdma-app")
+	if fetcher.callCount() != 2 || sample == nil || sample.Value != 9 {
+		t.Fatalf("fetch calls = %d, sample = %#v, want a fresh fetch for the new container", fetcher.callCount(), sample)
+	}
+}
+
 func TestContainerInitPID(t *testing.T) {
 	root := t.TempDir()
 	scraper := NewRuntimeScraper(fakeFabricNodeClient{}, discardLogger(), config.NodeTopologyDiscoveryConfig{})

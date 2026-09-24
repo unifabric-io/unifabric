@@ -146,7 +146,7 @@ auto-generated, existing, or disabled mTLS.
 | agent.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | Seccomp profile applied to agent pods. |
 | agent.ports.health | int | `8083` | Agent health probe container port. |
 | agent.ports.metrics | int | `8082` | Agent metrics container port. |
-| agent.resources.limits.cpu | string | `"500m"` | Agent CPU limit. |
+| agent.resources.limits.cpu | string | `"2"` | Agent CPU limit. Keep it generous: the agent issues one ethtool ioctl per RDMA interface (PFs and every SR-IOV VF) while holding the kernel rtnl lock, and CFS throttling mid-ioctl stalls other network operations on the node. |
 | agent.resources.limits.memory | string | `"512Mi"` | Agent memory limit. |
 | agent.resources.requests.cpu | string | `"100m"` | Agent CPU request. |
 | agent.resources.requests.memory | string | `"128Mi"` | Agent memory request. |

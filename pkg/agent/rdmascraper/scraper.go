@@ -12,10 +12,11 @@ import (
 )
 
 type RuntimeScraper struct {
-	fabricNode  fabricnode.Interface
-	logger      *slog.Logger
-	kindMatcher interfaceKindMatcher
-	paths       scraperPaths
+	fabricNode   fabricnode.Interface
+	logger       *slog.Logger
+	kindMatcher  interfaceKindMatcher
+	paths        scraperPaths
+	ethtoolStats *ethtoolStatsCache
 }
 
 type hostCollection struct {
@@ -28,10 +29,11 @@ func NewRuntimeScraper(fabricNode fabricnode.Interface, logger *slog.Logger, top
 		logger = slog.Default()
 	}
 	return &RuntimeScraper{
-		fabricNode:  fabricNode,
-		logger:      logger,
-		kindMatcher: buildInterfaceKindMatcher(topologyConfig),
-		paths:       defaultScraperPaths(),
+		fabricNode:   fabricNode,
+		logger:       logger,
+		kindMatcher:  buildInterfaceKindMatcher(topologyConfig),
+		paths:        defaultScraperPaths(),
+		ethtoolStats: newEthtoolStatsCache(ethtoolStatsTTL, readEthtoolStats),
 	}
 }
 
