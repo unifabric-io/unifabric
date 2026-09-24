@@ -13,9 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/safchain/ethtool"
-
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
 )
 
@@ -77,7 +74,7 @@ func (s *RuntimeScraper) collectNamespacedPod(snapshot *ScrapeSnapshot, pod v1be
 
 		ethtoolBefore := len(snapshot.Samples)
 		if len(ifNameToDevice) > 0 {
-			s.collectPodEthtool(snapshot, workload, pid, ifNameToDevice)
+			s.collectPodEthtool(snapshot, workload, containerID, pid, ifNameToDevice)
 		}
 		if len(snapshot.Samples) > sampleCountBefore || len(snapshot.Samples) > ethtoolBefore {
 			return
@@ -173,33 +170,34 @@ func (s *RuntimeScraper) collectPodDeviceTOS(snapshot *ScrapeSnapshot, workload 
 	snapshot.AddSample(s.podSample("rdma_device_tos", value, MetricSourceDevice, workload, device, ifname, parentIfname, "", ""))
 }
 
-func (s *RuntimeScraper) collectPodEthtool(snapshot *ScrapeSnapshot, workload WorkloadLabels, pid int, ifNameToDevice map[string]string) {
-	netnsPath := s.netNamespacePath(pid)
-	err := ns.WithNetNSPath(netnsPath, func(hostNS ns.NetNS) error {
-		et, err := ethtool.NewEthtool()
-		if err != nil {
-			return fmt.Errorf("init ethtool: %w", err)
-		}
-		defer et.Close()
+func (s *RuntimeScraper) collectPodEthtool(snapshot *ScrapeSnapshot, workload WorkloadLabels, containerID string, pid int, ifNameToDevice map[string]string) {
+	// The container ID, unlike the PID behind the path, is never reused.
+	netns := netnsRef{id: containerID, path: s.netNamespacePath(pid)}
+	ifnames := make([]string, 0, len(ifNameToDevice))
+	for ifname := range ifNameToDevice {
+		ifnames = append(ifnames, ifname)
+	}
 
-		for ifname, device := range ifNameToDevice {
-			stats, err := et.Stats(ifname)
-			if err != nil {
-				snapshot.AddWarning(scrapeWarning(MetricScopePod, device, ifname, "", netnsPath, "failed to read pod ethtool stats", err))
+	results, err := s.ethtoolStats.Stats(netns, ifnames)
+	if err != nil {
+		snapshot.AddWarning(scrapeWarning(MetricScopePod, "", "", "", netns.path, "failed to enter pod net namespace", err))
+	}
+	for ifname, device := range ifNameToDevice {
+		result, ok := results[ifname]
+		if !ok {
+			continue
+		}
+		if result.err != nil {
+			snapshot.AddWarning(scrapeWarning(MetricScopePod, device, ifname, "", netns.path, "failed to read pod ethtool stats", result.err))
+			continue
+		}
+		for statName, statValue := range result.stats {
+			name, priority, ok := extractPriorityMetric(statName)
+			if !ok {
 				continue
 			}
-			for statName, statValue := range stats {
-				name, priority, ok := extractPriorityMetric(statName)
-				if !ok {
-					continue
-				}
-				snapshot.AddSample(s.podSample(name, float64(statValue), MetricSourceEthtool, workload, device, ifname, ifname, "", strconv.Itoa(priority)))
-			}
+			snapshot.AddSample(s.podSample(name, float64(statValue), MetricSourceEthtool, workload, device, ifname, ifname, "", strconv.Itoa(priority)))
 		}
-		return nil
-	})
-	if err != nil {
-		snapshot.AddWarning(scrapeWarning(MetricScopePod, "", "", "", netnsPath, "failed to enter pod net namespace", err))
 	}
 }
 
