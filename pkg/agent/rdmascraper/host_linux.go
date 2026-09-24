@@ -12,9 +12,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/safchain/ethtool"
 )
 
 func (s *RuntimeScraper) collectHost(ctx context.Context, snapshot *ScrapeSnapshot) hostCollection {
@@ -73,6 +70,11 @@ func (s *RuntimeScraper) collectHostSysfs(snapshot *ScrapeSnapshot) (hostCollect
 		parentIfname := s.resolveParentIfname(ifname, pciToPfIfname)
 		if ifname != "" && parentIfname == ifname {
 			collection.rootIfnames = append(collection.rootIfnames, ifname)
+		}
+		// A VF whose netdev is still visible here is not attached to any pod: it carries
+		// no traffic, and pod VFs are scraped through the pod netns instead.
+		if ifname != "" && parentIfname != ifname {
+			continue
 		}
 
 		ports, err := s.readRDMAPorts(deviceName)
@@ -180,31 +182,27 @@ func (s *RuntimeScraper) collectHostEthtool(snapshot *ScrapeSnapshot, rootIfname
 		return
 	}
 
-	err := ns.WithNetNSPath(s.paths.hostNetNSPath, func(hostNS ns.NetNS) error {
-		et, err := ethtool.NewEthtool()
-		if err != nil {
-			return fmt.Errorf("init ethtool: %w", err)
-		}
-		defer et.Close()
-
-		for _, ifname := range rootIfnames {
-			stats, err := et.Stats(ifname)
-			if err != nil {
-				snapshot.AddWarning(scrapeWarning(MetricScopeHost, "", ifname, "", s.paths.hostNetNSPath, "failed to read ethtool stats", err))
-				continue
-			}
-			for statName, statValue := range stats {
-				name, priority, ok := extractPriorityMetric(statName)
-				if !ok {
-					continue
-				}
-				snapshot.AddSample(s.hostSample(name, float64(statValue), MetricSourceEthtool, "", ifname, ifname, "", strconv.Itoa(priority)))
-			}
-		}
-		return nil
-	})
+	netns := netnsRef{id: hostNetNSID, path: s.paths.hostNetNSPath}
+	results, err := s.ethtoolStats.Stats(netns, rootIfnames)
 	if err != nil {
 		snapshot.AddWarning(scrapeWarning(MetricScopeHost, "", "", "", s.paths.hostNetNSPath, "failed to enter host net namespace", err))
+	}
+	for _, ifname := range rootIfnames {
+		result, ok := results[ifname]
+		if !ok {
+			continue
+		}
+		if result.err != nil {
+			snapshot.AddWarning(scrapeWarning(MetricScopeHost, "", ifname, "", s.paths.hostNetNSPath, "failed to read ethtool stats", result.err))
+			continue
+		}
+		for statName, statValue := range result.stats {
+			name, priority, ok := extractPriorityMetric(statName)
+			if !ok {
+				continue
+			}
+			snapshot.AddSample(s.hostSample(name, float64(statValue), MetricSourceEthtool, "", ifname, ifname, "", strconv.Itoa(priority)))
+		}
 	}
 }
 
