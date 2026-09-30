@@ -26,6 +26,11 @@ Key features:
 - Read the RDMA observability usage guide in [docs/usage/rdma-metrics.md](./docs/usage/rdma-metrics.md).
 - Read the Kueue TAS workload example in [docs/usage/workload-tas.md](./docs/usage/workload-tas.md).
 
+## Origin
+
+Originally created by DaoCloud on 2026-04-19; see the public repository history at
+[unifabric-io/unifabric](https://github.com/unifabric-io/unifabric) for provenance.
+
 ## License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](./LICENSE).
