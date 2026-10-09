@@ -97,6 +97,13 @@ spec:
             - name: proc
               mountPath: /host/proc
               readOnly: true
+            {{- if .Values.agent.ebpfFlow.enabled }}
+            - name: bpffs
+              mountPath: {{ .Values.agent.ebpfFlow.bpffsPath }}
+              mountPropagation: HostToContainer
+            - name: ebpf-flow-state
+              mountPath: {{ .Values.agent.ebpfFlow.hostStateDir }}
+            {{- end }}
             {{- if .Values.agent.lldp.enabled }}
             - name: lldpd-state
               mountPath: /run/
@@ -155,6 +162,18 @@ spec:
           hostPath:
             path: /proc
             type: Directory
+        {{- if .Values.agent.ebpfFlow.enabled }}
+        # bpffs keeps the pinned maps across agent restarts, the state dir
+        # keeps learned provider callback offsets.
+        - name: bpffs
+          hostPath:
+            path: {{ .Values.agent.ebpfFlow.bpffsPath }}
+            type: DirectoryOrCreate
+        - name: ebpf-flow-state
+          hostPath:
+            path: {{ .Values.agent.ebpfFlow.hostStateDir }}
+            type: DirectoryOrCreate
+        {{- end }}
         {{- if .Values.agent.lldp.enabled }}
         - name: lldpd-state
           emptyDir: {}

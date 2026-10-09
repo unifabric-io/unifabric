@@ -67,6 +67,8 @@ attribute traffic to Pods, namespaces, and top-level workloads. Grafana dashboar
 diagnose RDMA traffic and health by cluster, Node, and workload.
 
 - [RDMA observability usage guide](./usage/rdma-metrics.md)
+- [eBPF RDMA flow attribution usage guide](./usage/rdma-flow.md): attribute RDMA sends to
+  Pod-to-Pod flows, publish `RDMAEndpoint`, and store per-send events.
 - [Topology visualization usage guide](./usage/topology-visualization.md)
 
 ## Development
@@ -76,12 +78,15 @@ diagnose RDMA traffic and health by cluster, Node, and workload.
 
 ## Design
 
-- [Unifabric API reference](./reference/README.md): Query `FabricNode`, `Switch`, and `Topology`.
+- [Unifabric API reference](./reference/README.md): Query `FabricNode`, `Switch`, `Topology`, and
+  `RDMAEndpoint`.
 - [Topology CRD design](./design/topology-crd.md): Understand performance domains, Node paths, and
   the topology data model.
 - [Scale-out topology discovery design](./design/scaleout-topology.md): Understand how Scale-out
   topologies are discovered and constructed.
 - [RDMA metric model and Pod attribution design](./design/rdma-metrics.md): Understand metric
   definitions and workload attribution.
+- [eBPF RDMA flow attribution design](./design/rdma-flow.md): Understand how `libibverbs`
+  uprobes, `RDMAEndpoint` and the send event pipeline attribute traffic between Pods.
 - [Topology visualization design](./design/topology-visualization.md): Understand the Topology
   HTTP API and the Grafana datasource/panel plugins that render it.

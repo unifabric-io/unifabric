@@ -98,7 +98,7 @@
               "refId": "A"
             }
           ],
-          "title": "Node Total (RDMA Capacity)",
+          "title": "节点总数（具备 RDMA）",
           "type": "stat"
         },
         {
@@ -161,7 +161,7 @@
               "refId": "A"
             }
           ],
-          "title": "Workload Total (RDMA Capacity)",
+          "title": "Workload 总数（具备 RDMA）",
           "type": "stat"
         },
         {
@@ -224,7 +224,7 @@
               "refId": "A"
             }
           ],
-          "title": "Pod Total (RDMA Capacity)",
+          "title": "Pod 总数（具备 RDMA）",
           "type": "stat"
         },
         {
@@ -307,12 +307,12 @@
               },
               "editorMode": "code",
               "expr": "sum(\n  rate(unifabric_port_rcv_data{cluster=~\"$cluster\",host_rdma!=\"true\"}[$__rate_interval])\n) * 8",
-              "legendFormat": "Read",
+              "legendFormat": "读取",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Cluster Read Throughput In Total",
+          "title": "集群读取总吞吐",
           "type": "timeseries"
         },
         {
@@ -395,12 +395,12 @@
               },
               "editorMode": "code",
               "expr": "sum(\n  rate(unifabric_port_xmit_data{cluster=~\"$cluster\",host_rdma!=\"true\"}[$__rate_interval])\n) * 8",
-              "legendFormat": "Write",
+              "legendFormat": "写入",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Cluster Write Throughput In Total",
+          "title": "集群写入总吞吐",
           "type": "timeseries"
         },
         {
@@ -488,7 +488,7 @@
               "refId": "A"
             }
           ],
-          "title": "Read Throughput by Node",
+          "title": "按节点的读取吞吐",
           "type": "timeseries"
         },
         {
@@ -576,7 +576,7 @@
               "refId": "A"
             }
           ],
-          "title": "Write Throughput by Node",
+          "title": "按节点的写入吞吐",
           "type": "timeseries"
         },
         {
@@ -667,7 +667,7 @@
               "refId": "A"
             }
           ],
-          "title": "Read Throughput Utilization by Node",
+          "title": "按节点的读取吞吐利用率",
           "type": "timeseries"
         },
         {
@@ -758,11 +758,11 @@
               "refId": "A"
             }
           ],
-          "title": "Write Throughput Utilization by Node",
+          "title": "按节点的写入吞吐利用率",
           "type": "timeseries"
         }
       ],
-      "title": "Summary",
+      "title": "概览",
       "type": "row"
     },
     {
@@ -861,7 +861,7 @@
               "refId": "A"
             }
           ],
-          "title": "Top 10 Read Throughput by Node",
+          "title": "读取吞吐 Top 10 节点",
           "type": "timeseries"
         },
         {
@@ -950,7 +950,7 @@
               "refId": "A"
             }
           ],
-          "title": "Top 10 Write Throughput by Node",
+          "title": "写入吞吐 Top 10 节点",
           "type": "timeseries"
         },
         {
@@ -1039,7 +1039,7 @@
               "refId": "A"
             }
           ],
-          "title": "Top 10 Read Throughput by Pod",
+          "title": "读取吞吐 Top 10 Pod",
           "type": "timeseries"
         },
         {
@@ -1128,7 +1128,7 @@
               "refId": "A"
             }
           ],
-          "title": "Top 10 Write Throughput by Pod",
+          "title": "写入吞吐 Top 10 Pod",
           "type": "timeseries"
         },
         {
@@ -1216,7 +1216,7 @@
               "refId": "A"
             }
           ],
-          "title": "Top 10 Read Throughput by Workload",
+          "title": "读取吞吐 Top 10 Workload",
           "type": "timeseries"
         },
         {
@@ -1304,11 +1304,11 @@
               "refId": "A"
             }
           ],
-          "title": "Top 10 Write Throughput by Workload",
+          "title": "写入吞吐 Top 10 Workload",
           "type": "timeseries"
         }
       ],
-      "title": "Hotspot",
+      "title": "热点",
       "type": "row"
     },
     {
@@ -1321,7 +1321,7 @@
       },
       "id": 26,
       "panels": [],
-      "title": "Node Status",
+      "title": "节点状态",
       "type": "row"
     },
     {
@@ -1329,7 +1329,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Source form ethtool",
+      "description": "来源为 ethtool",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1417,7 +1417,7 @@
           "refId": "A"
         }
       ],
-      "title": "Read Pause by by Node PF",
+      "title": "按节点 PF 的读取 Pause",
       "type": "timeseries"
     },
     {
@@ -1425,7 +1425,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Source form ethtool",
+      "description": "来源为 ethtool",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1513,7 +1513,7 @@
           "refId": "A"
         }
       ],
-      "title": "Write Pause by by Node PF",
+      "title": "按节点 PF 的写入 Pause",
       "type": "timeseries"
     },
     {
@@ -1521,7 +1521,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Source form ethtool",
+      "description": "来源为 ethtool",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1609,7 +1609,7 @@
           "refId": "A"
         }
       ],
-      "title": "Read Discards by Node PF",
+      "title": "按节点 PF 的读取丢弃",
       "type": "timeseries"
     },
     {
@@ -1617,7 +1617,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "The number of CNP packets sent by the Notification Point when it noticed congestion experienced in the RoCEv2 IP header (ECN bits).",
+      "description": "Notification Point 在 RoCEv2 IP 头（ECN 位）中察觉到拥塞后发送的 CNP 报文数。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1705,7 +1705,7 @@
           "refId": "A"
         }
       ],
-      "title": "CNP Packets Sent Rate by Node PF",
+      "title": "按节点 PF 的 CNP 发送速率",
       "type": "timeseries"
     },
     {
@@ -1797,7 +1797,7 @@
           "refId": "A"
         }
       ],
-      "title": "NP ECN Marked ROCE Packets by Node PF",
+      "title": "按节点 PF 的 NP ECN 标记 RoCE 报文",
       "type": "timeseries"
     },
     {
@@ -1893,7 +1893,7 @@
           "refId": "A"
         }
       ],
-      "title": "RP CNP Handled by Node PF",
+      "title": "按节点 PF 的 RP CNP 处理数",
       "type": "timeseries"
     },
     {
@@ -1985,7 +1985,7 @@
           "refId": "A"
         }
       ],
-      "title": "Out of Sequence by Node PF",
+      "title": "按节点 PF 的乱序报文",
       "type": "timeseries"
     },
     {
@@ -2077,7 +2077,7 @@
           "refId": "A"
         }
       ],
-      "title": "RP CNP Ignored by Node PF",
+      "title": "按节点 PF 的 RP CNP 忽略数",
       "type": "timeseries"
     },
     {
@@ -2090,7 +2090,7 @@
       },
       "id": 39,
       "panels": [],
-      "title": "Pod Status",
+      "title": "Pod 状态",
       "type": "row"
     },
     {
@@ -2182,7 +2182,7 @@
           "refId": "A"
         }
       ],
-      "title": "Out of Sequence  by Pods (Top 10)",
+      "title": "按 Pod 的乱序报文（Top 10）",
       "type": "timeseries"
     },
     {
@@ -2274,14 +2274,19 @@
           "refId": "A"
         }
       ],
-      "title": "Read Discards by Pods (Top 10)",
+      "title": "按 Pod 的读取丢弃（Top 10）",
       "type": "timeseries"
     }
   ],
-  "refresh": false,
+  "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "unifabric",
+    "rdma",
+    "cluster",
+    "overview"
+  ],
   "templating": {
     "list": [
       {
@@ -2292,7 +2297,7 @@
         },
         "hide": 2,
         "includeAll": false,
-        "label": "Data source",
+        "label": "数据源",
         "multi": false,
         "name": "datasource",
         "options": [],
@@ -2316,7 +2321,7 @@
         "definition": "label_values(global_cluster_info, cluster_name)",
         "hide": 0,
         "includeAll": false,
-        "label": "Cluster",
+        "label": "集群",
         "multi": false,
         "name": "cluster_name",
         "options": [],
@@ -2365,8 +2370,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Unifabric RDMA Cluster",
-  "uid": "unifabric-rdma-cluster",
+  "title": "Unifabric RDMA 集群",
+  "uid": "unifabric-rdma-cluster-zh",
   "version": 4,
   "weekStart": ""
 }

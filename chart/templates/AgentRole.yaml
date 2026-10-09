@@ -43,27 +43,6 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - kubeflow.org
-  resources:
-  - mpijobs
-  - pytorchjobs
-  - tfjobs
-  - xgboostjobs
-  verbs:
-  - get
-- apiGroups:
-  - ray.io
-  resources:
-  - rayjobs
-  verbs:
-  - get
-- apiGroups:
-  - sparkoperator.k8s.io
-  resources:
-  - sparkapplications
-  verbs:
-  - get
-- apiGroups:
   - unifabric.io
   resources:
   - fabricnodes
@@ -83,3 +62,20 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - unifabric.io
+  resources:
+  - rdmaendpoints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - unifabric.io
+  resources:
+  - rdmaendpoints/status
+  verbs:
+  - patch
