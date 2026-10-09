@@ -2,14 +2,16 @@
 
 中文版：[README.zh.md](./README.zh.md)
 
-Unifabric provides three cluster-scoped custom resources in
-`unifabric.io/v1beta1`. Each CRD has a dedicated API reference:
+Unifabric provides three cluster-scoped custom resources and one namespaced
+custom resource in `unifabric.io/v1beta1`. Each CRD has a dedicated API
+reference:
 
 | Kind | Resource | Short name | Description |
 | --- | --- | --- | --- |
 | [`FabricNode`](./fabricnode.md) | `fabricnodes` | `fn` | RDMA NIC, LLDP neighbor, and RDMA Pod state reported by the node Agent |
 | [`Switch`](./switch.md) | `switches` | `sw` | Switch declaration, switch-agent connectivity, and switch LLDP state |
 | [`Topology`](./topology.md) | `topologies` | `topo` | Read-only aggregate for scale-out, scale-up, and storage topology |
+| [`RDMAEndpoint`](./rdmaendpoint.md) | `rdmaendpoints` | `rep` | RDMA devices, addresses, and queue pairs of one Pod, published by the Agent when `agent.ebpfFlow` is enabled |
 
 List the APIs installed in the cluster:
 
@@ -18,6 +20,7 @@ kubectl api-resources --api-group=unifabric.io
 kubectl get fn
 kubectl get sw
 kubectl get topo
+kubectl get rep -A
 ```
 
 `spec` represents desired state declared by a user or component. `status`

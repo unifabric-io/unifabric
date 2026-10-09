@@ -125,7 +125,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (device,ifname) (\n    rate(unifabric_port_rcv_data{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])\n) * 8",
+          "expr": "sum by (device,ifname) (\n    rate(unifabric_port_rcv_data{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])\n) * 8",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -221,7 +221,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (device,ifname) (\n    rate(unifabric_port_xmit_data{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])\n) * 8",
+          "expr": "sum by (device,ifname) (\n    rate(unifabric_port_xmit_data{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])\n) * 8",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -348,7 +348,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "irate(unifabric_port_rcv_data{pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])\n/\n(unifabric_port_speed_mbps{cluster=~\"$cluster\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\"} * 1000000 / 8) * 100",
+          "expr": "sum by (device, ifname, pod_namespace, pod_name) (\n  irate(unifabric_port_rcv_data{pod_namespace=~\"$namespace\", pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)\n/\nsum by (device, ifname, pod_namespace, pod_name) (\n  unifabric_port_speed_mbps{pod_namespace=~\"$namespace\", pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"} * 1000000 / 8\n) * 100",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -475,7 +475,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "irate(unifabric_port_speed_mbps{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])\n/\n(unifabric_port_speed_mbps{cluster=~\"$cluster\", pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\"} * 1000000 / 8) * 100",
+          "expr": "sum by (device, ifname, pod_namespace, pod_name) (\n  irate(unifabric_port_xmit_data{pod_namespace=~\"$namespace\", pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)\n/\nsum by (device, ifname, pod_namespace, pod_name) (\n  unifabric_port_speed_mbps{pod_namespace=~\"$namespace\", pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"} * 1000000 / 8\n) * 100",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -571,7 +571,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(unifabric_unicast_rcv_packets{pod_name!=\"\", pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+          "expr": "rate(unifabric_unicast_rcv_packets{pod_name!=\"\", pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -667,7 +667,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(unifabric_unicast_xmit_packets{pod_name!=\"\", pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+          "expr": "rate(unifabric_unicast_xmit_packets{pod_name!=\"\", pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -762,7 +762,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(unifabric_multicast_rcv_packets{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+          "expr": "rate(unifabric_multicast_rcv_packets{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -857,7 +857,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "irate(unifabric_multicast_xmit_packets{pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+          "expr": "irate(unifabric_multicast_xmit_packets{pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -961,7 +961,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_rx_write_requests{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_rx_write_requests{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1054,7 +1054,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_rx_read_requests{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_rx_read_requests{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1147,7 +1147,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_rx_atomic_requests{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_rx_atomic_requests{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1240,7 +1240,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_rx_dct_connect{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_rx_dct_connect{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1333,7 +1333,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_out_of_buffer{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_out_of_buffer{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1426,7 +1426,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_out_of_sequence{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_out_of_sequence{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1519,7 +1519,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "irate(unifabric_duplicate_request{pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "irate(unifabric_duplicate_request{pod_namespace!=\"\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1612,7 +1612,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_rnr_nak_retry_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_rnr_nak_retry_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1705,7 +1705,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_packet_seq_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_packet_seq_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1798,7 +1798,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_implied_nak_seq_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_implied_nak_seq_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1891,7 +1891,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_local_ack_timeout_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_local_ack_timeout_err{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1904,7 +1904,7 @@
           "type": "timeseries"
         }
       ],
-      "title": "Basic",
+      "title": "RDMA basic statistics",
       "type": "row"
     },
     {
@@ -1998,7 +1998,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_resp_local_length_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_resp_local_length_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2091,7 +2091,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_resp_cqe_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_resp_cqe_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2184,7 +2184,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_req_cqe_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_req_cqe_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2277,7 +2277,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_req_remote_invalid_request{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_req_remote_invalid_request{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2370,7 +2370,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_req_remote_access_errors{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_req_remote_access_errors{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2463,7 +2463,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_resp_remote_access_errors{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_resp_remote_access_errors{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2556,7 +2556,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_resp_cqe_flush_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_resp_cqe_flush_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2649,7 +2649,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "rate(unifabric_req_cqe_flush_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"$cluster\"}[$__rate_interval])",
+              "expr": "rate(unifabric_req_cqe_flush_error{pod_name!=\"\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\",cluster=~\"${cluster:raw}\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2662,14 +2662,1151 @@
           "type": "timeseries"
         }
       ],
-      "title": "Detail",
+      "title": "RDMA error statistics",
       "type": "row"
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "RDMA send details (CPU initiated)",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "panels": [
+        {
+          "id": 202,
+          "type": "stat",
+          "title": "Cumulative sends",
+          "description": "Total submissions in the time range, the sum of count in aggregation mode.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 28
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(increase(rdma_flow_sends_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range]))",
+              "format": "time_series",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "none",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 203,
+          "type": "stat",
+          "title": "Cumulative bytes sent",
+          "description": "Total payload bytes in the time range, bytes times count.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 28
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(increase(rdma_flow_bytes_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range]))",
+              "format": "time_series",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "none",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 204,
+          "type": "stat",
+          "title": "Active QPs",
+          "description": "Current active QPs attributed to the selected source Pod.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 28
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(rdma_flow_qps{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"})",
+              "format": "time_series",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "none",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 205,
+          "type": "stat",
+          "title": "Peer Pods in time range",
+          "description": "Distinct peer Pods receiving sends from this Pod during the selected time range.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 28
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "count(sum by (dst_pod_namespace, dst_pod_name) (increase(rdma_flow_sends_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range])) > 0)",
+              "format": "time_series",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "none",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 218,
+          "type": "timeseries",
+          "title": "Cumulative bytes from source Pod to destination Pods",
+          "description": "Cumulative bytes sent from the selected source Pod to each destination Pod. The legend includes destination WorkloadKind, WorkloadNS, PodNS, and PodName.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 32
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum by (src_pod_namespace, src_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_namespace, dst_pod_name) (rdma_flow_bytes_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"})",
+              "format": "time_series",
+              "instant": false,
+              "interval": "",
+              "legendFormat": "{{dst_pod_top_owner_kind}} · {{dst_pod_top_owner_namespace}} · {{dst_pod_namespace}}/{{dst_pod_name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "mode": "none"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 219,
+          "type": "table",
+          "title": "NIC cumulative transmit",
+          "description": "Cumulative bytes transmitted by each RDMA NIC counter for this Pod during the selected time range, for comparison with eBPF payload bytes.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 40
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "refId": "A",
+              "expr": "sum by (device, ifname) (increase(unifabric_port_xmit_data{cluster=~\"${cluster:raw}\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\"}[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "device": "NIC device",
+                  "ifname": "Interface",
+                  "Value": "Cumulative transmit bytes"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cumulative transmit bytes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "Cumulative transmit bytes",
+                "desc": true
+              }
+            ],
+            "footer": {
+              "show": false
+            }
+          }
+        },
+        {
+          "id": 220,
+          "type": "table",
+          "title": "NIC cumulative receive",
+          "description": "Cumulative bytes received by each RDMA NIC counter for this Pod during the selected time range, for context alongside the eBPF send-side data.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 40
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "refId": "A",
+              "expr": "sum by (device, ifname) (increase(unifabric_port_rcv_data{cluster=~\"${cluster:raw}\", pod_namespace=~\"$namespace\", pod_name=~\"$pod\"}[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "device": "NIC device",
+                  "ifname": "Interface",
+                  "Value": "Cumulative receive bytes"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cumulative receive bytes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "Cumulative receive bytes",
+                "desc": true
+              }
+            ],
+            "footer": {
+              "show": false
+            }
+          }
+        },
+        {
+          "id": 211,
+          "type": "table",
+          "title": "Top 20 most common message sizes",
+          "description": "Exact bytes values ordered by sends. LLM communication repeats a few message sizes, this shows which sizes are used and their share.",
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "unifabric-elasticsearch"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 48
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "unifabric-elasticsearch"
+              },
+              "query": "src_pod_namespace:/${namespace:regex}/ AND src_pod_name:/${pod:regex}/",
+              "timeField": "@timestamp",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "sum",
+                  "field": "count"
+                }
+              ],
+              "bucketAggs": [
+                {
+                  "id": "3",
+                  "type": "terms",
+                  "field": "bytes",
+                  "settings": {
+                    "order": "desc",
+                    "orderBy": "1",
+                    "size": "20",
+                    "min_doc_count": "1"
+                  }
+                }
+              ]
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "bytes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sum"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Sends"
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "gauge",
+                      "mode": "basic"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "sortBy": [
+              {
+                "displayName": "Sends",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": 212,
+          "type": "table",
+          "title": "Cumulative sends and size percentiles by source and destination Pod",
+          "description": "Prometheus-based cumulative sends, bytes, and message-size P50/P90/P99 for each source/destination Pod pair in the selected time range.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 56
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum by (src_pod_namespace, src_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_namespace, dst_pod_name) (increase(rdma_flow_sends_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum by (src_pod_namespace, src_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_namespace, dst_pod_name) (increase(rdma_flow_bytes_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "histogram_quantile(0.50, sum by (le, src_pod_namespace, src_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_namespace, dst_pod_name) (increase(rdma_flow_send_bytes_bucket{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range])))",
+              "format": "table",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "histogram_quantile(0.90, sum by (le, src_pod_namespace, src_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_namespace, dst_pod_name) (increase(rdma_flow_send_bytes_bucket{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range])))",
+              "format": "table",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "D"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "histogram_quantile(0.99, sum by (le, src_pod_namespace, src_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_namespace, dst_pod_name) (increase(rdma_flow_send_bytes_bucket{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range])))",
+              "format": "table",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "E"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cumulative sends"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "^(Cumulative bytes|P50 message size|P90 message size|P99 message size)$"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "sortBy": [
+              {
+                "displayName": "Cumulative bytes",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "indexByName": {
+                  "src_pod_namespace": 0,
+                  "src_pod_name": 1,
+                  "dst_pod_top_owner_kind": 2,
+                  "dst_pod_top_owner_namespace": 3,
+                  "dst_pod_namespace": 4,
+                  "dst_pod_name": 5,
+                  "Value #A": 6,
+                  "Value #B": 7,
+                  "Value #C": 8,
+                  "Value #D": 9,
+                  "Value #E": 10
+                },
+                "renameByName": {
+                  "src_pod_namespace": "Source PodNS",
+                  "src_pod_name": "Source Pod",
+                  "dst_pod_top_owner_kind": "Destination WorkloadKind",
+                  "dst_pod_top_owner_namespace": "Destination WorkloadNS",
+                  "dst_pod_namespace": "Destination PodNS",
+                  "dst_pod_name": "Destination PodName",
+                  "Value #A": "Cumulative sends",
+                  "Value #B": "Cumulative bytes",
+                  "Value #C": "P50 message size",
+                  "Value #D": "P90 message size",
+                  "Value #E": "P99 message size"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 215,
+          "type": "table",
+          "title": "Processes and QPs per source Pod",
+          "description": "Sends, bytes and QP count per tgid of each source Pod, showing the spread across processes or ranks.",
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "unifabric-elasticsearch"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 64
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "unifabric-elasticsearch"
+              },
+              "query": "src_pod_namespace:/${namespace:regex}/ AND src_pod_name:/${pod:regex}/",
+              "timeField": "@timestamp",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "sum",
+                  "field": "count"
+                },
+                {
+                  "id": "4",
+                  "type": "sum",
+                  "field": "bytes",
+                  "settings": {
+                    "script": "_value * doc['count'].value"
+                  }
+                },
+                {
+                  "id": "5",
+                  "type": "cardinality",
+                  "field": "qpn"
+                }
+              ],
+              "bucketAggs": [
+                {
+                  "id": "2",
+                  "type": "terms",
+                  "field": "src_pod_name",
+                  "settings": {
+                    "order": "desc",
+                    "orderBy": "1",
+                    "size": "50",
+                    "min_doc_count": "1"
+                  }
+                },
+                {
+                  "id": "3",
+                  "type": "terms",
+                  "field": "tgid",
+                  "settings": {
+                    "order": "desc",
+                    "orderBy": "1",
+                    "size": "50",
+                    "min_doc_count": "1"
+                  }
+                }
+              ]
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sum bytes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Unique Count"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "QPs"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "tgid"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "sortBy": [
+              {
+                "displayName": "Sum count",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": 216,
+          "type": "table",
+          "title": "Cumulative traffic by device pair",
+          "description": "Prometheus-based cumulative sends and bytes for each source/destination RDMA device pair in the selected time range.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 64
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum by (src_device, dst_device) (increase(rdma_flow_sends_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum by (src_device, dst_device) (increase(rdma_flow_bytes_total{cluster=~\"${cluster:raw}\", src_pod_namespace=~\"$namespace\", src_pod_name=~\"$pod\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "interval": "",
+              "legendFormat": "",
+              "range": false,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cumulative sends"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cumulative bytes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "sortBy": [
+              {
+                "displayName": "Cumulative bytes",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "indexByName": {
+                  "src_device": 0,
+                  "dst_device": 1,
+                  "Value #A": 2,
+                  "Value #B": 3
+                },
+                "renameByName": {
+                  "src_device": "Source device",
+                  "dst_device": "Destination device",
+                  "Value #A": "Cumulative sends",
+                  "Value #B": "Cumulative bytes"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 217,
+          "type": "table",
+          "title": "Latest send records",
+          "description": "Latest 500 raw documents in reverse time order, returned directly by the ES query.",
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "unifabric-elasticsearch"
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 24,
+            "x": 0,
+            "y": 72
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "unifabric-elasticsearch"
+              },
+              "query": "src_pod_namespace:/${namespace:regex}/ AND src_pod_name:/${pod:regex}/",
+              "timeField": "@timestamp",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "raw_data",
+                  "settings": {
+                    "size": "500"
+                  }
+                }
+              ],
+              "bucketAggs": []
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "bytes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "qpn"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "tgid"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "_id": true,
+                  "_index": true,
+                  "_type": true,
+                  "sort": true,
+                  "highlight": true,
+                  "message": true,
+                  "event.action": true,
+                  "log.level": true,
+                  "agent.name": true,
+                  "service.name": true,
+                  "kubernetes.node.name": true,
+                  "src_pod_top_owner_kind": true,
+                  "src_pod_top_owner_namespace": true,
+                  "src_pod_top_owner_name": true,
+                  "dst_pod_top_owner_kind": true,
+                  "dst_pod_top_owner_namespace": true,
+                  "dst_pod_top_owner_name": true
+                },
+                "indexByName": {
+                  "@timestamp": 0,
+                  "node": 1,
+                  "src_pod_namespace": 2,
+                  "src_pod_name": 3,
+                  "dst_pod_namespace": 4,
+                  "dst_pod_name": 5,
+                  "qpn": 6,
+                  "tgid": 7,
+                  "kind": 8,
+                  "bytes": 9,
+                  "wrs": 10,
+                  "count": 11,
+                  "src_device": 12,
+                  "dst_device": 13
+                }
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
-  "refresh": "5s",
+  "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "unifabric",
+    "rdma",
+    "pod",
+    "flow",
+    "metrics"
+  ],
   "templating": {
     "list": [
       {
@@ -2691,17 +3828,12 @@
         "type": "datasource"
       },
       {
-        "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
-          "value": ""
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(global_cluster_info, cluster_name)",
+        "definition": "query_result(count by (cluster_name) (global_cluster_info) or label_replace(vector(1) unless on() global_cluster_info, \"cluster_name\", \"Local\", \"\", \"\"))",
         "hide": 0,
         "includeAll": false,
         "label": "Cluster",
@@ -2709,38 +3841,33 @@
         "name": "cluster_name",
         "options": [],
         "query": {
-          "query": "label_values(global_cluster_info, cluster_name)",
+          "query": "query_result(count by (cluster_name) (global_cluster_info) or label_replace(vector(1) unless on() global_cluster_info, \"cluster_name\", \"Local\", \"\", \"\"))",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
-        "regex": "",
+        "regex": "/cluster_name=\"([^\"]+)\"/",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
       },
       {
-        "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
-          "value": ""
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(global_cluster_info{cluster_name=\"$cluster_name\"}, cluster)",
+        "definition": "query_result(count by (cluster) (global_cluster_info{cluster_name=\"$cluster_name\"}) or label_replace(vector(1) unless on() global_cluster_info, \"cluster\", \"^$\", \"\", \"\"))",
         "hide": 2,
         "includeAll": false,
         "multi": false,
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(global_cluster_info{cluster_name=\"$cluster_name\"}, cluster)",
+          "query": "query_result(count by (cluster) (global_cluster_info{cluster_name=\"$cluster_name\"}) or label_replace(vector(1) unless on() global_cluster_info, \"cluster\", \"^$\", \"\", \"\"))",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
-        "regex": "",
+        "regex": "/cluster=\"([^\"]+)\"/",
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
@@ -2756,14 +3883,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(unifabric_port_xmit_data{cluster=~\"$cluster\"}, pod_namespace)",
+        "definition": "label_values(unifabric_port_xmit_data{scope=\"pod\", cluster=~\"${cluster:raw}\", pod_namespace!=\"\"}, pod_namespace)",
         "hide": 0,
         "includeAll": true,
         "multi": false,
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(unifabric_port_xmit_data{cluster=~\"$cluster\"}, pod_namespace)",
+          "query": "label_values(unifabric_port_xmit_data{scope=\"pod\", cluster=~\"${cluster:raw}\", pod_namespace!=\"\"}, pod_namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -2783,7 +3910,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(unifabric_port_xmit_data{pod_namespace=~\"$namespace\",cluster=~\"$cluster\"}, pod_name)",
+        "definition": "label_values(unifabric_port_xmit_data{scope=\"pod\", cluster=~\"${cluster:raw}\", pod_namespace=~\"$namespace\", pod_name!=\"\"}, pod_name)",
         "hide": 0,
         "includeAll": false,
         "label": "pod",
@@ -2791,7 +3918,7 @@
         "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(unifabric_port_xmit_data{pod_namespace=~\"$namespace\",cluster=~\"$cluster\"}, pod_name)",
+          "query": "label_values(unifabric_port_xmit_data{scope=\"pod\", cluster=~\"${cluster:raw}\", pod_namespace=~\"$namespace\", pod_name!=\"\"}, pod_name)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,

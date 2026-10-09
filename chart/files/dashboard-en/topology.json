@@ -287,9 +287,13 @@
       "type": "table"
     }
   ],
-  "refresh": false,
+  "refresh": "10s",
   "schemaVersion": 39,
-  "tags": [],
+  "tags": [
+    "unifabric",
+    "topology",
+    "network"
+  ],
   "templating": {
     "list": [
       {
