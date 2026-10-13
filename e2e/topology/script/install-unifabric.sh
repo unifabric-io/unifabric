@@ -32,6 +32,7 @@ Required image inputs:
 Optional environment variables:
   CHART_PATH                    Helm chart path. Default: chart
   SWITCH_MTLS_MODE              switchSubscription.mtls.mode. Default: auto
+  LOAD_IMAGES_FROM_ARTIFACTS     Use preloaded images without pulling. Default: false
 
 Kubeconfig:
   This script does not accept KUBECONFIG_PATH.
@@ -128,6 +129,13 @@ HELM_ARGS=(
   --set-string switchSubscription.mtls.mode="${SWITCH_MTLS_MODE}"
 
 )
+
+if [[ "${LOAD_IMAGES_FROM_ARTIFACTS:-false}" == "true" ]]; then
+  HELM_ARGS+=(
+    --set-string controller.image.pullPolicy=Never
+    --set-string agent.image.pullPolicy=Never
+  )
+fi
 
 printf '%q' helm
 printf ' %q' "${HELM_ARGS[@]}"

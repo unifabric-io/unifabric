@@ -28,6 +28,11 @@ on:
         required: false
         default: latest
         type: string
+      load_images_from_artifacts:
+        description: Load PR image artifacts onto the runner and remote nodes
+        required: false
+        default: false
+        type: boolean
       chart_path:
         description: Helm chart path
         required: false
@@ -64,6 +69,10 @@ on:
       image_tag:
         required: true
         type: string
+      load_images_from_artifacts:
+        required: false
+        default: false
+        type: boolean
       chart_path:
         required: false
         default: chart
@@ -103,6 +112,7 @@ jobs:
       IMAGE_TAG_INPUT: ${{ inputs.image_tag }}
       CHART_PATH: ${{ inputs.chart_path }}
       E2E_WAIT_TIMEOUT_MINUTES: ${{ inputs.e2e_wait_timeout_minutes }}
+      LOAD_IMAGES_FROM_ARTIFACTS: ${{ inputs.load_images_from_artifacts }}
 
     steps:
       - name: Checkout code
@@ -143,6 +153,7 @@ jobs:
           IMAGE_TAG="${IMAGE_TAG_INPUT:-latest}"
           KUBECONFIG_PATH="${RUNNER_TEMP}/kubeconfig-${SIMULATION_NAME}-external.yaml"
 
+          echo "IMAGE_ARTIFACT_DIR=${RUNNER_TEMP}/images" >> "${GITHUB_ENV}"
           echo "image_namespace=${IMAGE_NAMESPACE}" >> "${GITHUB_OUTPUT}"
           echo "image_tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "kubeconfig_path=${KUBECONFIG_PATH}" >> "${GITHUB_OUTPUT}"
@@ -189,6 +200,24 @@ jobs:
             exit 1
           fi
           echo "KUBECONFIG=${KUBECONFIG_FORWARD_OUT}" >> "${GITHUB_ENV}"
+
+      - name: Download Docker images
+        if: inputs.load_images_from_artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: image-*
+          merge-multiple: true
+          path: ${{ env.IMAGE_ARTIFACT_DIR }}
+
+      - name: Load Docker images on runner and remote nodes
+        if: inputs.load_images_from_artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image_tar in "${IMAGE_ARTIFACT_DIR}"/*.tar; do
+            docker load -i "${image_tar}"
+          done
+          bash e2e/topology/setup.sh step-load-images
 
       - name: Step 2 - Setup RDMA RXE
         shell: bash

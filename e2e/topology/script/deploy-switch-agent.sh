@@ -34,6 +34,7 @@ Optional environment variables:
   SWITCH_SUDO_PASSWORD          Switch sudo password for Cumulus VX images.
   SWITCH_RESOURCES_FILE         Switch CR manifest to apply after deployment.
                                 Default: e2e/topology/script/switch-resources.yaml
+  LOAD_IMAGES_FROM_ARTIFACTS     Use preloaded images without pulling. Default: false
 
 If SWITCH_NAMES is empty, the script uses its built-in default switch list for
 the e2e topology.
@@ -102,6 +103,12 @@ if (( ${#TARGET_SWITCHES[@]} == 0 )); then
 fi
 
 SIM_ARGS=(-s "${SIMULATION_NAME}")
+IMAGE_COMMAND=pull
+IMAGE_PULL_OPTION=""
+if [[ "${LOAD_IMAGES_FROM_ARTIFACTS:-false}" == "true" ]]; then
+  IMAGE_COMMAND="image inspect"
+  IMAGE_PULL_OPTION="--pull=never"
+fi
 
 log "Target switches: ${TARGET_SWITCHES[*]}"
 
@@ -179,7 +186,7 @@ switch_sudo mkdir -p /opt/unifabric-switch-agent/mtls"
   nvair exec "${switch_name}" "${SIM_ARGS[@]}" -- bash -c "set -euo pipefail
 $(switch_sudo_function)
 
-switch_sudo docker pull '$(printf '%q' "${SWITCH_AGENT_IMAGE}")'
+switch_sudo docker ${IMAGE_COMMAND} '$(printf '%q' "${SWITCH_AGENT_IMAGE}")'
 
 switch_sudo docker rm -f unifabric-switch-agent >/dev/null 2>&1 || true
 
@@ -190,6 +197,7 @@ fi
 
 set +e
 container_output=\$(switch_sudo docker run -d \
+  ${IMAGE_PULL_OPTION} \
   --name unifabric-switch-agent \
   --restart unless-stopped \
   --network host \

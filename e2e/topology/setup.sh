@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
-  bash e2e/topology/setup.sh [all|step1-install-topology|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric] [args...]
+  bash e2e/topology/setup.sh [all|step1-install-topology|step-load-images|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric] [args...]
 
 Examples:
   CONTROLLER_REGISTRY=ghcr.io CONTROLLER_REPOSITORY=unifabric-io/unifabric-controller CONTROLLER_TAG=YOU_TAG \
@@ -17,6 +17,8 @@ Examples:
   SWITCH_AGENT_IMAGE=ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG \
     bash e2e/topology/setup.sh all --delete-if-exists
   bash e2e/topology/setup.sh step1-install-topology --delete-if-exists --bootstrap-node node-gpu-1
+  IMAGE_ARTIFACT_DIR=/tmp/images bash e2e/topology/setup.sh step-load-images
+  # Run after step1 and before step4; use LOAD_IMAGES_FROM_ARTIFACTS=true for offline deployment.
   bash e2e/topology/setup.sh step2-setup-rdma-rxe node-gpu-1,node-gpu-2,node-gpu-3,node-gpu-4
   bash e2e/topology/setup.sh step2-setup-rdma-rxe --simulation my-simulation
   SIMULATION_NAME=my-simulation bash e2e/topology/setup.sh step3-install-monitoring-operators
@@ -89,6 +91,9 @@ case "${stage}" in
     ;;
   step1-install-topology)
     run_step install-topology.sh "$@"
+    ;;
+  step-load-images)
+    run_step load-images.sh "$@"
     ;;
   step2-setup-rdma-rxe)
     run_step setup-rdma-rxe.sh "$@"
