@@ -2,35 +2,60 @@
 
 中文版：[fabricnode.zh.md](./fabricnode.zh.md)
 
-A `FabricNode` records RDMA NICs, LLDP neighbors, and RDMA Pods observed on a
-Kubernetes Node. The node Agent creates and updates this resource. Users
-normally read it and should not maintain its `status` manually.
+## Overview
 
-## Example
+A `FabricNode` records the RDMA NICs, LLDP neighbors, and RDMA Pods observed on one
+Kubernetes Node. The Agent creates and updates it, and users read it. For its role in
+topology discovery, see the [architecture overview](../concepts/architecture.md).
 
-The Agent generates the following object:
+## Resource Information
+
+| Item | Value |
+| --- | --- |
+| API group | `unifabric.io` |
+| API version | `v1beta1` |
+| Kind | `FabricNode` |
+| Scope | Cluster |
+| Plural | `fabricnodes` |
+| Singular | `fabricnode` |
+| Short name | `fn` |
+| Status subresource | Yes |
+| Printer columns | `TotalNics`, `Ready`, `Role`, `NodeIP`, `Topologies` |
+
+## Example YAML
+
+The Agent generates objects like this one. Users do not write the `status`.
 
 ```yaml
 apiVersion: unifabric.io/v1beta1
 kind: FabricNode
 metadata:
+  # The name matches the Kubernetes Node name. The Node owns this
+  # resource, so deleting the Node also removes the FabricNode.
   name: node1
+# spec has no fields in v1beta1.
 spec: {}
 status:
   conditions:
+    # Ready summarizes all other conditions.
     - lastTransitionTime: "2026-07-24T01:00:00Z"
       message: All FabricNode conditions are ready
       reason: Ready
       status: "True"
       type: Ready
+    # LLDPNeighborsReady reports whether every selected RDMA
+    # interface has a valid LLDP neighbor.
     - lastTransitionTime: "2026-07-24T01:00:00Z"
-      message: LLDP neighbors are ready
+      message: All selected RDMA interfaces have LLDP neighbors
       reason: LLDPNeighborsReady
       status: "True"
       type: LLDPNeighborsReady
+  # Node IP and role as reported by the Agent.
   nodeIP: 10.0.0.11
   nodeRole: GPU
-  totalNics: 1
+  # Count of RDMA NICs classified into the scale-out or storage network.
+  totalNics: 2
+  # RDMA NICs in the scale-out network.
   scaleOutNics:
     - name: eth1
       rdmaDeviceName: mlx5_0
@@ -44,114 +69,138 @@ status:
         mac: 00:11:22:33:44:55
         port: Ethernet1
         description: leaf switch
+  # RDMA NICs in the storage network.
+  storageNics:
+    - name: eth5
+      rdmaDeviceName: mlx5_4
+      rdma: true
+      ipv4: 192.168.5.11/24
+      ipv6: ""
+      state: up
+      lldpNeighbor:
+        hostname: storagesw
+        mgmtIP: 10.0.5.1
+        mac: 00:11:22:33:44:66
+        port: Ethernet8
+        description: storage switch
+  # Pods on this Node that use RDMA devices.
+  rdmaPods:
+    - namespace: training
+      name: llm-job-worker-0
+      containerList:
+        - containerd://3f9c2b
+      hostRDMA: false
+      topOwner:
+        apiVersion: batch/v1
+        kind: Job
+        namespace: training
+        name: llm-job
+  # Fixed Topology names whose domain labels this Node currently carries.
+  topologies:
+    - scaleout
+    - storage
 ```
 
-## Resource information
+## Field Definitions
 
-| Field | Value |
-| --- | --- |
-| API group | `unifabric.io` |
-| API version | `v1beta1` |
-| Kind | `FabricNode` |
-| Scope | Cluster |
-| Resource | `fabricnodes` |
-| Singular name | `fabricnode` |
-| Short name | `fn` |
-| Status subresource | Yes |
+### Metadata
 
-The resource name matches its Kubernetes Node name, and that Node is its owner.
-The corresponding `FabricNode` is cleaned up after the Node is deleted.
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `metadata.name` | string | Yes | none | Matches the Kubernetes Node name. The Node is the owner, so the `FabricNode` is removed after the Node is deleted. |
 
-## FabricNode fields
+The resource defines no required labels or annotations.
 
-| Field | Type | Description |
+### Spec
+
+`FabricNodeSpec` has no fields in `v1beta1`. Write `spec: {}`.
+
+### Status
+
+The Agent maintains `status`. Do not edit it manually.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `conditions` | `[]metav1.Condition` | No | none | Current conditions, unique by `type`. See [Conditions](#conditions). |
+| `totalNics` | integer | Yes | none | Total RDMA NICs classified into the scale-out or storage network. |
+| `rdmaPods` | `[]RdmaPod` | No | none | RDMA Pods currently running on the Node. See [RdmaPod](#rdmapod). |
+| `scaleOutNics` | `[]NicInfo` | No | none | RDMA NICs in the scale-out network. See [NicInfo](#nicinfo). |
+| `storageNics` | `[]NicInfo` | No | none | RDMA NICs in the storage network. See [NicInfo](#nicinfo). |
+| `nodeRole` | string | No | none | Node role reported by the Agent. Allowed values are `GPU` and `Storage`. |
+| `nodeIP` | string | No | none | Node IP address. |
+| `topologies` | `[]string` (set) | No | none | Fixed `Topology` names whose domain labels this Node currently carries, for example `["scaleout", "storage"]`. Derived from the Node labels, not reported by the Agent. |
+
+#### NicInfo
+
+Element type of `scaleOutNics` and `storageNics`.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `name` | string | Yes | none | Linux interface name, for example `eth0` or `ib0`. |
+| `rdmaDeviceName` | string | Yes | none | RDMA device name, for example `mlx5_0`. |
+| `rdma` | boolean | Yes | none | Whether the interface supports RDMA. |
+| `ipv4` | string | Yes | none | IPv4 address in CIDR notation, for example `172.17.0.1/32`. Empty when no address exists. |
+| `ipv6` | string | Yes | none | IPv6 address in CIDR notation, for example `fe80::1/64`. Empty when no address exists. |
+| `state` | string | Yes | none | Current interface state, for example `up`, `down`, or `unknown`. |
+| `lldpNeighbor` | `LLDPNeighbor` | No | none | The neighbor device connected to this NIC. See [LLDPNeighbor](#lldpneighbor). |
+
+#### LLDPNeighbor
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `hostname` | string | Yes | none | Hostname of the neighbor device. |
+| `mgmtIP` | string | Yes | none | Management IP address of the neighbor device. |
+| `mac` | string | Yes | none | MAC address of the neighbor device. |
+| `port` | string | Yes | none | Port name on the neighbor device, for example `Ethernet32`. |
+| `description` | string | Yes | none | Description of the neighbor device. |
+
+The schema requires these fields when an `lldpNeighbor` object is present. A value
+that the Agent cannot collect is an empty string.
+
+#### RdmaPod
+
+Element type of `rdmaPods`.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `namespace` | string | Yes | none | Namespace of the RDMA Pod. |
+| `name` | string | Yes | none | Name of the RDMA Pod. |
+| `containerList` | `[]string` | No | none | IDs of the containers in the RDMA Pod. |
+| `hostRDMA` | boolean | No | `false` | Whether the Pod runs in host RDMA mode. That mode typically mounts `/dev/infiniband`, enables privileged mode, and sets `hostNetwork: true`. |
+| `topOwner` | `OwnerRef` | No | none | Top-level owner of the RDMA Pod. See [OwnerRef](#ownerref). |
+
+#### OwnerRef
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `apiVersion` | string | No | none | API version of the owner. |
+| `kind` | string | No | none | Kind of the owner, for example `Job`. |
+| `namespace` | string | No | none | Namespace of the owner. |
+| `name` | string | No | none | Name of the owner. |
+
+#### Conditions
+
+The Agent sets two condition types. The tables enumerate every status and reason with
+its trigger.
+
+`LLDPNeighborsReady`:
+
+| Status | Reason | Trigger |
 | --- | --- | --- |
-| `apiVersion` | string | `unifabric.io/v1beta1` |
-| `kind` | string | `FabricNode` |
-| `metadata` | `metav1.ObjectMeta` | Standard Kubernetes metadata |
-| `spec` | `FabricNodeSpec` | Desired state; currently empty |
-| `status` | `FabricNodeStatus` | Read-only observed state maintained by the Agent |
+| `True` | `LLDPNeighborsReady` | Every selected RDMA interface has an LLDP neighbor, or no selected interface requires LLDP. |
+| `False` | `LLDPNeighborMissing` | At least one selected interface is `up` but reports no LLDP neighbor hostname. The message lists the interfaces. |
+| `Unknown` | `DiscoveryFailed` | The Agent failed to list the network interfaces or failed to run LLDP discovery. The message contains the error. |
 
-## FabricNodeSpec
+`Ready`:
 
-`FabricNodeSpec` currently has no configurable fields.
+| Status | Reason | Trigger |
+| --- | --- | --- |
+| `True` | `Ready` | All other conditions are `True`. |
+| `False` | `ConditionNotReady` | At least one other condition is `False`. The message names that condition. |
+| `Unknown` | `ConditionUnknown` | At least one other condition is `Unknown`, and none is `False`. |
 
-## FabricNodeStatus
+The Agent also emits Kubernetes Events on `LLDPNeighborsReady` transitions. A failed
+discovery uses the `LLDPDiscoveryFailed` event reason instead of `DiscoveryFailed`.
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `conditions` | `[]metav1.Condition` | No | Current resource conditions, unique by `type` |
-| `totalNics` | integer | Yes | Total RDMA NICs classified into the scale-out or storage network |
-| `rdmaPods` | `[]RdmaPod` | No | RDMA Pods currently running on the Node |
-| `scaleOutNics` | `[]NicInfo` | No | RDMA NICs in the scale-out network |
-| `storageNics` | `[]NicInfo` | No | RDMA NICs in the storage network |
-| `nodeRole` | string | No | Node role: `GPU` or `Storage` |
-| `nodeIP` | string | No | Node IP address |
-
-Known condition types:
-
-| Type | Description |
-| --- | --- |
-| `Ready` | Summarizes the other conditions and is `True` when all conditions are ready |
-| `LLDPNeighborsReady` | Whether every interface that requires LLDP has a valid neighbor |
-
-A common reason for `LLDPNeighborsReady=False` is `LLDPNeighborMissing`.
-Collection failures use the `DiscoveryFailed` reason.
-
-## NicInfo
-
-Element type used by `scaleOutNics` and `storageNics`.
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `name` | string | Yes | Linux interface name, such as `eth1` or `ib0` |
-| `rdmaDeviceName` | string | Yes | RDMA device name, such as `mlx5_0` |
-| `rdma` | boolean | Yes | Whether the interface supports RDMA |
-| `ipv4` | string | Yes | IPv4 address in CIDR notation; empty when no address exists |
-| `ipv6` | string | Yes | IPv6 address in CIDR notation; empty when no address exists |
-| `state` | string | Yes | Link state, such as `up`, `down`, or `unknown` |
-| `lldpNeighbor` | `LLDPNeighbor` | No | LLDP neighbor observed on this interface |
-
-Topology discovery uses only NICs that match the current fabric role, are
-`up`, and have both `hostname` and `port` in their LLDP neighbor.
-
-## LLDPNeighbor
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `hostname` | string | Yes | Neighbor device hostname |
-| `mgmtIP` | string | Yes | Neighbor management IP |
-| `mac` | string | Yes | Neighbor MAC address |
-| `port` | string | Yes | Neighbor port, such as `Ethernet32` |
-| `description` | string | Yes | Neighbor device description |
-
-The schema requires these fields when an `lldpNeighbor` object is present. A
-value that cannot be collected may be an empty string.
-
-## RdmaPod
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `namespace` | string | Yes | Pod namespace |
-| `name` | string | Yes | Pod name |
-| `containerList` | `[]string` | No | IDs of containers using RDMA |
-| `hostRDMA` | boolean | No | Whether the Pod uses host RDMA mode |
-| `topOwner` | `OwnerRef` | No | Top-level workload owner of the Pod |
-
-`OwnerRef` may contain `apiVersion`, `kind`, `namespace`, and `name`.
-
-## Common commands
-
-```bash
-kubectl get fn
-kubectl get fn node1 -o yaml
-
-kubectl get fn node1 \
-  -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\t"}{.reason}{"\n"}{end}'
-
-kubectl get fn node1 \
-  -o jsonpath='{range .status.scaleOutNics[*]}{.name}{"\t"}{.state}{"\t"}{.lldpNeighbor.hostname}{"\n"}{end}'
-```
-
-For details about how topology calculation uses these fields, see
-[Scale-out topology discovery design](../design/scaleout-topology.md).
+For how to act on these fields, see the
+[SONiC RoCE guide](../getting-started-sonic-roce.md).

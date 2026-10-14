@@ -1,31 +1,16 @@
-# Unifabric API Reference
+# API Reference
 
 中文版：[README.zh.md](./README.zh.md)
 
-Unifabric provides three cluster-scoped custom resources and one namespaced
-custom resource in `unifabric.io/v1beta1`. Each CRD has a dedicated API
-reference:
+Unifabric provides three cluster-scoped custom resources and one namespaced custom
+resource in `unifabric.io/v1beta1`.
 
-| Kind | Resource | Short name | Description |
-| --- | --- | --- | --- |
-| [`FabricNode`](./fabricnode.md) | `fabricnodes` | `fn` | RDMA NIC, LLDP neighbor, and RDMA Pod state reported by the node Agent |
-| [`Switch`](./switch.md) | `switches` | `sw` | Switch declaration, switch-agent connectivity, and switch LLDP state |
-| [`Topology`](./topology.md) | `topologies` | `topo` | Read-only aggregate for scale-out, scale-up, and storage topology |
-| [`RDMAEndpoint`](./rdmaendpoint.md) | `rdmaendpoints` | `rep` | RDMA devices, addresses, and queue pairs of one Pod, published by the Agent when `agent.ebpfFlow` is enabled |
+| Resource | Description | Reference |
+| --- | --- | --- |
+| `FabricNode` | RDMA NIC, LLDP neighbor, and RDMA Pod state reported by the node Agent | [fabricnode.md](./fabricnode.md) |
+| `Switch` | Switch declaration, switch-agent connection state, and switch LLDP neighbors | [switch.md](./switch.md) |
+| `Topology` | Read-only aggregate topology for the scale-out, scale-up, and storage networks | [topology.md](./topology.md) |
+| `RDMAEndpoint` | RDMA devices, addresses, and queue pairs of one Pod, published by the Agent when `agent.ebpfFlow` is enabled | [rdmaendpoint.md](./rdmaendpoint.md) |
 
-List the APIs installed in the cluster:
-
-```bash
-kubectl api-resources --api-group=unifabric.io
-kubectl get fn
-kubectl get sw
-kubectl get topo
-kubectl get rep -A
-```
-
-`spec` represents desired state declared by a user or component. `status`
-represents observed state maintained by Unifabric components. Do not edit
-`status` manually unless a document explicitly says otherwise.
-
-The generated manifests in [`chart/crds`](../../chart/crds/) are the source of
-truth for the CRD OpenAPI schemas.
+The generated manifests in [`chart/crds`](../../chart/crds/) are the source of truth
+for the CRD OpenAPI schemas.

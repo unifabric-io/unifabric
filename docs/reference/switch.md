@@ -2,172 +2,151 @@
 
 中文版：[switch.zh.md](./switch.zh.md)
 
-A `Switch` represents a physical switch. The user declares its `metadata` and
-`spec`. After a switch-agent connection is configured, the Controller writes
-connection state and LLDP snapshots to `status`. switch-agent does not access
-the Kubernetes API directly.
+## Overview
 
-## Examples
+A `Switch` declares one physical switch and holds the switch-agent connection state
+and LLDP neighbors that the Controller observes. For its role in topology discovery,
+see the [architecture overview](../concepts/architecture.md).
 
-### Fully automatic LLDP discovery
+## Resource Information
 
-In this mode, each Switch CR represents a real switch and provides its
-switch-agent address:
+| Item | Value |
+| --- | --- |
+| API group | `unifabric.io` |
+| API version | `v1beta1` |
+| Kind | `Switch` |
+| Scope | Cluster |
+| Plural | `switches` |
+| Singular | `switch` |
+| Short name | `sw` |
+| Status subresource | Yes |
+| Printer columns | `MgmtIP`, `Role`, `Healthy`, `Neighbors` |
+
+## Example YAML
+
+Users write `metadata` and `spec`. The Controller writes `status`.
 
 ```yaml
 apiVersion: unifabric.io/v1beta1
 kind: Switch
 metadata:
   name: leaf01
-spec:
-  mgmtIP: 10.0.0.1
-  role: ScaleOut
-  grpcPort: 8090
-```
-
-### Semi-automatic discovery
-
-When Node LLDP has discovered `leaf01` and `leaf02`, create a CR only for the
-upstream switch:
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Switch
-metadata:
-  name: spine01
+  labels:
+    # Performance domain that contains this switch. Discovery writes it,
+    # or an administrator sets it manually.
+    unifabric.io/domain: tier1-group1
   annotations:
-    unifabric.io/switch-neighbors: '["leaf01", "leaf02"]'
+    # Semi-automatic mode only: directly connected switch names,
+    # as a JSON string array. Node names are not allowed.
+    unifabric.io/switch-neighbors: '["spine01"]'
 spec:
+  # Dial target for the switch-agent subscription. Omit it to declare
+  # the switch without a subscription.
+  mgmtIP: 10.0.0.1
+  # Fabric domain of this switch.
   role: ScaleOut
+  # Per-switch override of the switch-agent gRPC port.
+  grpcPort: 8090
+status:
+  conditions:
+    # Connected reports the gRPC stream state.
+    - lastTransitionTime: "2026-07-24T01:00:00Z"
+      message: controller is receiving LLDP snapshots from switch agent
+      reason: StreamReady
+      status: "True"
+      type: Connected
+    # Ready reports the freshness of the stored LLDP data.
+    - lastTransitionTime: "2026-07-24T01:00:00Z"
+      message: accepted LLDP snapshot generation 7
+      reason: SnapshotAccepted
+      status: "True"
+      type: Ready
+  # Hostname from the latest accepted snapshot.
+  hostname: leaf01
+  healthy: true
+  # Unique LLDP neighbors, deduplicated by remote system.
+  lldpNeighborCount: 2
+  lldpNeighbors:
+    - remoteSystemType: KubernetesNode
+      remoteSystemName: node1
+      linkCount: 1
+    - remoteSystemType: Switch
+      remoteSystemName: spine01
+      linkCount: 2
 ```
 
-## Resource information
+## Field Definitions
 
-| Field | Value |
-| --- | --- |
-| API group | `unifabric.io` |
-| API version | `v1beta1` |
-| Kind | `Switch` |
-| Scope | Cluster |
-| Resource | `switches` |
-| Singular name | `switch` |
-| Short name | `sw` |
-| Status subresource | Yes |
-
-## Switch fields
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `apiVersion` | string | `unifabric.io/v1beta1` |
-| `kind` | string | `Switch` |
-| `metadata` | `metav1.ObjectMeta` | Standard Kubernetes metadata with Unifabric labels and annotations |
-| `spec` | `SwitchSpec` | User-declared switch connection and fabric role |
-| `status` | `SwitchStatus` | Read-only observed state maintained by the Controller |
-
-## SwitchSpec
+### Metadata
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `mgmtIP` | string | No | None | Management address used by the Controller to connect to switch-agent; no subscription is started when omitted |
-| `role` | string | No | `ScaleOut` | Fabric role: `ScaleOut`, `ScaleUp`, or `Storage` |
-| `grpcPort` | int32 | No | Global port | Overrides the switch-agent gRPC port for this switch; valid range is `1`–`65535` |
+| `metadata.name` | string | Yes | none | Switch name. Topology discovery matches it against LLDP system names. |
+| `metadata.labels["unifabric.io/domain"]` | label | No | none | Performance domain that contains this switch, for example `tier1-group1`. Discovery writes it, and a manual value must name an existing domain. |
+| `metadata.annotations["unifabric.io/switch-neighbors"]` | annotation | No | none | Directly connected switch names in semi-automatic mode, as a JSON string array. Kubernetes Node names are not allowed. |
 
-When `grpcPort` is omitted, `switchSubscription.defaultGrpcPort` is used. Its
-chart default is `8090`.
+For switches with the same `role`, the presence of the
+`unifabric.io/switch-neighbors` key selects the discovery mode. When every switch has
+the key, discovery runs in semi-automatic mode. When any switch lacks the key,
+discovery runs in fully automatic mode and ignores every such annotation. An empty
+value and `[]` both count as the key being present.
 
-A Switch without `mgmtIP` can still declare semi-automatic adjacency or
-populate `Topology.status.domains[*].members` through metadata, but the
-Controller does not connect to switch-agent.
+### Spec
 
-## SwitchStatus
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `mgmtIP` | string | No | none | Dial target for the switch-agent subscription. When omitted, the Controller starts no subscription, and the switch still contributes topology membership and manual adjacency through metadata. |
+| `role` | string | No | `ScaleOut` | Fabric domain of this switch. Allowed values are `ScaleOut`, `ScaleUp`, and `Storage`. |
+| `grpcPort` | integer | No | none | Per-switch override of the switch-agent gRPC port, from `1` to `65535`. When omitted, the Controller uses its configured `defaultGrpcPort` (`8090` in the chart). |
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `hostname` | string | No | Hostname reported by the latest switch-agent snapshot |
-| `healthy` | boolean | No | Whether the current subscription and LLDP data are healthy |
-| `conditions` | `[]metav1.Condition` | No | Connection and data freshness conditions, unique by `type` |
-| `lldpNeighborCount` | int32 | No | Number of unique stored LLDP neighbors |
-| `lldpNeighbors` | `[]SwitchNeighbor` | No | LLDP neighbors in the latest accepted snapshot |
+### Status
 
-Known condition types and reasons:
+The Controller maintains `status`. Do not edit it manually. When `spec.mgmtIP` is
+removed, the Controller stops the subscription and clears the whole `status`.
 
-| Category | Values |
-| --- | --- |
-| Type | `Connected`, `Ready` |
-| Healthy reasons | `StreamReady`, `SnapshotAccepted` |
-| Failure reasons | `DialFailed`, `AuthenticationFailed`, `SnapshotRejected`, `DataStale` |
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `hostname` | string | No | none | Switch-reported system name from the latest accepted snapshot. |
+| `healthy` | boolean | No | none | `true` after an accepted snapshot, `false` after a subscription failure. |
+| `conditions` | `[]metav1.Condition` | No | none | Stream and data freshness conditions, unique by `type`. See [Conditions](#conditions). |
+| `lldpNeighborCount` | integer | No | none | Number of stored LLDP neighbor entries. |
+| `lldpNeighbors` | `[]SwitchNeighbor` | No | none | Unique remote neighbors observed for this switch. See [SwitchNeighbor](#switchneighbor). |
 
-## SwitchNeighbor
+#### SwitchNeighbor
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `remoteSystemType` | string | No | Neighbor type: `KubernetesNode` or `Switch` |
-| `remoteSystemName` | string | Yes | Neighbor Node or switch name |
-| `linkCount` | int32 | No | Number of physical links (local ports) to this remote system; multiple links to the same remote system are deduplicated into one entry |
+Element type of `lldpNeighbors`.
 
-## Events
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `remoteSystemType` | string | No | none | Whether the remote system resolves to a Kubernetes Node or another switch. Allowed values are `KubernetesNode` and `Switch`. |
+| `remoteSystemName` | string | Yes | none | Name of the remote system for this LLDP entry. |
+| `linkCount` | integer | No | none | Number of physical links (local ports) observed to this remote system. Multiple links to the same remote system are deduplicated into this single entry. |
 
-The controller emits a `Normal` Kubernetes event of reason `NeighborsChanged`
-on the `Switch` object whenever the set of LLDP neighbors changes between two
-accepted snapshots (a neighbor is identified by `remoteSystemType` +
-`remoteSystemName`). The event message reports how many neighbors were added
-and removed, for example:
+#### Conditions
 
-```text
-LLDP neighbors changed: 1 added, 1 removed
-```
+The Controller sets two condition types. The tables enumerate every status and reason
+with its trigger.
 
-A `linkCount` change alone (e.g. a second physical link to an already-known
-neighbor appears or disappears) does not trigger this event; only the
-appearance or disappearance of a neighbor itself does. Use
-`kubectl describe switch <name>` or `kubectl get events --field-selector
-involvedObject.name=<name>` to see these events.
+`Connected`:
 
-## Labels and annotations
-
-| Key | Type | Description |
+| Status | Reason | Trigger |
 | --- | --- | --- |
-| `unifabric.io/domain` | Label | Performance domain containing the Switch, for example `tier1-group1` |
-| `unifabric.io/switch-neighbors` | Annotation | Directly connected **switch** names in semi-automatic mode, encoded as a JSON string array; Kubernetes Node names are not allowed |
+| `True` | `StreamReady` | The Controller is receiving LLDP snapshots from switch-agent. |
+| `False` | `DialFailed` | The gRPC dial or stream failed for a reason other than the ones below. The message contains the error. |
+| `False` | `AuthenticationFailed` | The subscription failed with a gRPC `FailedPrecondition`, `Unauthenticated`, or `PermissionDenied` code, or with a TLS or certificate error. |
+| `False` | `SnapshotRejected` | switch-agent rejected the request with a gRPC `InvalidArgument` code. |
 
-Built-in discovery can write `unifabric.io/domain`. An administrator may set
-the label manually to populate `Topology.status.domains[*].members`, but its
-value must match an existing performance domain.
+`Ready`:
 
-Example `unifabric.io/switch-neighbors` value:
+| Status | Reason | Trigger |
+| --- | --- | --- |
+| `True` | `SnapshotAccepted` | The Controller accepted and stored the latest LLDP snapshot. The message contains the snapshot generation. |
+| `False` | `DataStale` | The subscription failed, so the stored LLDP data is no longer fresh. Set together with `Connected=False`. |
 
-```yaml
-metadata:
-  annotations:
-    unifabric.io/switch-neighbors: '["leaf01", "leaf02"]'
-```
+The Controller also emits a `Normal` Kubernetes Event with reason `NeighborsChanged`
+when the neighbor set changes between two accepted snapshots. A neighbor is identified
+by `remoteSystemType` plus `remoteSystemName`, so a `linkCount` change alone does not
+trigger the event.
 
-**Important:** this annotation contains only switch neighbors. A synthetic leaf
-discovered by Node LLDP is still a switch neighbor and may be listed, but a
-Kubernetes Node name must never be included. FabricNode LLDP supplies
-Node-to-switch links separately.
-
-For Switches with the same `role`, topology mode is selected by the presence of
-the annotation **key**:
-
-- If every Switch has the key, semi-automatic mode uses Node LLDP to create
-  synthetic leaves and annotations to connect upstream switches.
-- If any Switch lacks the key, fully automatic mode uses switch-reported LLDP
-  and ignores every `unifabric.io/switch-neighbors` annotation.
-- An empty value and `[]` both count as the key being present.
-
-## Common commands
-
-```bash
-kubectl get sw
-kubectl get sw leaf01 -o yaml
-
-kubectl get sw leaf01 \
-  -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\t"}{.reason}{"\n"}{end}'
-
-kubectl get sw leaf01 \
-  -o jsonpath='{range .status.lldpNeighbors[*]}{.remoteSystemType}{"\t"}{.remoteSystemName}{"\n"}{end}'
-```
-
-For discovery modes and name matching rules, see
-[Scale-out topology discovery design](../design/scaleout-topology.md).
+For how to deploy switch-agent and connect a switch, see the
+[switch-agent deployment guide](../usage/switch-agent-deployment.md).
