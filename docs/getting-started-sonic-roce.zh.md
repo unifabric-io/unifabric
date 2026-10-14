@@ -124,10 +124,10 @@ docker logs --tail 100 unifabric-switch-agent
 ```
 
 如果交换机不能使用 Docker，请使用
-[switch-agent systemd 安装方式](./usage/switch-agent-systemd.zh.md)。如果不能挂载
+[switch-agent systemd 安装方式](./usage/switch-agent-deployment.zh.md)。如果不能挂载
 `/run/lldpd.socket`，请使用
-[hostProc LLDP 采集方式](./usage/switch-agent-host-proc.zh.md)。需要批量部署时，可以使用
-[switch-agent 自动化部署脚本](./usage/deploy-switch-agent-script.zh.md)。
+[hostProc LLDP 采集方式](./usage/switch-agent-deployment.zh.md)。需要批量部署时，可以使用
+[switch-agent 自动化部署脚本](./usage/switch-agent-deployment.zh.md)。
 
 ### 步骤 5：创建全部 Switch CR
 

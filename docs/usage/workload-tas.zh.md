@@ -1,157 +1,63 @@
 # 拓扑感知调度
 
-数据中心通常会按机架（rack）、区块（block）等组织单元划分节点。同一组织单元内的
-节点通常网络距离更近、带宽更好；跨机架或跨区块的节点则距离更远。拓扑感知调度需要
-把这些层级关系表达成 Kubernetes Node label，让每个节点标明自己所属的拓扑域。
-Unifabric 或 NVIDIA Topograph 负责发现拓扑并写回 Node label；Kueue、Volcano 或
-KAI Scheduler 最终消费这些 label 来放置工作负载。
+English version: [workload-tas.md](./workload-tas.md)
 
-Unifabric 通过 helm values `topoDiscovery.*.nodeLabel.keyTemplate` 统一定义会被调度器消费的 label key：
+## 简介
 
-| 调度层级 | 默认 Node label | 使用说明 |
+拓扑感知调度把同一个 workload 的 Pod 放进同一个网络拓扑域,让跨节点 RDMA 流量走
+短路径。Unifabric 或 NVIDIA Topograph 发现拓扑,并以标签形式写到 Kubernetes Node 上;
+Kueue、Volcano 或 KAI Scheduler 等调度器消费这些标签。调度器只能使用真实存在于
+Node 上的标签。本文以 Kueue 演示完整路径;Volcano 和 KAI Scheduler 通过各自的配置
+消费相同的标签。
+
+Helm values `topoDiscovery.*.nodeLabel.keyTemplate` 定义标签键,默认值如下:
+
+| 调度层级 | 默认 Node 标签 | 含义 |
 | --- | --- | --- |
-| scale-up tier 1 | `scale-up.unifabric.io/tier-1` | GPU 高速互联域，例如 NVLink domain |
-| scale-out tier 1 | `scale-out.unifabric.io/tier-1` | 主机直接上联的第一层 scale-out 拓扑域 |
-| scale-out tier 2 | `scale-out.unifabric.io/tier-2` | tier 1 的上联拓扑域 |
-| scale-out tier 3 | `scale-out.unifabric.io/tier-3` | tier 2 的上联拓扑域 |
-| node | `kubernetes.io/hostname` | Kubernetes 默认节点标签，是最细粒度的节点级拓扑域 |
+| scale-up tier 1 | `scale-up.unifabric.io/tier-1` | GPU 高速互联域,如 NVLink 域 |
+| scale-out tier 1 | `scale-out.unifabric.io/tier-1` | 第一层 scale-out,直连主机 |
+| scale-out tier 2 | `scale-out.unifabric.io/tier-2` | 第二层 scale-out,位于 tier 1 上游 |
+| scale-out tier 3 | `scale-out.unifabric.io/tier-3` | 第三层 scale-out,位于 tier 2 上游 |
+| 节点 | `kubernetes.io/hostname` | Kubernetes 默认节点标签,最细粒度的拓扑域 |
 
-调度器只能使用已经真实写到 Node 上的 label。配置 Kueue `Topology`、Volcano 或 KAI
-Scheduler 时，拓扑层级应按从粗到细排列；如果某一层 label 没有覆盖所有参与调度的节点，
-就不要把它加入拓扑配置。
+> **注意:** 如果自定义了 `topoDiscovery.*.nodeLabel.keyTemplate`,本文中所有调度器
+> 配置和 workload 注解都必须改用自定义后的键。
 
-## 安装拓扑发现
+## 前提条件
 
-使用 TAS 队列前，先按 fabric 场景完成 Unifabric 安装。然后按下面的小节验证拓扑结果，确认
-目标节点已经写入预期的 Node label。安装步骤可根据下面不同场景跳转到对应文档。
+- 已按[基础安装](../getting-started.zh.md)安装 Unifabric,并完成对应网络场景的指南:
+  [SONiC RoCE](../getting-started-sonic-roce.zh.md)、
+  [Spectrum-X](../getting-started-spectrum-x.zh.md) 或
+  [InfiniBand](../getting-started-infiniband.zh.md)。
+- 已安装 Kueue,并开启 `TopologyAwareScheduling` feature gate。
+- GPU 示例要求节点上报可分配的 `nvidia.com/gpu` 资源。
 
-- [通用 SONiC RoCE](./getting-started-sonic-roce.zh.md)：适用于 SONiC 交换机承载 RoCE 网络的场景。
-- [Spectrum-X fabric](./getting-started-spectrum-x.zh.md)：适用于 Spectrum-X 交换机的场景。
-- [InfiniBand fabric](./getting-started-infiniband.zh.md)：适用于 NVIDIA InfiniBand 网络场景。
+## 配置与使用
 
-## 验证拓扑结果
+### 第 1 步:确认 Node 上存在拓扑标签
 
-验证时以 Node 上真实存在的 label 为准：确认节点已经写入前文提到的
-`unifabric.io/` 开头的拓扑 label。不同 fabric 场景会写入的 label 层级可能不同。
-
-```bash
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
-```
-
-检查：
-
-- 参与调度的节点已经写入预期的 `unifabric.io/` 拓扑 label。
-
-`FabricNode` 和 `Switch` CR 只会在 SONiC RoCE 场景中生成。Spectrum-X 和 InfiniBand
-场景通过 NVIDIA topograph 写回 Node label，不会创建或更新这些 CR。
+Node 上实际存在的标签是调度器的事实源。不同网络场景写入的标签层级不同:
 
 ```bash
-kubectl get fabricnodes
-kubectl get fabricnode <node-name> -o yaml
-kubectl get switches -o wide
-kubectl get switch <switch-name> -o yaml
+kubectl get nodes -L scale-up.unifabric.io/tier-1,scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
 ```
 
-`FabricNode` 输出示例：
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: FabricNode
-metadata:
-  name: node-gpu-1
-status:
-  conditions:
-  - type: Ready
-    status: "True"
-    reason: Ready
-    message: All FabricNode conditions are ready
-  - type: LLDPNeighborsReady
-    status: "True"
-    reason: LLDPNeighborsReady
-    message: All selected RDMA interfaces have LLDP neighbors
-  totalNics: 2
-  nodeRole: GPU
-  nodeIP: 192.168.200.6
-  scaleOutNics:
-  - name: eth1
-    rdma: true
-    rdmaDeviceName: mlx5_0
-    state: up
-    ipv4: 172.17.1.11/24
-    ipv6: ""
-    lldpNeighbor:
-      hostname: gpu-leaf-1
-      mgmtIP: 10.10.10.1
-      mac: 00:11:22:33:44:55
-      port: Ethernet1/1
-      description: GPU leaf switch
+```text
+<!-- TODO: 待真实环境采集输出 -->
 ```
 
-`Switch` 输出示例：
+参与拓扑感知调度的每个 Node 都必须拥有 Kueue `Topology` 将要引用的标签。如果某个
+标签层级没有覆盖所有参与的 Node,不要把该层级加入 Kueue `Topology`。
 
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Switch
-metadata:
-  name: gpu-leaf-1
-spec:
-  mgmtIP: 10.10.10.1
-  role: ScaleOut
-status:
-  hostname: gpu-leaf-1
-  healthy: true
-  conditions:
-  - type: Connected
-    status: "True"
-    reason: StreamReady
-  lldpNeighborCount: 2
-  lldpNeighbors:
-  - remoteSystemType: KubernetesNode
-    remoteSystemName: node-gpu-1
-  - remoteSystemType: Switch
-    remoteSystemName: gpu-spine-1
-```
+### 第 2 步:创建 Kueue 队列
 
-- `FabricNode.status.conditions` 中 `Ready` 和 `LLDPNeighborsReady` 为 `True`。
-- `Switch.status.healthy` 为 `true`，且 `Switch.status.lldpNeighbors` 包含预期的节点和交换机邻居。
-- 节点上有当前拓扑层级对应的 `unifabric.io/scale-out-leaf`、
-  `unifabric.io/scale-out-spine`、`unifabric.io/scale-out-core` label。
+下面的示例创建四个资源:Kueue `Topology` 按从粗到细列出拓扑层级,并以
+`kubernetes.io/hostname` 结尾;`ResourceFlavor` 把 GPU 节点绑定到该 `Topology`,
+并容忍 `nvidia.com/gpu:NoSchedule` 污点;`ClusterQueue` 设置资源配额;`LocalQueue`
+把 `ClusterQueue` 暴露给 `training` 命名空间。
 
-这些检查通过后，说明拓扑识别结果已经通过 Kubernetes Node label 暴露出来，可继续配置
-后续调度队列。
-
-## Kueue 示例
-
-示例使用当前 Kueue `kueue.x-k8s.io/v1beta2` API。若集群安装的是较旧版本
-Kueue，请按该版本 CRD 支持的 API version 调整。
-
-### 前置条件
-
-- 已按 [文档索引](../README.zh.md) 中对应 fabric 场景完成 Unifabric 安装，并在上一节
-  验证过拓扑结果。
-- Kueue 已安装，并启用了 `TopologyAwareScheduling` feature gate。
-- 参与拓扑感知调度的节点存在 `kubernetes.io/hostname` 标签。
-- 参与拓扑感知调度的节点已经写入本示例要使用的拓扑 label，例如
-  `unifabric.io/scale-out-leaf`。
-- GPU 示例要求节点已上报 `nvidia.com/gpu` 可分配资源。
-- 如果 GPU 节点带有 `nvidia.com/gpu:NoSchedule` taint，需要在
-  `ResourceFlavor.spec.tolerations` 中声明对应 toleration。
-
-再次确认 Kueue Topology 将消费的 Node label：
-
-```bash
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
-```
-
-如果某个 GPU 节点没有期望的拓扑 label，先回到上一节或对应安装文档排查拓扑发现组件。
-
-### 创建 Kueue 拓扑感知调度队列
-
-以下示例创建：
-
-- 一个使用 `unifabric.io/scale-out-leaf` Node label 的 Kueue `Topology`。
-- 一个引用该 Topology 的 GPU `ResourceFlavor`。
-- 一个面向 `training` namespace 的 `LocalQueue`。
+> **注意:** 示例使用 Kueue `kueue.x-k8s.io/v1beta2` API。如果集群运行较旧的
+> Kueue,把 API 版本改成其 CRD 支持的版本。
 
 ```yaml
 apiVersion: v1
@@ -165,7 +71,7 @@ metadata:
   name: unifabric-scaleout
 spec:
   levels:
-  - nodeLabel: unifabric.io/scale-out-leaf
+  - nodeLabel: scale-out.unifabric.io/tier-1
   - nodeLabel: kubernetes.io/hostname
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
@@ -178,9 +84,6 @@ spec:
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
-  # 如果集群中只有一部分节点应该进入该 flavor，可按实际标签打开下面配置。
-  # nodeLabels:
-  #   node-role.kubernetes.io/gpu: "true"
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
@@ -212,36 +115,48 @@ spec:
   clusterQueue: unifabric-gpu-tas
 ```
 
-应用后确认队列可用：
+> **注意:** 如果只允许部分节点进入该 flavor,把 `ResourceFlavor.spec.nodeLabels`
+> 设置为这些节点上真实存在的标签,例如 `node-role.kubernetes.io/gpu: "true"`。
+
+应用文件后,确认队列已就绪:
 
 ```bash
+kubectl apply -f tas-queues.yaml
 kubectl get topology,resourceflavor,clusterqueue
 kubectl -n training get localqueue
 ```
 
-如果你的集群已经通过 NVIDIA topograph 或其他组件写入了 spine/core label，可以把
-Kueue `Topology` 改成更完整的层级。例如：
-
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta2
-kind: Topology
-metadata:
-  name: unifabric-scaleout
-spec:
-  levels:
-  - nodeLabel: unifabric.io/scale-out-spine
-  - nodeLabel: unifabric.io/scale-out-leaf
-  - nodeLabel: kubernetes.io/hostname
+```text
+<!-- TODO: 待真实环境采集输出 -->
 ```
 
-配置前必须确认所有参与该 `ResourceFlavor` 的节点都实际带有
-`unifabric.io/scale-out-spine` label。调度侧以 Node 上的真实 label 为准。
+> **注意:** 当所有参与的 Node 也都带有 `scale-out.unifabric.io/tier-2` 标签时,
+> 可以在 tier 1 之上增加该层级,构成更深的层次:
+>
+> ```yaml
+> spec:
+>   levels:
+>   - nodeLabel: scale-out.unifabric.io/tier-2
+>   - nodeLabel: scale-out.unifabric.io/tier-1
+>   - nodeLabel: kubernetes.io/hostname
+> ```
+>
+> 增加层级之前,必须确认该 flavor 中的每个 Node 都有该标签。
 
-### 示例 1：优先调度到同一个 leaf group
+### 第 3 步:为 Workload 加注解
 
-`kueue.x-k8s.io/podset-preferred-topology` 表示尽量把同一个 PodSet 放进指定拓扑
-层级的同一个 domain。如果单个 leaf group 容量不足，Kueue 可以向更高层或跨
-domain 放置，避免工作负载长期 pending。
+Job 通过 Pod 模板上的一个注解选择放置规则,分两种 case:
+
+- Case 1,偏好同一 tier 1 域:吞吐和排队时间比严格的局部性更重要,作业可以接受
+  部分跨域放置。
+- Case 2,要求同一 tier 1 域:作业对跨域带宽敏感,例如 AllReduce、AllGather 训练,
+  宁可等待也不跨域运行。
+
+#### Case 1:偏好同一 tier 1 域
+
+`kueue.x-k8s.io/podset-preferred-topology` 注解让 Kueue 尽量把整个 PodSet 放进
+指定层级的同一个域。当单个域容量不足时,Kueue 在更高层级或跨域放置,避免长时间
+pending。
 
 ```yaml
 apiVersion: batch/v1
@@ -258,7 +173,7 @@ spec:
   template:
     metadata:
       annotations:
-        kueue.x-k8s.io/podset-preferred-topology: unifabric.io/scale-out-leaf
+        kueue.x-k8s.io/podset-preferred-topology: scale-out.unifabric.io/tier-1
     spec:
       restartPolicy: Never
       containers:
@@ -274,16 +189,11 @@ spec:
             nvidia.com/gpu: "1"
 ```
 
-适合场景：
+#### Case 2:要求同一 tier 1 域
 
-- 希望减少跨 leaf RDMA 流量，但更重视吞吐和排队时间。
-- 单个训练任务可接受少量跨 leaf 放置。
-
-### 示例 2：强制调度到同一个 leaf group
-
-`kueue.x-k8s.io/podset-required-topology` 表示同一个 PodSet 必须全部放进指定拓扑
-层级的同一个 domain。若没有任何 leaf group 能同时容纳所有 Pod，Workload 会保持
-未准入状态，直到资源满足要求或配置发生变化。
+`kueue.x-k8s.io/podset-required-topology` 注解要求 Kueue 把整个 PodSet 放进指定
+层级的同一个域。当没有任何域能同时容纳所有 Pod 时,Workload 保持未准入,直到资源
+或配置发生变化。
 
 ```yaml
 apiVersion: batch/v1
@@ -300,7 +210,7 @@ spec:
   template:
     metadata:
       annotations:
-        kueue.x-k8s.io/podset-required-topology: unifabric.io/scale-out-leaf
+        kueue.x-k8s.io/podset-required-topology: scale-out.unifabric.io/tier-1
     spec:
       restartPolicy: Never
       containers:
@@ -316,77 +226,157 @@ spec:
             nvidia.com/gpu: "1"
 ```
 
-适合场景：
+## 验证
 
-- AllReduce、AllGather 等对跨 leaf 带宽敏感的训练任务。
-- 拓扑不满足时宁可排队，也不希望跨 leaf 运行。
-
-### 验证调度结果
-
-查看 Kueue Workload 准入状态：
+提交 Case 1 或 Case 2 的 Job,确认 Kueue 已准入该 Workload:
 
 ```bash
+kubectl create -f tas-job.yaml
 kubectl -n training get workloads.kueue.x-k8s.io
 kubectl -n training describe workloads.kueue.x-k8s.io <workload-name>
 ```
 
-查看 Pod 实际落点：
+```text
+<!-- TODO: 待真实环境采集输出 -->
+```
+
+确认 Pod 落到共享同一拓扑域的 Node 上:
 
 ```bash
 kubectl -n training get pods -o wide
+kubectl get nodes -L scale-out.unifabric.io/tier-1
 ```
 
-查看 Pod 所在节点的拓扑 label：
-
-```bash
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
+```text
+<!-- TODO: 待真实环境采集输出 -->
 ```
 
-如果 Job annotation 使用的是 `unifabric.io/scale-out-leaf`：
+满足以下条件时验证通过:
 
-- 对于 `required` 示例，所有 Pod 所在节点的 `unifabric.io/scale-out-leaf` 值应相同。
-- 对于 `preferred` 示例，Kueue 会先尝试同 leaf 放置；当资源不足时，可能会跨 leaf
-  放置。
+- Case 2:所有 Pod 所在 Node 的 `scale-out.unifabric.io/tier-1` 取值相同。
+- Case 1:Kueue 先尝试同一个域;容量不足时 Pod 可以跨域,Workload 仍被准入。
+- 当注解使用更高层级(如 `scale-out.unifabric.io/tier-2`)时,所有 Pod 所在 Node
+  在该层级的标签取值相同。
 
-如果 Job annotation 使用的是 `unifabric.io/scale-out-spine` 或其他更高层级 label，
-则应检查所有 Pod 所在节点在对应层级的 label 值是否相同。
+## 故障排查
 
-### 排障
+### Workload 保持未准入
 
-Workload 一直未准入：
+先确认前提条件成立:参与的 Node 拥有 `Topology.spec.levels[*].nodeLabel` 声明的
+所有标签,且 Node 处于 Ready 状态、未被 cordon。
 
-- 检查 `kubectl -n training describe workloads.kueue.x-k8s.io <workload-name>` 中
-  是否提示 topology domain 容量不足。
-- 确认 `ClusterQueue` 的 `nominalQuota` 覆盖了 Job 请求的 `cpu`、`memory` 和
-  `nvidia.com/gpu`。
-- 确认目标节点 Ready、未 cordon，且 `status.allocatable` 中有足够资源。
-- 确认参与调度的节点同时具有 Kueue `Topology.spec.levels[*].nodeLabel` 中声明的
-  所有 label。
-- 如果 `Topology.spec.levels` 中加入了 `unifabric.io/scale-up`、
-  `unifabric.io/scale-out-spine` 或 `unifabric.io/scale-out-core`，确认这些 label
-  已经写入 Node。
+1. 查看准入事件:
 
-Pod 已准入但无法调度：
+   ```bash
+   kubectl -n training describe workloads.kueue.x-k8s.io <workload-name>
+   ```
 
-- 检查 GPU taint 是否已由 `ResourceFlavor.spec.tolerations` 覆盖。
-- 如果启用了 `ResourceFlavor.spec.nodeLabels`，确认对应节点确实带有这些标签。
-- 查看 Pod 事件：
+   如果事件提示拓扑域容量不足,说明没有任何单个域能容纳该 PodSet。
 
-  ```bash
-  kubectl -n training describe pod <pod-name>
-  ```
+2. 确认 `ClusterQueue` 的 `nominalQuota` 覆盖 Job 申请的 `cpu`、`memory` 和
+   `nvidia.com/gpu`。
+3. 确认目标 Node 的 `status.allocatable` 有足够资源。
 
-拓扑 label 缺失或不稳定：
+### Workload 已准入但 Pod 一直 Pending
 
-- 回到对应安装文档排查拓扑发现组件：
-  [通用 SONiC RoCE](../getting-started-sonic-roce.zh.md)、
-  [Spectrum-X fabric](../getting-started-spectrum-x.zh.md) 或
-  [InfiniBand fabric](../getting-started-infiniband.zh.md)。
-- 确认 Node 上真实存在的拓扑 label：
+1. 确认 `ResourceFlavor.spec.tolerations` 覆盖了 GPU 污点。
+2. 如果设置了 `ResourceFlavor.spec.nodeLabels`,确认 Node 上确实有这些标签。
+3. 查看 Pod 事件:
 
-  ```bash
-  kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
-  ```
+   ```bash
+   kubectl -n training describe pod <pod-name>
+   ```
 
-- 如果自定义了 Helm values 中的 `topoDiscovery.*.nodeLabel.keyTemplate`，Kueue
-  `Topology.spec.levels[*].nodeLabel` 和 Job annotation 的值也必须同步更新。
+### 拓扑标签缺失或不稳定
+
+1. 列出 Node 上实际存在的标签:
+
+   ```bash
+   kubectl get nodes -L scale-up.unifabric.io/tier-1,scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
+   ```
+
+2. SONiC RoCE 场景下,检查发现输入。Spectrum-X 和 InfiniBand 场景通过 NVIDIA
+   Topograph 写标签,不创建这些资源;这两个场景直接查阅场景指南。
+
+   ```bash
+   kubectl get fabricnodes
+   kubectl get fabricnode <node-name> -o yaml
+   ```
+
+   ```yaml
+   apiVersion: unifabric.io/v1beta1
+   kind: FabricNode
+   metadata:
+     name: node-gpu-1
+   status:
+     conditions:
+     - type: Ready
+       status: "True"
+       reason: Ready
+       message: All FabricNode conditions are ready
+     - type: LLDPNeighborsReady
+       status: "True"
+       reason: LLDPNeighborsReady
+       message: All selected RDMA interfaces have LLDP neighbors
+     totalNics: 2
+     nodeRole: GPU
+     nodeIP: 192.168.200.6
+     scaleOutNics:
+     - name: eth1
+       rdma: true
+       rdmaDeviceName: mlx5_0
+       state: up
+       ipv4: 172.17.1.11/24
+       ipv6: ""
+       lldpNeighbor:
+         hostname: gpu-leaf-1
+         mgmtIP: 10.10.10.1
+         mac: 00:11:22:33:44:55
+         port: Ethernet1/1
+         description: GPU leaf switch
+   ```
+
+   确认 `status.conditions` 中 `Ready` 和 `LLDPNeighborsReady` 为 `True`。
+
+   ```bash
+   kubectl get switches -o wide
+   kubectl get switch <switch-name> -o yaml
+   ```
+
+   ```yaml
+   apiVersion: unifabric.io/v1beta1
+   kind: Switch
+   metadata:
+     name: gpu-leaf-1
+   spec:
+     mgmtIP: 10.10.10.1
+     role: ScaleOut
+   status:
+     hostname: gpu-leaf-1
+     healthy: true
+     conditions:
+     - type: Connected
+       status: "True"
+       reason: StreamReady
+     lldpNeighborCount: 2
+     lldpNeighbors:
+     - remoteSystemType: KubernetesNode
+       remoteSystemName: node-gpu-1
+     - remoteSystemType: Switch
+       remoteSystemName: gpu-spine-1
+   ```
+
+   确认 `status.healthy` 为 `true`,且 `status.lldpNeighbors` 包含预期的节点与
+   交换机邻居。
+
+3. 如果标签仍然缺失,进入对应场景指南的故障排查章节:
+   [SONiC RoCE](../getting-started-sonic-roce.zh.md)、
+   [Spectrum-X](../getting-started-spectrum-x.zh.md) 或
+   [InfiniBand](../getting-started-infiniband.zh.md)。
+
+## 参考
+
+- [Topology 参考](../reference/topology.zh.md):聚合后的拓扑资源。
+- [FabricNode 参考](../reference/fabricnode.zh.md):节点侧发现输入。
+- [Switch 参考](../reference/switch.zh.md):交换机侧发现输入。
+- [Scale-out 拓扑设计](../design/scaleout-topology.zh.md):拓扑分层与标签的生成方式。

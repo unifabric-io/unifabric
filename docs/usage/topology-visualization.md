@@ -1,193 +1,237 @@
-# Topology Visualization Usage Guide
+# Topology Visualization
 
 中文版: [topology-visualization.zh.md](./topology-visualization.zh.md)
 
-This guide explains how to enable and use Unifabric topology visualization. The feature uses a
-Grafana datasource plugin and panel plugin to present the cluster's Scale-out, Scale-up, and Storage
-network topologies in one graph.
+## Introduction
+
+Topology visualization renders the discovered Scale-out, Scale-up, and Storage
+topologies of the cluster as one interactive graph in Grafana. The feature reads only
+the `Topology`, `FabricNode`, and `Switch` resources. It shows topology data that
+discovery has already produced. It does not discover topology itself, and it does not
+show live traffic or link utilization. A cluster without at least one populated
+`Topology` resource renders an empty graph.
+
+The feature has three parts. The Controller serves a Topology HTTP API. A Grafana
+datasource plugin queries that API. A Grafana panel plugin renders the graph.
+
+> **Note:** With NVIDIA Topograph sources (`nv-topograph` mode), switch member
+> cards stay empty unless an administrator creates label-only `Switch` resources.
+> See the [Topology CRD design](../design/topology-crd.md).
 
 ## Prerequisites
 
-1. Unifabric is installed in the cluster.
-2. Grafana Operator and its CRDs are installed in the cluster.
-3. The following command returns at least one Topology CR:
+- Unifabric is installed through the [basic installation](../getting-started.md),
+  and a scenario guide such as [SONiC RoCE](../getting-started-sonic-roce.md) is
+  complete.
+- Grafana Operator and its CRDs are installed in the cluster.
+- The following command returns at least one `Topology` resource:
 
-```bash
-kubectl get topologies.unifabric.io
-NAME       AGE
-scaleout   4h27m
-scaleup    4h27m
-storage    4h27m
-```
+  ```bash
+  kubectl get topologies.unifabric.io
+  ```
 
-## Enable Topology Visualization
+  ```text
+  NAME       AGE
+  scaleout   4h27m
+  scaleup    4h27m
+  storage    4h27m
+  ```
 
-### Use the Bundled Grafana Instance
+## Configuration and Usage
 
-Run the following Helm upgrade to retain the existing values while enabling the Topology API and
-the bundled Grafana instance:
+This feature has two cases. Use the bundled Grafana instance when the cluster has no
+Grafana of its own. Use an external instance when another team already operates
+Grafana.
 
-```bash
-helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --namespace unifabric-system \
-  --reuse-values \
-  --set topologyAPI.enabled=true \
-  --set grafanaInstance.enabled=true \
-  --wait
-```
+### Case 1: Use the Bundled Grafana Instance
 
-The Chart creates a `Grafana`, `GrafanaDatasource`, and `GrafanaDashboard`. The Topology datasource
-automatically connects to the Controller Topology API from the same release.
+1. Enable the Topology API and the bundled Grafana instance. Run this command on a
+   host with Helm access to the cluster:
 
-The bundled instance uses the `ghcr.io/unifabric-io/unifabric-grafana:<version>` image. It contains
-both the topology datasource and panel plugins; its tag follows the Chart `appVersion` by default.
+   ```bash
+   helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
+     --namespace unifabric-system \
+     --reuse-values \
+     --set topologyAPI.enabled=true \
+     --set grafanaInstance.enabled=true \
+     --wait
+   ```
 
-Grafana Operator creates a Service for the bundled instance. The Service type is controlled by
-`grafanaInstance.serviceType` and defaults to NodePort with a randomly assigned node port. The
-login username and password are stored in an auto-generated Secret. Run the following commands to
-get the node port and login credentials:
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-```bash
-kubectl get service -n unifabric-system unifabric-grafana-service
-kubectl get secret -n unifabric-system unifabric-grafana-admin-credentials \
-  -o go-template='{{range $k, $v := .data}}{{$k}}: {{$v | base64decode}}{{"\n"}}{{end}}'
-```
+   The chart creates a `Grafana`, a `GrafanaDatasource`, and a `GrafanaDashboard`.
+   The datasource connects to the Controller Topology API from the same release. The
+   bundled image `ghcr.io/unifabric-io/unifabric-grafana:<version>` contains both
+   plugins.
 
-Open `http://<node IP>:<NodePort>` in a browser, log in, then search for and open the
-**Unifabric Topology** dashboard.
+   > **Warning:** The Topology API has no authentication of its own. In production,
+   > pair `topologyAPI.enabled=true` with a NetworkPolicy or an ingress rule that
+   > restricts access to the Grafana instance. Without it, any Pod in the cluster can
+   > read the topology.
 
-### Use an External Grafana Instance
+2. Get the node port and the login credentials. The Service type defaults to NodePort
+   with a random port:
 
-When using a Grafana instance managed by another Chart or component, enable only the Topology API:
+   ```bash
+   kubectl get service -n unifabric-system unifabric-grafana-service
+   kubectl get secret -n unifabric-system unifabric-grafana-admin-credentials \
+     -o go-template='{{range $k, $v := .data}}{{$k}}: {{$v | base64decode}}{{"\n"}}{{end}}'
+   ```
 
-```bash
-helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --namespace unifabric-system \
-  --reuse-values \
-  --set topologyAPI.enabled=true \
-  --wait
-```
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-`grafanaInstance.enabled` defaults to `false`. With the default Grafana dashboard settings, the
-Chart creates a `GrafanaDatasource` and `GrafanaDashboard`, using
-`grafanaDashboard.instanceSelector` to select the external Grafana instance. The default selector is
-`{}`. If the cluster contains multiple Grafana instances, set the selector to match the intended
-instance.
+3. Open `http://<node IP>:<NodePort>` in a browser, log in, then search for and open
+   the `Unifabric Topology` dashboard.
 
-For example, when the external `Grafana` CR has a `dashboards: grafana` label, set:
+### Case 2: Use an External Grafana Instance
 
-```yaml
-grafanaDashboard:
-  instanceSelector:
-    matchLabels:
-      dashboards: grafana
-```
+1. Enable only the Topology API:
 
-If the external instance can use the Unifabric Grafana image, update `spec.version` in its `Grafana`
-CR:
+   ```bash
+   helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
+     --namespace unifabric-system \
+     --reuse-values \
+     --set topologyAPI.enabled=true \
+     --wait
+   ```
 
-```yaml
-spec:
-  version: ghcr.io/unifabric-io/unifabric-grafana:<version>
-```
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-If the external instance must retain its current image, install the plugins with an init container.
-The following configuration assumes that the `grafana-plugins` shared volume is mounted at
-`/var/lib/grafana/plugins` in the Grafana container. It also allows Grafana to load the two unsigned
-plugins:
+   The chart creates a `GrafanaDatasource` and a `GrafanaDashboard` and selects the
+   external instance through `grafanaDashboard.instanceSelector`. The default selector
+   is `{}`.
 
-```yaml
-spec:
-  config:
-    plugins:
-      allow_loading_unsigned_plugins: unifabric-unifabrictopology-datasource,unifabric-unifabrictopology-panel
-  deployment:
-    spec:
-      template:
-        spec:
-          initContainers:
-            - name: unifabric-plugins-init
-              image: ghcr.io/unifabric-io/unifabric-grafana:<version>
-              command:
-                - /bin/sh
-                - -c
-              args:
-                - |
-                  set -eu
-                  for plugin in \
-                    unifabric-unifabrictopology-datasource \
-                    unifabric-unifabrictopology-panel
-                  do
-                    test -f "/var/lib/grafana/plugins/${plugin}/plugin.json"
-                    rm -rf "/opt/plugins/${plugin}"
-                    cp -a "/var/lib/grafana/plugins/${plugin}" /opt/plugins/
-                  done
-              volumeMounts:
-                - name: grafana-plugins
-                  mountPath: /opt/plugins
-```
+   > **Note:** If the cluster contains more than one Grafana instance, set the
+   > selector to match the intended instance. Otherwise the dashboard can land on the
+   > wrong Grafana. For example, when the external `Grafana` resource has a
+   > `dashboards: grafana` label, set:
+   >
+   > ```yaml
+   > grafanaDashboard:
+   >   instanceSelector:
+   >     matchLabels:
+   >       dashboards: grafana
+   > ```
 
-If the shared volume has a different name, update `volumeMounts[].name` in the init
-container to match it. After applying the CR, wait for Grafana Operator to reconcile it and confirm
-that both plugin directories exist in the Grafana Pod.
+2. Install the plugins into the external instance. If the instance can use the
+   Unifabric Grafana image, update `spec.version` in its `Grafana` resource:
 
-## Topology Dashboard Overview
+   ```yaml
+   spec:
+     version: ghcr.io/unifabric-io/unifabric-grafana:<version>
+   ```
+
+   If the instance must keep its current image, install the plugins with an init
+   container. The configuration below assumes that the `grafana-plugins` shared volume
+   is mounted at `/var/lib/grafana/plugins` in the Grafana container. It also allows
+   Grafana to load the two unsigned plugins:
+
+   ```yaml
+   spec:
+     config:
+       plugins:
+         allow_loading_unsigned_plugins: unifabric-unifabrictopology-datasource,unifabric-unifabrictopology-panel
+     deployment:
+       spec:
+         template:
+           spec:
+             initContainers:
+               - name: unifabric-plugins-init
+                 image: ghcr.io/unifabric-io/unifabric-grafana:<version>
+                 command:
+                   - /bin/sh
+                   - -c
+                 args:
+                   - |
+                     set -eu
+                     for plugin in \
+                       unifabric-unifabrictopology-datasource \
+                       unifabric-unifabrictopology-panel
+                     do
+                       test -f "/var/lib/grafana/plugins/${plugin}/plugin.json"
+                       rm -rf "/opt/plugins/${plugin}"
+                       cp -a "/var/lib/grafana/plugins/${plugin}" /opt/plugins/
+                     done
+                 volumeMounts:
+                   - name: grafana-plugins
+                     mountPath: /opt/plugins
+   ```
+
+   > **Note:** If the shared volume has a different name, update
+   > `volumeMounts[].name` in the init container to match it.
+
+3. After you apply the resource, wait for Grafana Operator to reconcile it. Make sure
+   that both plugin directories exist in the Grafana Pod.
+
+### Read the Dashboard
 
 ![Unifabric Topology dashboard](../images/topology-visualization.png)
 
-The graph uses four vertical regions:
+The graph uses four vertical regions. Scale-out domains appear above the Node row,
+with tier 1 closest to the Nodes. Scale-up domains appear between Scale-out and the
+Node row. Node cards form the shared row that all topology types use. Storage domains
+appear below the Node row.
 
-1. **Scale-Out** domains appear above the Nodes. Tier 1 is closest to the Node row; higher tiers are
-   placed farther away.
-2. **Scale-Up** domains appear between Scale-Out and the Node row.
-3. **Node** cards form the shared row used by all topology types.
-4. **Storage** domains appear below the Node row.
+Each domain card shows its topology type, tier, domain name, and member switches.
+Lines show parent relationships and Node membership. Select a domain, a switch, or a
+Node to emphasize its direct connections. Select it again, or select the empty canvas,
+to clear the selection. Use the controls in the lower-left corner to zoom or to fit
+the graph into the panel.
 
-Each domain card shows its topology type, tier, domain name, and member switches. Lines show domain
-parent relationships and Node membership. Select a domain, switch, or Node to emphasize its direct
-connections. Select it again, or select the empty canvas, to clear the selection.
+Hover over a card to inspect the resource behind it. A Node card loads the matching
+`FabricNode`. A switch card loads the matching `Switch`. The detail popover includes a
+`View raw JSON` action.
 
-Cards can be dragged for temporary inspection. Use the controls in the lower-left corner to zoom in,
-zoom out, or fit the graph back into the panel.
+## Verification
 
-### View Resource Details
+Open the `Unifabric Topology` dashboard in Grafana. The verification passes when the
+graph shows the expected domain cards, the Node row, and the connection lines that
+match the physical fabric.
 
-Hover over a card to inspect the resource represented by it:
-
-- A Node card loads the corresponding `FabricNode` resource.
-- A switch card in Switch View loads the corresponding `Switch` resource.
-- A domain or switch group shows fields from the corresponding `Topology` domain.
-
-The detail popover includes a **View raw JSON** action. A `Not found` message means the name appears
-in the topology but the corresponding FabricNode or Switch resource is not currently available.
+![Expected dashboard result](../images/topology-visualization.png)
+<!-- TODO: capture a screenshot from a real environment -->
 
 ## Troubleshooting
 
-### The dashboard is not imported
+### The Dashboard Is Not Imported
 
-- Confirm `topologyAPI.enabled=true`.
-- `grafanaDashboard.enabled` defaults to `true`; enable it again if it was explicitly disabled during
-  installation.
-- Confirm `grafanaDashboard.kind=GrafanaDashboard` and that its instance selector matches
-  `grafanaDashboard.instanceSelector`.
+First make sure that the preconditions hold:
 
-### The graph has no topology domains
+1. Make sure that `topologyAPI.enabled=true`.
+2. Make sure that `grafanaDashboard.enabled=true`. The default is `true`. Enable it
+   again if it was disabled during installation.
+3. Make sure that `grafanaDashboard.kind=GrafanaDashboard` and that the target Grafana
+   instance matches `grafanaDashboard.instanceSelector`.
 
-- Check `kubectl get topologies` and inspect each resource's `status.domains` and `status.nodes`.
-- Confirm that topology discovery has completed and the Controller cache has synchronized.
-- Confirm that the dashboard's Cluster selection matches the API cluster name.
+### The Graph Has No Topology Domains
 
-### Nodes appear under Outside topology
+1. Make sure that `kubectl get topologies` returns resources and that each resource
+   has `status.domains` and `status.nodes`.
+2. Make sure that topology discovery is complete. See the verification steps in the
+   [SONiC RoCE guide](../getting-started-sonic-roce.md).
+3. Make sure that the Cluster selection of the dashboard matches the API cluster name.
 
-The panel builds this group by comparing `FabricNode.metadata.name` with every Node name in
-`Topology.status.nodes`. Check the affected Node's topology labels and the current Topology resources.
-After discovery updates the Topology status, refresh the dashboard.
+### Nodes Appear Under Outside Topology
 
-### A switch or Node detail shows Not found
+The panel builds this group by comparing `FabricNode.metadata.name` with every Node
+name in `Topology.status.nodes`. Inspect the topology labels of the affected Node and
+the current `Topology` resources. After discovery updates the status, refresh the
+dashboard.
 
-The domain can remain visible from a Topology resource even when its referenced `Switch` or
-`FabricNode` resource is absent. Check the referenced name with `kubectl get switch <name>` or
-`kubectl get fabricnode <name>`.
+### A Switch or Node Detail Shows Not Found
 
-For API and plugin architecture details, see
-[Topology visualization design](../design/topology-visualization.md).
+The domain stays visible from a `Topology` resource even when the referenced `Switch`
+or `FabricNode` resource is absent. Make sure that the referenced resource exists with
+`kubectl get switch <name>` or `kubectl get fabricnode <name>`.
+
+## References
+
+- [FabricNode reference](../reference/fabricnode.md): fields that the Node detail popover shows.
+- [Topology CRD design](../design/topology-crd.md): how the topology data model works.
+- [Topology visualization design](../design/topology-visualization.md): the API and plugin architecture.

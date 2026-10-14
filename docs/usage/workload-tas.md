@@ -1,173 +1,71 @@
-# Topology Aware Scheduling
+# Topology-Aware Scheduling
 
 中文版: [workload-tas.zh.md](./workload-tas.zh.md)
 
-Data centers are usually divided into organizational units such as racks and
-blocks. Nodes in the same organizational unit usually have shorter network
-distance and better bandwidth, while nodes across racks or blocks are farther
-apart. Topology aware scheduling expresses these hierarchy relationships as
-Kubernetes Node labels, so each node declares the topology domain it belongs to.
-Unifabric or NVIDIA Topograph discovers the topology and writes it back as Node
-labels; Kueue, Volcano, or KAI Scheduler ultimately consumes these labels to
-place workloads.
+## Introduction
 
-Unifabric uses Helm values `topoDiscovery.*.nodeLabel.keyTemplate` to define the label keys consumed
-by schedulers:
+Topology-aware scheduling places the Pods of one workload into the same network
+topology domain, so that cross-node RDMA traffic stays on short paths. Unifabric or
+NVIDIA Topograph discovers the topology and writes it to Kubernetes Nodes as labels.
+A scheduler such as Kueue, Volcano, or KAI Scheduler consumes these labels. A
+scheduler can only use labels that exist on the Nodes. This guide shows the full path
+with Kueue. Volcano and KAI Scheduler consume the same labels through their own
+configuration.
 
-| Scheduling level | Default Node label | Usage |
+The Helm values `topoDiscovery.*.nodeLabel.keyTemplate` define the label keys. The
+defaults are:
+
+| Scheduling level | Default Node label | Meaning |
 | --- | --- | --- |
 | scale-up tier 1 | `scale-up.unifabric.io/tier-1` | GPU high-speed interconnect domain, such as an NVLink domain |
 | scale-out tier 1 | `scale-out.unifabric.io/tier-1` | First scale-out tier, directly connected to hosts |
 | scale-out tier 2 | `scale-out.unifabric.io/tier-2` | Second scale-out tier, upstream of tier 1 |
 | scale-out tier 3 | `scale-out.unifabric.io/tier-3` | Third scale-out tier, upstream of tier 2 |
-| node | `kubernetes.io/hostname` | Kubernetes default node label, the finest-grained node-level topology domain |
+| node | `kubernetes.io/hostname` | The default Kubernetes node label, the finest topology domain |
 
-Schedulers can only use labels that are actually written to Nodes. When
-configuring Kueue `Topology`, Volcano, or KAI Scheduler, topology levels should
-be ordered from coarse to fine. If a label at a given level does not cover all
-nodes participating in scheduling, do not add it to the topology configuration.
+> **Note:** If the `topoDiscovery.*.nodeLabel.keyTemplate` values are customized, use
+> the customized keys in every scheduler configuration and workload annotation in this
+> guide.
 
-## Install Topology Discovery
+## Prerequisites
 
-Before using a TAS queue, complete the Unifabric installation for your fabric
-scenario. Then validate the topology results below so you know the expected
-Node labels are in place. Use the scenario links below to jump to the
-corresponding document.
-
-- [General SONiC RoCE](./getting-started-sonic-roce.md): For scenarios where SONiC switches carry the RoCE network.
-- [Spectrum-X fabric](./getting-started-spectrum-x.md): For Spectrum-X switch scenarios.
-- [InfiniBand fabric](./getting-started-infiniband.md): For NVIDIA InfiniBand network scenarios.
-
-## Validate Topology Results
-
-Validate against the labels that actually exist on Nodes: confirm that nodes
-have the topology labels mentioned above with the `unifabric.io/` prefix.
-Different fabric scenarios may write different label levels.
-
-```bash
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
-```
-
-Check:
-
-- Nodes participating in scheduling have the expected `unifabric.io/` topology
-  labels.
-
-`FabricNode` and `Switch` CRs are generated only in the SONiC RoCE scenario.
-Spectrum-X and InfiniBand scenarios write Node labels through NVIDIA topograph
-and do not create or update these CRs.
-
-```bash
-kubectl get fabricnodes
-kubectl get fabricnode <node-name> -o yaml
-kubectl get switches -o wide
-kubectl get switch <switch-name> -o yaml
-```
-
-`FabricNode` output example:
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: FabricNode
-metadata:
-  name: node-gpu-1
-status:
-  conditions:
-  - type: Ready
-    status: "True"
-    reason: Ready
-    message: All FabricNode conditions are ready
-  - type: LLDPNeighborsReady
-    status: "True"
-    reason: LLDPNeighborsReady
-    message: All selected RDMA interfaces have LLDP neighbors
-  totalNics: 2
-  nodeRole: GPU
-  nodeIP: 192.168.200.6
-  scaleOutNics:
-  - name: eth1
-    rdma: true
-    rdmaDeviceName: mlx5_0
-    state: up
-    ipv4: 172.17.1.11/24
-    ipv6: ""
-    lldpNeighbor:
-      hostname: gpu-leaf-1
-      mgmtIP: 10.10.10.1
-      mac: 00:11:22:33:44:55
-      port: Ethernet1/1
-      description: GPU leaf switch
-```
-
-`Switch` output example:
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Switch
-metadata:
-  name: gpu-leaf-1
-spec:
-  mgmtIP: 10.10.10.1
-  role: ScaleOut
-status:
-  hostname: gpu-leaf-1
-  healthy: true
-  conditions:
-  - type: Connected
-    status: "True"
-    reason: StreamReady
-  lldpNeighborCount: 2
-  lldpNeighbors:
-  - remoteSystemType: KubernetesNode
-    remoteSystemName: node-gpu-1
-  - remoteSystemType: Switch
-    remoteSystemName: gpu-spine-1
-```
-
-- `Ready` and `LLDPNeighborsReady` in `FabricNode.status.conditions` are `True`.
-- `Switch.status.healthy` is `true` and `Switch.status.lldpNeighbors` contains
-  the expected node and switch peers.
-- Nodes have the expected `unifabric.io/scale-out-leaf`,
-  `unifabric.io/scale-out-spine`, and `unifabric.io/scale-out-core` labels for
-  the discovered topology layers.
-
-Once these checks pass, the topology discovery result is exposed through
-Kubernetes Node labels and you can continue configuring scheduling queues.
-
-## Kueue Example
-
-The examples use the current Kueue `kueue.x-k8s.io/v1beta2` API. If your
-cluster runs an older Kueue version, adjust the API version to match the API
-version supported by that version's CRDs.
-
-### Prerequisites
-
-- Unifabric has been installed for the corresponding fabric scenario in the
-  [documentation index](../README.md), and you have validated the topology
-  results in the section above.
+- Unifabric is installed through the [basic installation](../getting-started.md), and
+  the scenario guide for your fabric is complete:
+  [SONiC RoCE](../getting-started-sonic-roce.md),
+  [Spectrum-X](../getting-started-spectrum-x.md), or
+  [InfiniBand](../getting-started-infiniband.md).
 - Kueue is installed with the `TopologyAwareScheduling` feature gate enabled.
-- Nodes participating in topology aware scheduling have the `kubernetes.io/hostname` label.
-- Nodes participating in topology aware scheduling already have the topology labels used by this example, such as `unifabric.io/scale-out-leaf`.
-- GPU examples require nodes to report allocatable `nvidia.com/gpu` resources.
-- If GPU nodes have the `nvidia.com/gpu:NoSchedule` taint, declare the corresponding toleration in `ResourceFlavor.spec.tolerations`.
+- The GPU examples need Nodes that report allocatable `nvidia.com/gpu` resources.
 
-Reconfirm the Node labels that the Kueue Topology will consume:
+## Configuration and Usage
+
+### Step 1: Make Sure That the Topology Labels Exist on the Nodes
+
+The labels on the Nodes are the source of truth for the scheduler. Different fabric
+scenarios write different label levels:
 
 ```bash
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
+kubectl get nodes -L scale-up.unifabric.io/tier-1,scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
 ```
 
-If a GPU node does not have the expected topology label, return to the
-previous section or the corresponding installation guide to troubleshoot
-topology discovery components.
+```text
+<!-- TODO: capture output from a real environment -->
+```
 
-### Create Kueue Topology Aware Scheduling Queues
+Every Node that takes part in topology-aware scheduling must have the labels that the
+Kueue `Topology` will reference. If a label level does not cover all participating
+Nodes, do not add that level to the Kueue `Topology`.
 
-The following example creates:
+### Step 2: Create the Kueue Queues
 
-- A Kueue `Topology` that uses the `unifabric.io/scale-out-leaf` Node label.
-- A GPU `ResourceFlavor` that references the Topology.
-- A `LocalQueue` for the `training` namespace.
+The example below creates four resources. A Kueue `Topology` lists the topology
+levels from coarse to fine and ends with `kubernetes.io/hostname`. A `ResourceFlavor`
+binds GPU Nodes to that `Topology` and tolerates the `nvidia.com/gpu:NoSchedule`
+taint. A `ClusterQueue` sets the resource quota. A `LocalQueue` exposes the
+`ClusterQueue` to the `training` namespace.
+
+> **Note:** The example uses the Kueue `kueue.x-k8s.io/v1beta2` API. If the cluster
+> runs an older Kueue, set the API version that its CRDs support.
 
 ```yaml
 apiVersion: v1
@@ -181,7 +79,7 @@ metadata:
   name: unifabric-scaleout
 spec:
   levels:
-  - nodeLabel: unifabric.io/scale-out-leaf
+  - nodeLabel: scale-out.unifabric.io/tier-1
   - nodeLabel: kubernetes.io/hostname
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
@@ -194,10 +92,6 @@ spec:
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
-  # If only a subset of nodes should enter this flavor, enable this
-  # configuration with labels that match your cluster.
-  # nodeLabels:
-  #   node-role.kubernetes.io/gpu: "true"
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
@@ -229,38 +123,52 @@ spec:
   clusterQueue: unifabric-gpu-tas
 ```
 
-After applying it, confirm that the queues are available:
+> **Note:** To admit only a subset of Nodes into the flavor, set
+> `ResourceFlavor.spec.nodeLabels` to labels that exist on those Nodes, for example
+> `node-role.kubernetes.io/gpu: "true"`.
+
+Apply the file, then make sure that the queues exist:
 
 ```bash
+kubectl apply -f tas-queues.yaml
 kubectl get topology,resourceflavor,clusterqueue
 kubectl -n training get localqueue
 ```
 
-If NVIDIA topograph or another component has already written spine/core labels
-in your cluster, you can configure a fuller Kueue `Topology`. For example:
-
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta2
-kind: Topology
-metadata:
-  name: unifabric-scaleout
-spec:
-  levels:
-  - nodeLabel: unifabric.io/scale-out-spine
-  - nodeLabel: unifabric.io/scale-out-leaf
-  - nodeLabel: kubernetes.io/hostname
+```text
+<!-- TODO: capture output from a real environment -->
 ```
 
-Before configuring this, confirm that all nodes participating in this
-`ResourceFlavor` actually have the `unifabric.io/scale-out-spine` label. Use
-the actual labels on Nodes as the scheduler-facing source of truth.
+> **Note:** When all participating Nodes also carry `scale-out.unifabric.io/tier-2`,
+> add that level above tier 1 for a deeper hierarchy:
+>
+> ```yaml
+> spec:
+>   levels:
+>   - nodeLabel: scale-out.unifabric.io/tier-2
+>   - nodeLabel: scale-out.unifabric.io/tier-1
+>   - nodeLabel: kubernetes.io/hostname
+> ```
+>
+> Before you add a level, make sure that every Node in the flavor has that label.
 
-### Example 1: Prefer the Same Leaf Group
+### Step 3: Annotate the Workload
 
-`kueue.x-k8s.io/podset-preferred-topology` means Kueue should try to place the
-same PodSet into the same domain at the specified topology level. If a single
-leaf group does not have enough capacity, Kueue can place the workload at a
-higher level or across domains, avoiding long pending times.
+A Job selects its placement rule with one annotation on the Pod template. Two cases
+exist:
+
+- Case 1, prefer the same tier 1 domain: throughput and queue time matter more than
+  strict locality, and the job tolerates some cross-domain placement.
+- Case 2, require the same tier 1 domain: the job is sensitive to cross-domain
+  bandwidth, for example AllReduce or AllGather training, and waiting is better than
+  running across domains.
+
+#### Case 1: Prefer the Same Tier 1 Domain
+
+The `kueue.x-k8s.io/podset-preferred-topology` annotation tells Kueue to try to place
+the whole PodSet into one domain at the given level. If one domain does not have
+enough capacity, Kueue places the PodSet at a higher level or across domains, which
+avoids long pending times.
 
 ```yaml
 apiVersion: batch/v1
@@ -277,7 +185,7 @@ spec:
   template:
     metadata:
       annotations:
-        kueue.x-k8s.io/podset-preferred-topology: unifabric.io/scale-out-leaf
+        kueue.x-k8s.io/podset-preferred-topology: scale-out.unifabric.io/tier-1
     spec:
       restartPolicy: Never
       containers:
@@ -293,17 +201,11 @@ spec:
             nvidia.com/gpu: "1"
 ```
 
-Use this when:
+#### Case 2: Require the Same Tier 1 Domain
 
-- You want to reduce cross-leaf RDMA traffic, but throughput and queue time matter more.
-- A single training job can tolerate some cross-leaf placement.
-
-### Example 2: Require the Same Leaf Group
-
-`kueue.x-k8s.io/podset-required-topology` means the same PodSet must be placed
-entirely within one domain at the specified topology level. If no leaf group
-can fit all Pods at the same time, the Workload remains not admitted until
-resources or configuration change.
+The `kueue.x-k8s.io/podset-required-topology` annotation tells Kueue to place the
+whole PodSet into one domain at the given level. If no domain can fit all Pods at the
+same time, the Workload stays not admitted until resources or configuration change.
 
 ```yaml
 apiVersion: batch/v1
@@ -320,7 +222,7 @@ spec:
   template:
     metadata:
       annotations:
-        kueue.x-k8s.io/podset-required-topology: unifabric.io/scale-out-leaf
+        kueue.x-k8s.io/podset-required-topology: scale-out.unifabric.io/tier-1
     spec:
       restartPolicy: Never
       containers:
@@ -336,73 +238,163 @@ spec:
             nvidia.com/gpu: "1"
 ```
 
-Use this when:
+## Verification
 
-- Training workloads such as AllReduce and AllGather are sensitive to cross-leaf bandwidth.
-- You prefer waiting when topology requirements cannot be met instead of running across leaf groups.
-
-### Verify Scheduling Results
-
-Check Kueue Workload admission:
+Submit a Job from Case 1 or Case 2, then make sure that Kueue admitted the Workload:
 
 ```bash
+kubectl create -f tas-job.yaml
 kubectl -n training get workloads.kueue.x-k8s.io
 kubectl -n training describe workloads.kueue.x-k8s.io <workload-name>
 ```
 
-Check actual Pod placement:
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
+Make sure that the Pods landed on Nodes that share one topology domain:
 
 ```bash
 kubectl -n training get pods -o wide
+kubectl get nodes -L scale-out.unifabric.io/tier-1
 ```
 
-Check the topology labels on the Nodes where Pods landed:
-
-```bash
-kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
+```text
+<!-- TODO: capture output from a real environment -->
 ```
 
-If the Job annotation uses `unifabric.io/scale-out-leaf`:
+The verification passes under these conditions:
 
-- For the `required` example, all Pod nodes should have the same `unifabric.io/scale-out-leaf` value.
-- For the `preferred` example, Kueue first tries same-leaf placement; when resources are insufficient, it may place Pods across leaf groups.
+- For Case 2, all Pod Nodes have the same `scale-out.unifabric.io/tier-1` value.
+- For Case 1, Kueue first tries one domain. When capacity is insufficient, Pods can
+  land across domains, and the Workload is still admitted.
+- For an annotation at a higher level, such as `scale-out.unifabric.io/tier-2`, all
+  Pod Nodes share the label value at that level.
 
-If the Job annotation uses `unifabric.io/scale-out-spine` or another
-higher-level label, check whether all Pod nodes have the same label value at
-that level.
+## Troubleshooting
 
-### Troubleshooting
+### The Workload Stays Not Admitted
 
-Workload remains not admitted:
+First make sure that the preconditions hold: the participating Nodes have every label
+that `Topology.spec.levels[*].nodeLabel` declares, and the Nodes are Ready and not
+cordoned.
 
-- Check whether `kubectl -n training describe workloads.kueue.x-k8s.io <workload-name>` reports insufficient topology domain capacity.
-- Confirm that `ClusterQueue` `nominalQuota` covers the Job's requested `cpu`, `memory`, and `nvidia.com/gpu`.
-- Confirm that target nodes are Ready, not cordoned, and have enough resources in `status.allocatable`.
-- Confirm that participating nodes have all labels declared in Kueue `Topology.spec.levels[*].nodeLabel`.
-- If `Topology.spec.levels` includes `unifabric.io/scale-up`, `unifabric.io/scale-out-spine`, or `unifabric.io/scale-out-core`, confirm that these labels have been written to Nodes.
+1. Read the admission events:
 
-Pod is admitted but cannot be scheduled:
+   ```bash
+   kubectl -n training describe workloads.kueue.x-k8s.io <workload-name>
+   ```
 
-- Check whether GPU taints are covered by `ResourceFlavor.spec.tolerations`.
-- If `ResourceFlavor.spec.nodeLabels` is enabled, confirm that nodes actually have those labels.
-- Check Pod events:
+   A message about insufficient topology domain capacity means that no single domain
+   fits the PodSet.
 
-  ```bash
-  kubectl -n training describe pod <pod-name>
-  ```
+2. Make sure that the `ClusterQueue` `nominalQuota` covers the `cpu`, `memory`, and
+   `nvidia.com/gpu` requests of the Job.
+3. Make sure that the target Nodes have enough resources in `status.allocatable`.
 
-Topology labels are missing or unstable:
+### The Workload Is Admitted but the Pods Stay Pending
 
-- Return to the corresponding installation guide to troubleshoot topology discovery components:
-  [General SONiC RoCE](../getting-started-sonic-roce.md),
-  [Spectrum-X fabric](../getting-started-spectrum-x.md), or
-  [InfiniBand fabric](../getting-started-infiniband.md).
-- Confirm the topology labels that actually exist on Nodes:
+1. Make sure that `ResourceFlavor.spec.tolerations` covers the GPU taints.
+2. If `ResourceFlavor.spec.nodeLabels` is set, make sure that the Nodes have those
+   labels.
+3. Read the Pod events:
 
-  ```bash
-  kubectl get nodes -L unifabric.io/scale-up,unifabric.io/scale-out-core,unifabric.io/scale-out-spine,unifabric.io/scale-out-leaf,kubernetes.io/hostname
-  ```
+   ```bash
+   kubectl -n training describe pod <pod-name>
+   ```
 
-- If Helm values `topoDiscovery.*.nodeLabel.keyTemplate` are customized, the Kueue
-  `Topology.spec.levels[*].nodeLabel` and Job annotation values must be updated
-  accordingly.
+### The Topology Labels Are Missing or Unstable
+
+1. List the labels that exist on the Nodes:
+
+   ```bash
+   kubectl get nodes -L scale-up.unifabric.io/tier-1,scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
+   ```
+
+2. In the SONiC RoCE scenario, inspect the discovery inputs. The Spectrum-X and
+   InfiniBand scenarios write labels through NVIDIA Topograph and do not create these
+   resources. For these two scenarios, go to the scenario guide directly.
+
+   ```bash
+   kubectl get fabricnodes
+   kubectl get fabricnode <node-name> -o yaml
+   ```
+
+   ```yaml
+   apiVersion: unifabric.io/v1beta1
+   kind: FabricNode
+   metadata:
+     name: node-gpu-1
+   status:
+     conditions:
+     - type: Ready
+       status: "True"
+       reason: Ready
+       message: All FabricNode conditions are ready
+     - type: LLDPNeighborsReady
+       status: "True"
+       reason: LLDPNeighborsReady
+       message: All selected RDMA interfaces have LLDP neighbors
+     totalNics: 2
+     nodeRole: GPU
+     nodeIP: 192.168.200.6
+     scaleOutNics:
+     - name: eth1
+       rdma: true
+       rdmaDeviceName: mlx5_0
+       state: up
+       ipv4: 172.17.1.11/24
+       ipv6: ""
+       lldpNeighbor:
+         hostname: gpu-leaf-1
+         mgmtIP: 10.10.10.1
+         mac: 00:11:22:33:44:55
+         port: Ethernet1/1
+         description: GPU leaf switch
+   ```
+
+   Make sure that `Ready` and `LLDPNeighborsReady` in `status.conditions` are `True`.
+
+   ```bash
+   kubectl get switches -o wide
+   kubectl get switch <switch-name> -o yaml
+   ```
+
+   ```yaml
+   apiVersion: unifabric.io/v1beta1
+   kind: Switch
+   metadata:
+     name: gpu-leaf-1
+   spec:
+     mgmtIP: 10.10.10.1
+     role: ScaleOut
+   status:
+     hostname: gpu-leaf-1
+     healthy: true
+     conditions:
+     - type: Connected
+       status: "True"
+       reason: StreamReady
+     lldpNeighborCount: 2
+     lldpNeighbors:
+     - remoteSystemType: KubernetesNode
+       remoteSystemName: node-gpu-1
+     - remoteSystemType: Switch
+       remoteSystemName: gpu-spine-1
+   ```
+
+   Make sure that `status.healthy` is `true` and that `status.lldpNeighbors` contains
+   the expected node and switch peers.
+
+3. If the labels are still missing, go to the troubleshooting section of the scenario
+   guide: [SONiC RoCE](../getting-started-sonic-roce.md),
+   [Spectrum-X](../getting-started-spectrum-x.md), or
+   [InfiniBand](../getting-started-infiniband.md).
+
+## References
+
+- [Topology reference](../reference/topology.md): the aggregated topology resource.
+- [FabricNode reference](../reference/fabricnode.md): the node-side discovery input.
+- [Switch reference](../reference/switch.md): the switch-side discovery input.
+- [Scale-out topology design](../design/scaleout-topology.md): how discovery builds
+  the tiers and the labels.

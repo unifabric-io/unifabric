@@ -29,7 +29,7 @@ After deployment, the cluster should achieve the following goals:
 
 - Unifabric has been installed by following the [basic installation](./getting-started.md).
 - Switches have Docker or another container runtime. If a switch cannot run
-  containers, use the [switch-agent systemd installation](./usage/switch-agent-systemd.md).
+  containers, use the [switch-agent systemd installation](./usage/switch-agent-deployment.md).
 
 ## Configure SONiC RoCE Topology Discovery
 
@@ -195,7 +195,7 @@ LLDP supplies the leaf-to-spine links. After discovery, the real Switch members 
 The installation and onboarding steps below apply only to Case 2.
 
 To distribute certificates and deploy containers to multiple switches, use the project's
-[automated switch-agent deployment script](./usage/deploy-switch-agent-script.md). It removes and
+[automated switch-agent deployment script](./usage/switch-agent-deployment.md). It removes and
 recreates an existing container or deploys one when absent; target addresses and credentials are
 provided only at runtime. The script uses a socket mount by default and can switch to `hostProc`
 through an environment variable.
@@ -207,7 +207,7 @@ Before running it, confirm the following:
 - The switch management network is reachable from the in-cluster Unifabric controller.
 - The switch can run the `switch-agent` container and can pull or pre-load the corresponding image.
   If Docker is not available, install the release binary with
-  [systemd](./usage/switch-agent-systemd.md) instead.
+  [systemd](./usage/switch-agent-deployment.md) instead.
 - LLDP is enabled on the switch, and `lldpcli show neighbors -f json0` on the switch host shows the expected neighbors.
   - `socket` mode only requires the container to mount and access `/run/lldpd.socket`.
   - If the switch cannot mount or access `/run/lldpd.socket`, use `hostProc` mode instead. That mode requires privileged permissions and mounts the host `/proc`.
@@ -271,7 +271,7 @@ Common environment variables:
 | `UNIFABRIC_SWITCH_AGENT_MTLS_KEY_FILE` | `/etc/unifabric/switch-mtls/tls.key` | Path to the switch-agent private key. |
 | `UNIFABRIC_SWITCH_AGENT_MTLS_PEER_CERT_FILE` | `/etc/unifabric/switch-mtls/peer.crt` | Path to the pinned controller peer certificate. |
 | `UNIFABRIC_SWITCH_AGENT_LLDP_REFRESH_INTERVAL` | `10s` | Local LLDP snapshot refresh interval. |
-| `UNIFABRIC_SWITCH_AGENT_LLDP_COLLECTION_MODE` | `socket` | LLDP collection mode. The default is `socket`. If the switch cannot mount the `lldpd` socket, use the host `/proc` namespace collection mode instead. See [switch-agent hostProc LLDP collection](./usage/switch-agent-host-proc.md). |
+| `UNIFABRIC_SWITCH_AGENT_LLDP_COLLECTION_MODE` | `socket` | LLDP collection mode. The default is `socket`. If the switch cannot mount the `lldpd` socket, use the host `/proc` namespace collection mode instead. See [switch-agent hostProc LLDP collection](./usage/switch-agent-deployment.md). |
 | `UNIFABRIC_SWITCH_AGENT_LLDP_SOCKET_PATH` | `/run/lldpd.socket` | lldpd Unix socket path used in `socket` mode. |
 | `UNIFABRIC_SWITCH_AGENT_LLDP_CLI_VERSION` | `1.0.16` | Packaged CLI version used in `socket` mode. Use `1.0.4` for SONiC 202006 through 202311. Keep the default `1.0.16` for other versions. |
 
