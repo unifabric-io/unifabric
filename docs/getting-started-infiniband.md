@@ -1,17 +1,22 @@
-# InfiniBand Fabric
+# Deploy Unifabric on an InfiniBand Fabric
 
 中文版: [getting-started-infiniband.zh.md](./getting-started-infiniband.zh.md)
 
-This guide explains how to deploy Unifabric in an InfiniBand NIC cluster. This scenario is for IB networking, such as Mellanox NICs in IB mode with IB switches.
+## Introduction and Deployment Goals
 
-## Example Topology and Deployment Goals
+This guide deploys Unifabric topology discovery in a cluster with an InfiniBand
+network, for example Mellanox NICs in IB mode with IB switches. In this
+environment, NVIDIA Topograph discovers the fabric topology, and Unifabric
+writes the result to Node labels.
 
-The following diagram shows a three-tier topology with a tier 3 core, tier 2 spine, and tier 1
-leaf switches. The four Nodes belong to two tier 1 performance domains:
+The diagram below shows the example topology for this guide: a three-tier
+fabric with tier 3 core, tier 2 spine, and tier 1 leaf switches. The four Nodes
+belong to two tier 1 performance domains:
 
 ![Example InfiniBand three-tier topology](images/infiniband-topology-example.png)
 
-After scale-out topology discovery completes, the four Nodes should have the following labels:
+After scale-out topology discovery completes, the four Nodes carry these
+labels:
 
 | Node | Expected labels |
 | --- | --- |
@@ -20,24 +25,33 @@ After scale-out topology discovery completes, the four Nodes should have the fol
 | `node3` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006637c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
 | `node4` | `scale-out.unifabric.io/tier-1=S-fc6a1c03006637c0`<br>`scale-out.unifabric.io/tier-2=S-fc6a1c0300afca40`<br>`scale-out.unifabric.io/tier-3=S-fc6a1c0300b03c40` |
 
-A larger tier number indicates a position closer to the upper layers of the network. Scale-up
-labels are derived from the high-speed GPU interconnect topology within each Node and are not
-shown in the diagram.
+A larger tier number is a position closer to the upper layers of the network.
+Scale-up labels come from the GPU interconnect topology inside each Node. The
+diagram does not show them.
 
-After deployment, you can also use Unifabric Agent metrics and the built-in RDMA Grafana
-Dashboard to observe Node RDMA state, including throughput, utilization, QoS, congestion, and
-error metrics by cluster, Node, Pod, and Workload.
+After the deployment, Agent metrics and the built-in RDMA Grafana dashboard
+show Node RDMA state: throughput, utilization, QoS, congestion, and error
+metrics by cluster, Node, Pod, and Workload.
 
 ## Prerequisites
 
-- Unifabric has been installed by following the [basic installation](./getting-started.md).
-- The Nodes have RDMA devices running in IB mode.
+Make sure that each item below is true before you continue:
 
-## Configure InfiniBand Topology Discovery
+- [ ] Unifabric is installed through the [basic installation](./getting-started.md).
+- [ ] The Nodes have RDMA devices in IB mode.
 
-Complete the [basic installation](./getting-started.md), then run the following Helm upgrade for
-the InfiniBand scale-up and scale-out networks. It changes only the scenario-specific modes and
-retains every other value from the base installation.
+## Installation
+
+First complete the [basic installation](./getting-started.md). It deploys the
+Controller, the Agent, and the observability components that every scenario
+shares. This guide adds no other installation step.
+
+## Environment Configuration
+
+Select NVIDIA Topograph as the writer for the InfiniBand scale-up and scale-out
+networks. The command changes only the scenario-specific modes and keeps every
+other value from the basic installation. Run it on a host with `kubectl` and
+Helm access to the cluster:
 
 ```bash
 helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
@@ -48,9 +62,14 @@ helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --wait
 ```
 
-## Verify the Deployment
+```text
+<!-- TODO: capture output from a real environment -->
+```
 
-Check topograph components, node-data-broker DaemonSet, Node annotation, and Node labels:
+## Verification
+
+Inspect the topograph components, the node-data-broker DaemonSet, and the Node
+labels:
 
 ```bash
 kubectl -n unifabric-system get pods
@@ -59,7 +78,7 @@ kubectl get fabricnodes.unifabric.io
 kubectl get nodes -L scale-up.unifabric.io/tier-1,scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
 ```
 
-The FabricNode list should include every target Node with `READY` set to `True`:
+The `FabricNode` list contains every target Node with `READY` set to `True`:
 
 ```text
 NAME                TOTALNICS   READY   ROLE   NODEIP
@@ -69,17 +88,23 @@ node3               2           True    GPU    10.0.0.3
 node4               2           True    GPU    10.0.0.4
 ```
 
-Inspect the Agent report for an individual Node:
+Inspect the Agent report for one Node. The short name `fn` also selects
+`FabricNode` resources:
 
 ```bash
 kubectl get fabricnode <node-name> -o yaml
 ```
 
-Confirm that `status.nodeRole`, `status.scaleOutNics`, and `status.conditions`
-match the expected state and that participating IB NICs are `up`. You can also
-query `FabricNode` resources with the `fn` short name.
+```text
+<!-- TODO: capture output from a real environment -->
+```
 
-After ScaleOut topology discovery succeeds, the `scaleout` Topology is created:
+Make sure that `status.nodeRole`, `status.scaleOutNics`, and
+`status.conditions` match the expected state and that the participating IB NICs
+are `up`.
+
+After scale-out topology discovery succeeds, the Controller creates the
+`scaleout` Topology:
 
 ```bash
 kubectl get topo
@@ -90,75 +115,62 @@ NAME       AGE
 scaleout   113m
 ```
 
-Inspect the complete result:
+Inspect the complete result. `status.domains` describes the parent-child
+relationships between performance domains. `status.nodes[].switchDomainPath`
+records the complete path of each Node from tier 3 down to tier 1:
 
 ```bash
 kubectl get topo scaleout -o yaml
 ```
 
-The following example represents a three-tier leaf, spine, and core topology.
-`status.domains` describes parent-child relationships between performance
-domains, while `status.nodes[].domainPath` records each Node's complete path
-from tier 3 to tier 1:
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Topology
-metadata:
-  name: scaleout
-status:
-  domains:
-    - name: S-fc6a1c0300b03c40
-      tier: 3
-    - name: S-fc6a1c0300afca40
-      parent: S-fc6a1c0300b03c40
-      tier: 2
-    - name: S-fc6a1c03006636c0
-      parent: S-fc6a1c0300afca40
-      tier: 1
-    - name: S-fc6a1c03006637c0
-      parent: S-fc6a1c0300afca40
-      tier: 1
-  nodes:
-    - domainPath:
-        - S-fc6a1c0300b03c40
-        - S-fc6a1c0300afca40
-        - S-fc6a1c03006636c0
-      nodes:
-        - node1
-        - node2
-    - domainPath:
-        - S-fc6a1c0300b03c40
-        - S-fc6a1c0300afca40
-        - S-fc6a1c03006637c0
-      nodes:
-        - node3
-        - node4
+```text
+<!-- TODO: capture output from a real environment -->
 ```
 
-When configuring Kueue, Volcano, or KAI Scheduler, use only labels that are actually written to Nodes.
+When you configure Kueue, Volcano, or KAI Scheduler, use only labels that are
+written to Nodes.
 
 ## Troubleshooting
 
-For general `FabricNode` and RDMA metrics troubleshooting, see
-[Basic installation troubleshooting](./getting-started.md#troubleshooting).
+First rule out the general `FabricNode` and RDMA metrics problems with the
+[basic installation troubleshooting](./getting-started.md#troubleshooting).
 
 ### Node Labels Are Not Written
 
-- Confirm that NVIDIA topograph, node-observer, and node-data-broker are running and have permission to update Nodes.
-- Confirm that node-data-broker Pods run on target GPU nodes.
-- If ScaleOut labels are not written, confirm that `ibnetdiscover` is available
-  in the node-data-broker Pod.
-- If `topoDiscovery.*.nodeLabel.keyTemplate` values are customized, scheduler label keys must be updated accordingly.
+1. Make sure that NVIDIA topograph, node-observer, and node-data-broker are
+   running and have permission to update Nodes.
+2. Make sure that node-data-broker Pods run on the target GPU nodes.
+3. If scale-out labels are not written, make sure that `ibnetdiscover` is
+   available in the node-data-broker Pod.
+4. If `topoDiscovery.*.nodeLabel.keyTemplate` values are customized, update the
+   scheduler label keys to match.
 
 ## Uninstall
+
+Remove the Helm release:
 
 ```bash
 helm uninstall unifabric --namespace unifabric-system --wait
 ```
 
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
+If you no longer need the CRDs, delete them. This also deletes all `FabricNode`,
+`Switch`, and `Topology` resources:
+
+```bash
+kubectl delete crd fabricnodes.unifabric.io switches.unifabric.io topologies.unifabric.io
+```
+
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
 ## Next Steps
 
-- Return to the [documentation index](./README.md).
-- Read the [Kueue TAS workload example](./usage/workload-tas.md).
-- See the [Helm values reference](../chart/README.md).
+- Use the labels in a scheduler with the [Kueue TAS workload example](./usage/workload-tas.md).
+- Render the topology with the [topology visualization guide](./usage/topology-visualization.md).
+- Look up fields in the [FabricNode reference](./reference/fabricnode.md).
+- Tune the installation with the [Helm values reference](../chart/README.md).

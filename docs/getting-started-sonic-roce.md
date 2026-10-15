@@ -1,41 +1,53 @@
-# General SONiC RoCE
+# Deploy Unifabric on a General SONiC RoCE Fabric
 
 中文版: [getting-started-sonic-roce.zh.md](./getting-started-sonic-roce.zh.md)
 
-This guide explains how to deploy Unifabric in a cluster where SONiC switches carry the RoCE network. In this scenario, Unifabric discovers scale-out leaf, spine, and core topology from node RDMA NICs, `FabricNode` LLDP neighbor information, and switch-side switch-agent LLDP snapshots.
+## Introduction and Deployment Goals
 
-## Choose a Deployment Scenario
+This guide deploys Unifabric topology discovery in a cluster where SONiC switches
+carry the RoCE network. RoCE is RDMA over a converged Ethernet fabric. Unifabric
+discovers the leaf, spine, and core topology from node RDMA NICs, from `FabricNode`
+LLDP neighbors, and optionally from switch-side LLDP snapshots. LLDP is a protocol in
+which each device announces itself to its link peers.
 
-| Deployment scenario | Use it when | What you need |
+After you finish this guide, the cluster will show the following results:
+
+- Nodes carry tiered topology labels such as `scale-out.unifabric.io/tier-1`, the tier
+  nearest to a Node, followed by `tier-2`, `tier-3`, and so on. Built-in discovery uses
+  `tierN-groupM` label values, for example `scale-out.unifabric.io/tier-1=tier1-group1`.
+- `FabricNode` and `Switch` resources expose the discovery input, and `Topology`
+  resources expose the aggregated read-only topology.
+- Node RDMA state is observable through Agent metrics.
+
+This guide covers two cases. Select one before you start:
+
+| Case | Use it when | What you need |
 | --- | --- | --- |
-| Scenario 1: switches run `switch-agent` (recommended) | The deployment environment allows the operations team to run Unifabric Switch Agent on SONiC switches as a Docker container or native binary, and automatic switch-to-switch topology discovery is preferred to manual maintenance | LLDP is enabled on the switches<br />The Kubernetes Node running `unifabric-controller` can reach TCP port `8090` on each switch (the switch-agent gRPC port) |
-| Scenario 2: switches do not run `switch-agent` | Security policies prohibit running Unifabric Switch Agent on the switches, or another team manages the switches | Kubernetes Nodes have discovered their leaf switches through node-side LLDP<br />An administrator creates `Switch` CRs for tiers above the leaf layer based on the actual topology and maintains the switch-neighbor annotations |
-
-## Deployment Goals
-
-After deployment, the cluster should achieve the following goals:
-
-- Nodes are labeled with tiered topology labels consumed by schedulers. By default they start
-  with `scale-out.unifabric.io/tier-1`, the tier nearest to a Node, followed by
-  `scale-out.unifabric.io/tier-2`, `scale-out.unifabric.io/tier-3`, and so on.
-- Node RDMA state is observable through Unifabric Agent metrics, including RDMA device, port,
-  priority, and Pod attribution metrics.
-- `FabricNode` and `Switch` CRs expose input state, `Topology` CRs expose the aggregated read-only topology, and schedulers consume the topology labels written to Nodes.
-
-> Built-in LLDP discovery uses `tierN-groupM` label values, for example
-> `scale-out.unifabric.io/tier-1=tier1-group1`.
+| Case 1: node LLDP only | Security policies prohibit software on the switches, or another team manages the switches | Nodes discover their leaf switches through node-side LLDP. An administrator declares tiers above the leaf layer with `Switch` resources and neighbor annotations. |
+| Case 2: switches run `switch-agent` (recommended) | The operations team can run the Unifabric Switch Agent on SONiC switches, and you want automatic switch-to-switch discovery | LLDP is enabled on the switches. The Kubernetes Node that runs `unifabric-controller` can reach TCP port `8090` on each switch. |
 
 ## Prerequisites
 
-- Unifabric has been installed by following the [basic installation](./getting-started.md).
-- Switches have Docker or another container runtime. If a switch cannot run
-  containers, use the [switch-agent systemd installation](./usage/switch-agent-systemd.md).
+Make sure that each item below is true before you continue:
 
-## Configure SONiC RoCE Topology Discovery
+- [ ] Unifabric is installed through the [basic installation](./getting-started.md).
+- [ ] SONiC switches carry the RoCE network, and LLDP is enabled on every switch.
+- [ ] Nodes have RDMA NICs, and the devices are visible under `/sys/class/infiniband`.
+- [ ] For Case 2 only: each switch runs Docker or another container runtime. If a
+      switch cannot run containers, use the
+      [switch-agent systemd installation](./usage/switch-agent-deployment.md).
+- [ ] For Case 2 only: the Node that runs `unifabric-controller` can reach TCP port
+      `8090` on the management IP of each switch.
 
-Complete the [basic installation](./getting-started.md). Its defaults already select
-`unifabric-roce` as the scale-out writer, so no additional change is normally required. To apply
-the scenario setting explicitly, run:
+## Installation
+
+First complete the [basic installation](./getting-started.md). It deploys the
+Controller, the Agent, and the observability components that every scenario shares.
+
+The basic installation defaults already select `unifabric-roce` as the scale-out
+topology writer. No additional change is normally required. To apply the scenario
+setting explicitly, run this command. Use a host with `kubectl` and Helm access to
+the cluster:
 
 ```bash
 helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
@@ -45,487 +57,365 @@ helm upgrade unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --wait
 ```
 
-If the RoCE fabric also carries the storage network, add:
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
+If the RoCE fabric also carries the storage network, add this option to the command
+above:
 
 ```bash
 --set topoDiscovery.storage.mode=unifabric-roce
 ```
 
-These settings select only the topology writers for the SONiC RoCE scenario. Installation, image,
-and observability settings remain those from the basic installation.
+These settings select only the topology writers for the SONiC RoCE scenario. Image and
+observability settings remain those from the basic installation.
 
-## Choose a Topology Discovery Method
+## Environment Configuration
 
-Helm deploys only the controller and node agent in Kubernetes; it does not install
-`switch-agent` on switches. Unifabric selects the discovery method independently for scale-out and
-storage according to `spec.role`. Choose one of the following methods depending on whether
-switch-side LLDP is required.
-
-The following diagram is the shared example for both discovery methods. `node1` and `node2`
-connect through `leaf1` and `leaf2` to form `tier1-group1`; `node3` and `node4` connect through
-`leaf3` and `leaf4` to form `tier1-group2`; their common uplink `spine1` forms `tier2-group1`.
+Both cases below use the same example fabric. `node1` and `node2` connect through
+`leaf1` and `leaf2` and form `tier1-group1`. `node3` and `node4` connect through
+`leaf3` and `leaf4` and form `tier1-group2`. Their common uplink `spine1` forms
+`tier2-group1`.
 
 ![RoCE switch topology discovery example](images/sonic-roce-topology-example.jpg)
 
-### Case 1: Use Node LLDP Only
+### Case 1: Node LLDP Only
 
-This method does not require `switch-agent` on the switches:
+In this case, no software runs on the switches. When no same-role `Switch` resources
+exist, Unifabric enters node-only mode. It treats the switch hostnames that
+`FabricNode` LLDP reports as synthetic leaves and generates only tier 1.
 
-1. When there are no same-role `Switch` CRs, Unifabric enters node-only mode. Switch hostnames
-   reported by FabricNode LLDP are treated as synthetic leaves, and only tier 1 is generated.
-2. To describe upper tiers such as spine or core, create only those upper-tier `Switch` CRs and add
-   the `unifabric.io/switch-neighbors` annotation to every CR. Node-discovered leaves remain synthetic,
-   while the annotations declare links from upper-tier Switches to synthetic leaves or other
-   upper-tier Switches.
+1. Wait for the Agents to report LLDP neighbors. No switch-side action is required for
+   tier 1. In the example fabric, discovery generates the two tier 1 domains, and each
+   Node receives its `scale-out.unifabric.io/tier-1` label.
 
-Semi-automatic mode requires every same-role `Switch` CR to contain the
-`unifabric.io/switch-neighbors` key. Do not create CRs for the synthetic leaves, and `spec.mgmtIP` is not
-required. Mode selection checks only whether the annotation key exists. An empty value or `[]`
-therefore selects semi-automatic mode but supplies no neighbor link.
+2. To describe upper tiers such as spine or core, create one `Switch` resource per
+   upper-tier switch and add the `unifabric.io/switch-neighbors` annotation to each.
+   Do not create resources for the leaves, and do not set `spec.mgmtIP`. For the
+   example fabric, apply this file on a host with `kubectl` access:
 
-> **Important:** `unifabric.io/switch-neighbors` lists switch neighbors only.
-> A node-discovered synthetic leaf is a switch neighbor, but a Kubernetes Node
-> name must not appear in the array. Node-to-switch links come from FabricNode
-> LLDP and are not repeated in this annotation.
+   ```yaml
+   apiVersion: unifabric.io/v1beta1
+   kind: Switch
+   metadata:
+     name: spine1
+     annotations:
+       unifabric.io/switch-neighbors: '["leaf1", "leaf2", "leaf3", "leaf4"]'
+   spec:
+     role: ScaleOut
+   ```
 
-#### Example 1: Discover Leaves in Node-Only Mode
+   ```bash
+   kubectl apply -f spine1.yaml
+   ```
 
-In the diagram, FabricNode LLDP reports that `node1` and `node2` connect to `leaf1` and `leaf2`,
-while `node3` and `node4` connect to `leaf3` and `leaf4`. With no ScaleOut `Switch` CRs, all four
-leaf hostnames are synthetic switches. Only the two tier 1 Domains are generated; `tier2-group1`
-is absent because `spine1` has not been declared:
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Topology
-metadata:
-  name: scaleout
-status:
-  domains:
-    - name: tier1-group1
-      tier: 1
-    - name: tier1-group2
-      tier: 1
-  nodes:
-    - domainPath:
-        - tier1-group1
-      nodes:
-        - node1
-        - node2
-    - domainPath:
-        - tier1-group2
-      nodes:
-        - node3
-        - node4
-```
+> **Warning:** Do not put Kubernetes Node names in `unifabric.io/switch-neighbors`.
+> The annotation lists switch neighbors only. Node-to-switch links come from
+> `FabricNode` LLDP. A Node name in the array corrupts the computed topology.
 
-Each Node receives only its `scale-out.unifabric.io/tier-1` label. Both Domains have no `members`
-because synthetic leaves do not correspond to real `Switch` CRs.
+> **Note:** Mode selection tests only whether the annotation key exists on every
+> same-role `Switch`. An empty value or `[]` selects this mode but supplies no
+> neighbor link.
 
-#### Example 2: Add spine1 with an Annotation
+After the apply, all four Nodes receive both tier 1 and tier 2 labels. The
+[Verification](#verification) section shows the expected `Topology` content.
 
-To produce `tier2-group1` from the diagram, create only the upper-tier `spine1` `Switch` CR and
-reference all four leaf hostnames reported by FabricNode LLDP:
+### Case 2: Automatic Discovery with switch-agent
 
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Switch
-metadata:
-  name: spine1
-  annotations:
-    unifabric.io/switch-neighbors: '["leaf1", "leaf2", "leaf3", "leaf4"]'
-spec:
-  role: ScaleOut
-```
+In this case, `switch-agent` runs on every participating switch and reports LLDP
+snapshots to the Controller over mutually authenticated TLS (mTLS). If any same-role
+`Switch` resource omits the `unifabric.io/switch-neighbors` key, Unifabric enters
+fully automatic mode and ignores all such annotations. To keep the configuration
+unambiguous, omit the annotation from every `Switch`.
 
-Do not create `Switch` CRs for `leaf1` through `leaf4`, and do not set `spec.mgmtIP` on `spine1`.
-After applying the resource, all four Nodes receive both tier 1 and tier 2 labels:
+> **Note:** To deploy to many switches at once, use the
+> [automated switch-agent deployment script](./usage/switch-agent-deployment.md)
+> instead of the manual steps below.
 
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Topology
-metadata:
-  name: scaleout
-status:
-  domains:
-    - members:
-        - spine1
-      name: tier2-group1
-      tier: 2
-    - name: tier1-group1
-      parent: tier2-group1
-      tier: 1
-    - name: tier1-group2
-      parent: tier2-group1
-      tier: 1
-  nodes:
-    - domainPath:
-        - tier2-group1
-        - tier1-group1
-      nodes:
-        - node1
-        - node2
-    - domainPath:
-        - tier2-group1
-        - tier1-group2
-      nodes:
-        - node3
-        - node4
-```
+1. Export the pinned mTLS certificates. Run these commands on a host with `kubectl`
+   access to the cluster:
 
-### Case 2: Use switch-agent for Automatic Discovery
+   ```bash
+   mkdir -p ./tmp-switch-mtls
 
-To discover complete leaf, spine, and core connectivity from switch LLDP, install `switch-agent`
-on every participating physical switch and create its corresponding `Switch` CR. If any same-role
-`Switch` CR omits the `unifabric.io/switch-neighbors` key, Unifabric enters fully automatic mode:
+   kubectl -n unifabric-system get secret switch-controller-mtls-agent -o jsonpath='{.data.tls\.crt}' | base64 -d > ./tmp-switch-mtls/tls.crt
+   kubectl -n unifabric-system get secret switch-controller-mtls-agent -o jsonpath='{.data.tls\.key}' | base64 -d > ./tmp-switch-mtls/tls.key
+   kubectl -n unifabric-system get secret switch-controller-mtls-agent -o jsonpath='{.data.peer\.crt}' | base64 -d > ./tmp-switch-mtls/peer.crt
+   ```
 
-- A real `Switch` CR must exist for every participating leaf, spine, and core.
-- The controller uses LLDP snapshots reported by switch-agent.
-- All `unifabric.io/switch-neighbors` annotations are ignored. To keep the configuration unambiguous,
-  omit this annotation from every Switch in fully automatic mode.
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-For the diagram, deploy switch-agent on `leaf1` through `leaf4` and `spine1`, and create five
-same-named ScaleOut `Switch` CRs. Node LLDP supplies the Node-to-leaf links, while switch-agent
-LLDP supplies the leaf-to-spine links. After discovery, the real Switch members are:
+2. Log in to the target switch and create the certificate directory:
 
-- `tier1-group1`: `leaf1`, `leaf2`
-- `tier1-group2`: `leaf3`, `leaf4`
-- `tier2-group1`: `spine1`
+   ```bash
+   sudo mkdir -p /opt/unifabric-switch-agent/mtls
+   ```
 
-The installation and onboarding steps below apply only to Case 2.
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-To distribute certificates and deploy containers to multiple switches, use the project's
-[automated switch-agent deployment script](./usage/deploy-switch-agent-script.md). It removes and
-recreates an existing container or deploys one when absent; target addresses and credentials are
-provided only at runtime. The script uses a socket mount by default and can switch to `hostProc`
-through an environment variable.
+   Then copy `tls.crt`, `tls.key`, and `peer.crt` into
+   `/opt/unifabric-switch-agent/mtls/` on the switch.
 
-## Install switch-agent and Switch Resources
+3. On the switch, make sure that LLDP sees the expected neighbors:
 
-Before running it, confirm the following:
+   ```bash
+   lldpcli show neighbors -f json0
+   ```
 
-- The switch management network is reachable from the in-cluster Unifabric controller.
-- The switch can run the `switch-agent` container and can pull or pre-load the corresponding image.
-  If Docker is not available, install the release binary with
-  [systemd](./usage/switch-agent-systemd.md) instead.
-- LLDP is enabled on the switch, and `lldpcli show neighbors -f json0` on the switch host shows the expected neighbors.
-  - `socket` mode only requires the container to mount and access `/run/lldpd.socket`.
-  - If the switch cannot mount or access `/run/lldpd.socket`, use `hostProc` mode instead. That mode requires privileged permissions and mounts the host `/proc`.
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-Pay attention to the following impact:
+4. Start `switch-agent` on the switch. The command below uses Docker bridge networking
+   and publishes the gRPC port through `-p 8090:8090`. It reads LLDP through the
+   mounted `lldpd` socket and does not require host network or privileged permissions.
 
-- `switch-agent` exposes a gRPC port on the switch management network through container port mapping. The default port is `8090`, and pinned mTLS is enabled by default.
+   ```bash
+   export SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:<release-tag>"
+   export SWITCH_NAME="$(hostname)"
 
-### Export switch-agent pinned mTLS certificates
+   docker pull "${SWITCH_AGENT_IMAGE}"
 
-Run the following certificate export commands on the Kubernetes control node, or on another management host that already has `kubectl` access to the cluster.
+   docker rm -f unifabric-switch-agent 2>/dev/null || true
 
-```bash
-mkdir -p ./tmp-switch-mtls
+   docker run -d \
+     --name unifabric-switch-agent \
+     --restart unless-stopped \
+     -p 8090:8090 \
+     -e UNIFABRIC_SWITCH_AGENT_SWITCH_NAME="${SWITCH_NAME}" \
+     -v /run/lldpd.socket:/run/lldpd.socket \
+     -v /opt/unifabric-switch-agent/mtls:/etc/unifabric/switch-mtls:ro \
+     "${SWITCH_AGENT_IMAGE}" \
+     /usr/bin/unifabric/switch-agent
+   ```
 
-kubectl -n unifabric-system get secret switch-controller-mtls-agent -o jsonpath='{.data.tls\.crt}' | base64 -d > ./tmp-switch-mtls/tls.crt
-kubectl -n unifabric-system get secret switch-controller-mtls-agent -o jsonpath='{.data.tls\.key}' | base64 -d > ./tmp-switch-mtls/tls.key
-kubectl -n unifabric-system get secret switch-controller-mtls-agent -o jsonpath='{.data.peer\.crt}' | base64 -d > ./tmp-switch-mtls/peer.crt
-```
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-After exporting the files, log in to the target switch and prepare the directory there:
+   > **Note:** If the switch runs SONiC 202006 through 202311, add
+   > `-e UNIFABRIC_SWITCH_AGENT_LLDP_CLI_VERSION=1.0.4`. Keep the default `1.0.16`
+   > for other versions.
 
-```bash
-sudo mkdir -p /opt/unifabric-switch-agent/mtls
-```
+   > **Note:** If the switch cannot mount `/run/lldpd.socket`, use the
+   > [hostProc collection mode](./usage/switch-agent-deployment.md) instead. That
+   > mode requires privileged permissions and mounts the host `/proc`. For all other
+   > environment variables, see the
+   > [switch-agent reference](./usage/switch-agent-deployment.md).
 
-Then copy `tls.crt`, `tls.key`, and `peer.crt` to `/opt/unifabric-switch-agent/mtls/` on the switch.
+5. Make sure that the container is running and that the logs contain no errors:
 
-### Start switch-agent on the switch
+   ```bash
+   docker ps | grep unifabric-switch-agent
+   docker logs --tail 100 unifabric-switch-agent
+   ```
 
-By default, switch-agent reads LLDP through the mounted `lldpd` socket and uses the packaged `lldpcli` `1.0.16`. The following command uses Docker bridge networking and publishes the gRPC port to the switch management IP through `-p 8090:8090`. It does not require host network, host UTS, or privileged permissions.
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-```bash
-export SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:<release-tag>"
-export SWITCH_NAME="$(hostname)"
+6. Create one `Switch` resource per switch. The Controller connects to `spec.mgmtIP`
+   to read LLDP snapshots. For the example fabric, create five resources: `leaf1`
+   through `leaf4` and `spine1`. Each resource looks like this:
 
-docker pull "${SWITCH_AGENT_IMAGE}"
+   ```yaml
+   apiVersion: unifabric.io/v1beta1
+   kind: Switch
+   metadata:
+     name: leaf1
+   spec:
+     mgmtIP: 192.0.2.11
+     role: ScaleOut
+     grpcPort: 8090
+   ```
 
-docker rm -f unifabric-switch-agent 2>/dev/null || true
+   Set `role` to the network that the switch serves. `ScaleOut` means that the switch
+   connects host RDMA NICs used for cross-node traffic. `Storage` means that the switch
+   connects the NICs that `fabricNode.storageInterfaceSelector` selects. `ScaleUp`
+   means that the switch connects GPU-side interconnect NICs. The default is
+   `ScaleOut`. `grpcPort` defaults to `8090`.
 
-docker run -d \
-  --name unifabric-switch-agent \
-  --restart unless-stopped \
-  -p 8090:8090 \
-  -e UNIFABRIC_SWITCH_AGENT_SWITCH_NAME="${SWITCH_NAME}" \
-  -v /run/lldpd.socket:/run/lldpd.socket \
-  -v /opt/unifabric-switch-agent/mtls:/etc/unifabric/switch-mtls:ro \
-  "${SWITCH_AGENT_IMAGE}" \
-  /usr/bin/unifabric/switch-agent
-```
+   On a host with `kubectl` access, apply the files:
 
-Common environment variables:
+   ```bash
+   kubectl apply -f leaf1.yaml
+   ```
 
-| Environment variable | Default | Meaning |
-| --- | --- | --- |
-| `UNIFABRIC_SWITCH_AGENT_LOG_LEVEL` | `info` | Log level. Supported values are `debug`, `info`, `warn`, and `error`. |
-| `UNIFABRIC_SWITCH_AGENT_SWITCH_NAME` | `$hostname` | Local switch name reported in LLDP snapshots. |
-| `UNIFABRIC_SWITCH_AGENT_LISTEN_ADDRESS` | `:8090` | gRPC listen address exposed by switch-agent. |
-| `UNIFABRIC_SWITCH_AGENT_MTLS_ENABLED` | `true` | Enables pinned mTLS. It must match the controller mTLS configuration. |
-| `UNIFABRIC_SWITCH_AGENT_MTLS_CERT_FILE` | `/etc/unifabric/switch-mtls/tls.crt` | Path to the switch-agent certificate. |
-| `UNIFABRIC_SWITCH_AGENT_MTLS_KEY_FILE` | `/etc/unifabric/switch-mtls/tls.key` | Path to the switch-agent private key. |
-| `UNIFABRIC_SWITCH_AGENT_MTLS_PEER_CERT_FILE` | `/etc/unifabric/switch-mtls/peer.crt` | Path to the pinned controller peer certificate. |
-| `UNIFABRIC_SWITCH_AGENT_LLDP_REFRESH_INTERVAL` | `10s` | Local LLDP snapshot refresh interval. |
-| `UNIFABRIC_SWITCH_AGENT_LLDP_COLLECTION_MODE` | `socket` | LLDP collection mode. The default is `socket`. If the switch cannot mount the `lldpd` socket, use the host `/proc` namespace collection mode instead. See [switch-agent hostProc LLDP collection](./usage/switch-agent-host-proc.md). |
-| `UNIFABRIC_SWITCH_AGENT_LLDP_SOCKET_PATH` | `/run/lldpd.socket` | lldpd Unix socket path used in `socket` mode. |
-| `UNIFABRIC_SWITCH_AGENT_LLDP_CLI_VERSION` | `1.0.16` | Packaged CLI version used in `socket` mode. Use `1.0.4` for SONiC 202006 through 202311. Keep the default `1.0.16` for other versions. |
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-After startup, first check whether the container is running and whether the logs contain errors:
+## Verification
+
+Make sure that the Controller and the Agent are ready:
 
 ```bash
-docker ps | grep unifabric-switch-agent
-docker logs --tail 100 unifabric-switch-agent
-```
-
-### Create Switch resources
-
-After switch-agent is running on the switches, create one `Switch` YAML for each switch. The Unifabric Controller connects by `spec.mgmtIP` to read LLDP information.
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Switch
-metadata:
-  name: leaf1
-spec:
-  mgmtIP: 192.0.2.11
-  role: ScaleOut
-  grpcPort: 8090
-```
-
-Fields to care about in `spec`:
-
-- `mgmtIP`: required when connecting to switch-agent; omit it for a label-only Switch used solely to enrich topology members.
-- `role`: optional. Identifies whether the switch belongs to the scale-out, scale-up, or storage network. Supported values are `ScaleOut`, `ScaleUp`, and `Storage`. Defaults to `ScaleOut` when omitted.
-- `grpcPort`: optional. gRPC port of switch-agent. Defaults to `8090`.
-
-You can choose `role` based on the NICs connected to the switch and the purpose of the network:
-
-- `ScaleOut`: the switch connects to host-side RDMA NICs used for cross-node GPU training or service traffic. These NICs participate in scale-out leaf / spine / core topology calculation.
-- `ScaleUp`: the switch connects to GPU-side scale-up NICs used for GPU-to-GPU communication within the same scale-up domain. These NICs do not participate in scale-out topology calculation.
-- `Storage`: the switch connects to host-side NICs used for storage access. These NICs should correspond to the storage NICs selected by `fabricNode.storageInterfaceSelector`.
-
-After the YAML is ready, run `kubectl apply -f <switch>.yaml` on the Kubernetes control node to create the switch CR.
-
-Then use `kubectl get switch` to check whether neighbor information has been synchronized. The deployment verification section below includes example output.
-
-## Verify the Deployment
-
-Wait for the controller and agent to be ready:
-
-```bash
-kubectl -n unifabric-system get pods
 kubectl -n unifabric-system rollout status deployment/unifabric-controller
 kubectl -n unifabric-system rollout status daemonset/unifabric-agent
 ```
 
-Inspect `FabricNode`:
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
+Inspect a `FabricNode`:
 
 ```bash
-kubectl get fabricnodes
 kubectl get fabricnode <node-name> -o yaml
 ```
 
-Check:
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
+Make sure that the output satisfies all of the following:
 
 - `status.scaleOutNics` contains the expected scale-out RDMA NICs.
-- `status.storageNics` contains only storage network interfaces.
 - `status.scaleOutNics[*].lldpNeighbor.hostname` is present.
 - `Ready` and `LLDPNeighborsReady` in `status.conditions` are `True`.
 
-Inspect switch status and Node labels:
+For Case 2, inspect the `Switch` resources:
 
 ```bash
-kubectl get switches -o wide
-kubectl get switch <switch-name> -o yaml
-kubectl get nodes -L scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,scale-out.unifabric.io/tier-3,kubernetes.io/hostname
+kubectl get switch
 ```
 
-For example, in the current test environment you may see output similar to:
-
-```bash
-$ kubectl get switch
+```text
 NAME     MGMTIP            ROLE       HEALTHY   NEIGHBORS
 leaf1    192.168.122.72    ScaleOut   true      2
 leaf2    192.168.122.80    ScaleOut   true      2
 spine1   192.168.122.163   ScaleOut   true      2
 ```
 
-Check:
+Make sure that `HEALTHY` is `true` and `NEIGHBORS` is greater than `0` for every
+switch.
 
-- `Switch.status.healthy` and conditions reflect the current connection state. Health is informational and does not filter stored topology data.
-- `Switch.status.lldpNeighborCount` is greater than `0`.
-- Nodes have a continuous sequence of `scale-out.unifabric.io/tier-N` labels, with tier1 nearest to the Node.
-
-When configuring Kueue, Volcano, or KAI Scheduler, use only labels that are actually written to Nodes by the command above. If the network has only a leaf layer, or the cluster has no Switch CRs and is in node-only mode, tier1 alone is expected.
-
-Verify RDMA metrics resources:
+Inspect the Node labels:
 
 ```bash
-kubectl -n unifabric-system get service unifabric-agent-metrics
-kubectl -n unifabric-system get servicemonitor unifabric-agent-metrics
+kubectl get nodes -L scale-out.unifabric.io/tier-1,scale-out.unifabric.io/tier-2,kubernetes.io/hostname
 ```
-
-Check the Agent metrics endpoint directly:
-
-```bash
-POD_IP=$(kubectl -n unifabric-system get pod -l app.kubernetes.io/component=unifabric-agent -o jsonpath='{.items[0].status.podIP}')
-curl -s "http://${POD_IP}:8082/metrics" | grep '^unifabric_'
-```
-
-Check RDMA metric NIC classification:
-
-```bash
-curl -s "http://${POD_IP}:8082/metrics" | grep 'kind="scaleOut"'
-```
-
-### Inspect the Topology CR
-
-The controller creates a cluster-scoped Topology CR only for a source that has produced a valid Domain and Node group. Topology has no `spec`; its `status` is a read-only view aggregated from Node and Switch labels:
-
-```bash
-kubectl get topologies
-```
-
-For example, when both scale-out and storage topology have been discovered:
 
 ```text
-NAME       AGE
-scaleout   34s
-storage    34s
+<!-- TODO: capture output from a real environment -->
 ```
 
-The absence of `scaleup` means that no valid scale-up Domain has been produced; it does not indicate a deployment failure.
+Make sure that each Node has a contiguous sequence of
+`scale-out.unifabric.io/tier-N` labels, with tier 1 nearest to the Node. In Case 1
+without upper-tier `Switch` resources, tier 1 alone is the expected result.
 
-Inspect the scale-out topology:
+Inspect the aggregated topology. The Controller creates the `Topology` resource only
+after discovery produces a valid result:
 
 ```bash
 kubectl get topology scaleout -o yaml
 ```
 
-The following observed output contains a tier 1 Domain formed by `leaf01` through `leaf04`, and a tier 2 Domain formed by `spine01` and `spine02`:
+For Case 2 with the example fabric, the status contains both tiers, and
+`switchMember` lists the real `Switch` names:
 
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Topology
-metadata:
-  name: scaleout
-status:
-  domains:
-    - members:
-        - spine01
-        - spine02
-      name: tier2-group1
-      tier: 2
-    - members:
-        - leaf01
-        - leaf02
-        - leaf03
-        - leaf04
-      name: tier1-group1
-      parent: tier2-group1
-      tier: 1
-  nodes:
-    - domainPath:
-        - tier2-group1
-        - tier1-group1
-      nodes:
-        - node1
-        - node2
-        - node3
-        - node4
+```text
+<!-- TODO: capture output from a real environment -->
 ```
 
-Inspect the storage topology:
-
-```bash
-kubectl get topology storage -o yaml
-```
-
-The storage network in this environment has only one tier, so it produces a tier 1 Domain:
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Topology
-metadata:
-  name: storage
-status:
-  domains:
-    - members:
-        - storagesw
-      name: tier1-group1
-      tier: 1
-  nodes:
-    - domainPath:
-        - tier1-group1
-      nodes:
-        - node1
-        - node2
-        - node3
-        - node4
-```
-
-`domains[*].members` contains the Switch CR names in each performance domain. `nodes[*].domainPath` is ordered from the highest tier down to tier1. In node-only mode, only tier1 is present and `members` is empty or omitted because there are no Switch CRs.
+For Case 1 in node-only mode, only tier 1 domains appear, and `switchMember` is
+empty, because synthetic leaves have no `Switch` resources.
 
 ## Troubleshooting
 
 ### `FabricNode` Has No Scale-Out NIC
 
-- Confirm that RDMA devices are visible under `/sys/class/infiniband` on the node.
-- If `fabricNode.scaleOutInterfaceSelector` is explicitly configured, confirm that it matches the real interface name or CIDR.
-- Confirm that scale-out interfaces were not accidentally matched as storage or scale-up. Those interfaces are excluded from scale-out grouping.
+First make sure that the preconditions hold:
 
-### `LLDPNeighborsReady=False`
+1. Make sure that RDMA devices are visible under `/sys/class/infiniband` on the node.
+2. If `fabricNode.scaleOutInterfaceSelector` is set, make sure that it matches the
+   real interface names or CIDRs.
+3. Make sure that the storage or scale-up selector did not match the scale-out
+   interfaces. A matched interface leaves the scale-out group.
 
-- Confirm that LLDP is enabled on switches.
-- Confirm that node-side `lldpd` works and the Agent Pod can read LLDP information.
-- Confirm that `fabricNode.initialScanDelay` is long enough, so the first Agent scan does not run before LLDP learning completes.
+### `LLDPNeighborsReady` Is `False`
 
-### No Node Label
+1. Make sure that LLDP is enabled on the switches.
+2. Make sure that node-side `lldpd` works and that the Agent Pod can read LLDP data.
+3. Make sure that `fabricNode.initialScanDelay` is long enough. A first scan that runs
+   before LLDP learning completes reports missing neighbors.
 
-- Confirm that `topoDiscovery.scaleOut.mode=unifabric-roce`.
-- Confirm that `FabricNode.status.nodeRole` is not `Storage`.
-- Confirm that at least one `scaleOutNics` entry has both `state=up` and `lldpNeighbor.hostname`.
-- With no Switch CRs, confirm that FabricNode LLDP hostnames form the expected tier1 groups.
-- In fully automatic mode, confirm that each FabricNode LLDP hostname matches a Switch CR name or `Switch.status.hostname` and that switch statuses contain LLDP neighbors.
-- In semi-automatic mode, confirm that every same-role Switch has the annotation key and that its neighbor names resolve to node-discovered leaves or other annotated Switch CRs.
-- Check controller logs:
+### Nodes Have No Topology Label
 
-  ```bash
-  kubectl -n unifabric-system logs deployment/unifabric-controller
-  ```
+1. Make sure that `topoDiscovery.scaleOut.mode=unifabric-roce`.
+2. Make sure that `FabricNode.status.nodeRole` is not `Storage`.
+3. Make sure that at least one `scaleOutNics` entry has both `state=up` and
+   `lldpNeighbor.hostname`.
+4. In Case 2, make sure that each LLDP hostname matches a `Switch` name and that the
+   switch statuses contain LLDP neighbors.
+5. In Case 1 with upper tiers, make sure that every same-role `Switch` carries the
+   annotation key and that its neighbor names resolve to node-discovered leaves or to
+   other annotated `Switch` resources.
+6. Read the Controller logs:
 
-- Check switch-agent logs on the switch:
+   ```bash
+   kubectl -n unifabric-system logs deployment/unifabric-controller
+   ```
 
-  ```bash
-  docker logs --tail 100 unifabric-switch-agent
-  ```
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
-### RDMA Metrics Do Not Include RoCE NICs
+7. In Case 2, read the switch-agent logs on the switch:
 
-- Confirm that the Agent Pod is running and RDMA devices are visible under `/sys/class/infiniband` on the node.
-- Confirm that `nodeMetrics.enabled=true`.
-- If using Prometheus Operator, confirm that `nodeMetrics.serviceMonitor.enabled=true` and that the `ServiceMonitor` is selected by the Prometheus selector.
-- Query the Agent metrics endpoint directly first. If `unifabric_` metrics exist there, troubleshoot Prometheus target discovery next.
+   ```bash
+   docker logs --tail 100 unifabric-switch-agent
+   ```
+
+   ```text
+   <!-- TODO: capture output from a real environment -->
+   ```
 
 ## Uninstall
+
+Remove the Helm release:
 
 ```bash
 helm uninstall unifabric --namespace unifabric-system --wait
 ```
 
-If CRDs are no longer needed, delete them manually:
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
+If you no longer need the CRDs, delete them. This also deletes all `FabricNode`,
+`Switch`, and `Topology` resources:
 
 ```bash
 kubectl delete crd fabricnodes.unifabric.io switches.unifabric.io topologies.unifabric.io
 ```
 
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
+For Case 2, remove the agent container on each switch:
+
+```bash
+docker rm -f unifabric-switch-agent
+```
+
+```text
+<!-- TODO: capture output from a real environment -->
+```
+
 ## Next Steps
 
-- Return to the [documentation index](./README.md).
-- Read the [Kueue TAS workload example](./usage/workload-tas.md).
-- See the [Helm values reference](../chart/README.md).
+- Use the labels in a scheduler with the [Kueue TAS workload example](./usage/workload-tas.md).
+- Render the topology with the [topology visualization guide](./usage/topology-visualization.md).
+- Look up fields in the [FabricNode reference](./reference/fabricnode.md).
+- Tune the installation with the [Helm values reference](../chart/README.md).
