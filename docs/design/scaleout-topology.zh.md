@@ -1,72 +1,99 @@
-# Scale-Out 网络拓扑发现
+# 横向扩展（Scale-Out）拓扑发现设计
 
-## 概述
+English version: [scaleout-topology.md](./scaleout-topology.md)
 
-本文讨论一套面向 scale-out 网络的 leaf、spine、core 拓扑识别方案。交换机侧运行轻量级 switch agent 周期性采集 LLDP 邻居信息，Unifabric Controller 主动发起 gRPC 长连接订阅这些邻居信息，并将结果写入 `Switch` CRD 的 `status`。随后，Controller 再结合节点侧 `FabricNode` 记录的主机网卡信息，计算完整的 scale-out 网络拓扑，并将 GPU 节点所属的 leaf、spine、core 层级写回 Kubernetes Node label。当前版本中，`Switch` 是交换机侧 API 资源，Node label 是调度侧拓扑输出；不再安装单独的分组 CRD。
+## 概要
 
-早期 leaf-only 分组只能表达节点直连 leaf 这一层结果。本文改为一条面向 leaf、spine、core 的统一控制面链路。Controller 持续消费交换机邻居数据，在内部维护拓扑分组，并把结果写回 Node label。
+本文描述针对含 leaf、spine、core 层级的 scale-out 网络的拓扑发现设计。每台交换机上运行一个
+轻量的 switch agent，周期性采集 LLDP 邻居数据。Unifabric Controller 建立长连接 gRPC 订阅，
+接收邻居快照并写入 `Switch.status`。Controller 把交换机侧数据与 `FabricNode` 中的主机网卡
+数据结合，计算完整的 scale-out 拓扑，并把结果以 Kubernetes Node labels 的形式写回。在当前
+版本中，`Switch` 是交换机侧的 API 资源，Node labels 是面向调度的输出。不安装独立的分组 CRD。
 
 ## 动机
 
-AI / ML 工作负载通常需要大量的 Pod 间通信才能推进任务。因此，为了保证运行时性能并控制整体成本，确保运行中的 Pod 之间具备高吞吐量的网络连接非常重要。这些拓扑信息可以帮助工作负载的所有 Pod 被调度到彼此接近的节点上。
+AI 和 ML 工作负载需要大量 Pod 间通信。拓扑数据帮助调度器把工作负载 Pod 放到网络上彼此接近
+的节点，从而保证运行性能并控制成本。
 
-当前已有的输入主要来自 `FabricNode.status.scaleOutNics`，它只能告诉 Controller 某个 GPU 节点直连哪些 leaf switches。它回答不了另外两类问题。
+在本设计之前，主要输入是 `FabricNode.status.scaleOutNics`。该数据只能告诉 Controller 某个
+GPU 节点直连了哪些 leaf 交换机。它回答不了两个问题：
 
-1. 这些 leaf 之上有哪些 spine、core 分层。
-2. 这些分层结果又该怎样写成调度系统能直接消费的对象和 Node label。
+1. 这些 leaf 交换机之上存在哪些 spine 和 core 层级。
+2. 这些分层结果如何写入调度器可以直接消费的对象和 Node labels。
 
-这也是早期 leaf-only 模型的边界。它不适合承载 spine、core 结果，也不能直接表达交换机与节点之间的引用关系。只靠这一路输入，Kueue 等调度系统仍然拿不到一组稳定、可复用的 scale-out 拓扑结果。
+这也是早期 leaf-only 模型的边界。它承载不了 spine 和 core 的结果，也表达不了交换机和节点的
+关系。只靠这一条输入路径，Kueue 等调度器仍然无法消费稳定、可复用的 scale-out 拓扑模型。
 
-因此，本提案把交换机侧的 LLDP 邻居信息接入 Controller，补齐 switch-to-switch 和 switch-to-node 关系，再与节点侧信息一起计算整张 scale-out 拓扑。顺着这组输入，Controller 可以统一生成 leaf、spine、core 对应的 Node label。与此同时，方案仍然需要控制实现复杂度，避免让每台交换机都携带单独的 Kubernetes 凭据或复杂的 per-switch TLS 配置。
+本设计把交换机侧 LLDP 邻居数据引入 Controller，补全交换机到交换机、交换机到节点的关系，
+并与节点侧输入结合，计算完整的 scale-out 拓扑。基于这些输入，Controller 生成对应的 leaf、
+spine、core Node labels。同时，方案必须把实现复杂度控制在可接受范围内，不给每台交换机单独的
+Kubernetes 凭据，也不引入复杂的按交换机 TLS 配置。
+
+用户故事：
+
+- 作为 GPU 集群管理员，我希望 Unifabric 自动发现 scale-out 网络的 leaf、spine、core 拓扑，
+  并把结果写入稳定的 Kubernetes Node labels，这样我可以在 Kueue 等系统中使用拓扑感知调度，
+  而不用直接处理原始 LLDP 数据、交换机厂商差异或多跳拓扑计算。
 
 ### 目标
 
-- 识别 GPU 集群中 scale-out 网络的 leaf、spine、core 拓扑层级，而不再停留在 leaf 识别。
-- 将拓扑结果持续写回稳定、可消费的 Kubernetes Node label，供 Kueue 等调度系统直接使用。
-- 支撑 GPU 集群管理员基于这些标签实施拓扑亲和调度，以提升运行时性能并控制整体成本。
-- 交换机接入和证书运维复杂度控制在可接受范围内。
+- 识别 GPU 集群 scale-out 网络中的 leaf、spine、core 层级，而不是停留在 leaf-only 发现。
+- 持续把拓扑结果写入稳定的 Kubernetes Node labels，供 Kueue 等调度器直接消费。
+- 让 GPU 集群管理员基于这些 labels 做拓扑感知调度。
+- 把交换机接入和证书运维的复杂度控制在可接受水平。
 
 ### 非目标
 
-- 不在本阶段覆盖 scale-up 网络或 storage 网络的拓扑识别，范围只聚焦于 scale-out 网络。
+- 本阶段不覆盖 scale-up 网络和存储网络的拓扑发现，范围仅限 scale-out。
+- 本设计不包含调度器插件或放置策略。
 
 ## 方案
 
-方案包含四个部分。
+设计分四部分：
 
-1. 交换机侧 `unifabric-switch-agent` 周期性采集 LLDP 邻居信息，并通过 gRPC server 对外提供全量快照。
-2. Controller 作为 gRPC client 主动订阅每台交换机的 LLDP 快照，并将结果写入 `Switch.status`。
-3. `SwitchTopologyDiscoveryController` 以 `FabricNode` 和 `Switch` 为输入，计算 GPU 节点对应的 leaf、spine、core 层级，并在内部维护拓扑分组。
-4. Controller 按 chart 中的 `topoDiscovery.scaleOut.nodeLabel.keyTemplate`，将最终拓扑结果写回 Kubernetes Node label。
+1. `unifabric-switch-agent` 运行在每台交换机上，周期性采集 LLDP 邻居数据，通过 gRPC server
+   暴露全量快照。
+2. Controller 作为 gRPC 客户端，向每台交换机订阅 LLDP 快照，把结果写入 `Switch.status`。
+3. `SwitchTopologyDiscoveryController` 以 `FabricNode` 和 `Switch` 为输入，计算 GPU 节点的
+   leaf、spine、core 层级，并把拓扑分组保存为内部投影。
+4. Controller 按 chart 中的 `topoDiscovery.scaleOut.nodeLabel.keyTemplate` 把最终拓扑结果
+   写回 Kubernetes Node labels。
 
-scale-out 拓扑发现和标签写回统一由 `SwitchTopologyDiscoveryController` 承担，不再安装 leaf-group CR。Controller 通过 `Switch.spec` 获取拨号目标，通过全局 pinned mTLS 建立安全连接，并将返回快照中的 `switch_name` 持久化到 `Switch.status.hostname`，再把这个上报 hostname 作为交换机别名来源，用于关联交换机侧与节点侧的拓扑数据。
+scale-out 拓扑发现和 label 协调由 `SwitchTopologyDiscoveryController` 负责，不安装
+leaf-group CR。Controller 从 `Switch.spec` 获取拨号目标，用全局固定（pinned）mTLS 建立安全
+连接，把返回的 `switch_name` 持久化到 `Switch.status.hostname`，并在协调交换机侧和节点侧
+拓扑数据时把该上报主机名作为别名来源。
 
-### 用户故事
+决策时记录的设计约束：
 
-#### 故事 1 GPU 集群中的拓扑亲和调度
+- Controller 主动连接 switch agent 的 gRPC 服务。连接生命周期、认证和重连逻辑集中在
+  Controller。
+- 传输使用长连接 gRPC，采用 server-streaming RPC。初次连接发送全量快照，之后只在 LLDP
+  变化时发送新的全量快照。
+- 认证使用全局固定 mTLS，而不是按交换机证书。Controller 持有一份客户端证书，switch agent
+  持有一份服务端证书，双方直接校验对端证书是否与预期一致。没有按交换机的 Secret、SNI 要求
+  或 IP SAN 要求。
+- 当前平台优先级是 NVIDIA Cumulus、NVIDIA SONiC 和社区 SONiC。
+- 内部拓扑分组表示 leaf、spine、core 层级的性能域。分层语义沿用 Volcano 的网络拓扑分层思路。
+  是否需要基于 CIDR 的分组、是否需要更高层的 `Topology` CRD，在决策时留作后续演进。
+  `Topology` CRD 后来已经加入，见 [Topology CRD 设计](./topology-crd.md)。
 
-作为 GPU 集群管理员，我希望 Unifabric 能自动识别 scale-out 网络中的 leaf、spine、core 拓扑，并把结果写成稳定的 Kubernetes Node labels，这样我就可以在 Kueue 等调度系统中使用基于网络拓扑的亲和调度能力，而不需要直接处理 LLDP 原始数据、交换机厂商差异或多跳拓扑计算细节。
+上线顺序：
 
-### 约束和注意事项
+1. 为同一代码版本构建或发布配套的 controller 镜像、node agent 镜像和 switch-agent 镜像。
+2. 准备交换机侧固定 mTLS 材料，在启用交换机驱动发现前，把 `unifabric-switch-agent` 部署到
+   每台 scale-out 交换机。
+3. 为每台受管 scale-out 交换机创建一个 `Switch` 资源，让 Controller 拿到每个 switch-agent
+   端点的拨号目标。
+4. 设置 `topoDiscovery.scaleOut.mode=unifabric-roce`，让 Controller 启动交换机驱动的
+   scale-out 路径。
+5. 确认 `Switch.status` 变为健康，且 GPU 节点 labels 由交换机驱动路径写入。
 
-- 由 Unifabric Controller 主动连到 switch agent 的 gRPC 服务。这样连接生命周期、认证和重连逻辑都集中在 Controller 侧管理。
-- 传输层使用 gRPC 长连接。当前方案先使用 server-streaming RPC，首次建连发送全量快照，后续仅在 LLDP 变化时推送新的全量快照。
-- 当前方案使用全局 pinned mTLS，不为每台交换机单独配置证书。Controller 只持有一张客户端证书，switch agent 只持有一张服务端证书，双方直接校验对端证书是否匹配预期值，不引入 per-switch secret、SNI 或 IP SAN。
-- 当前优先覆盖 NVIDIA Cumulus、NVIDIA SONiC 和社区 SONiC。
-- scale-out 拓扑能力围绕 `Switch` 输入和 Node label 输出设计，不再安装单独的 leaf-group CR。
-- `Switch` CRD 和交换机拓扑发现控制器链路构成当前实现。
-- 内部拓扑分组用于表达 leaf、spine、core 三类拓扑性能域，分层语义参考 Volcano 的网络拓扑层级设计。是否需要引入基于 CIDR 的分组能力，以及未来是否增加总览型 `Topology` CRD，仍属于后续演进议题。
+switch agent 的部署方法见[交换机 agent 部署指南](../usage/switch-agent-deployment.md)。
 
-### 风险与缓解
+## 详细设计
 
-- 风险是长连接中断或交换机侧采集异常后，`Switch.status` 中保存的邻居数据变旧，进而影响 Node label 的更新时效。缓解方式是 Controller 侧维护指数退避重连、周期性 resync，并通过 `status.healthy` 和 conditions 明确暴露数据新鲜度与连接状态。
-- 风险是全局 pinned mTLS 只能证明对端角色，不能单独证明设备身份。当前实现通过把返回的 `switch_name` 持久化到 `Switch.status.hostname`，并在匹配交换机侧与节点侧 LLDP 数据时把它作为别名来源，来降低拓扑关联错误的风险。如果后续需要更严格的设备身份钉住，可以启用可选的 `expected_switch_name` 请求字段来拒绝不匹配的快照。
-- 风险是大型交换机邻居表导致消息过大或 CRD 膨胀。缓解方式是 gRPC 双端显式设置 `maxRecvMsgSize`，只存结构化邻居表而不长期保存完整原始 JSON。
-- 风险是自动生成证书在 `helm upgrade` 时被非预期轮换。缓解方式是 Chart 在自动生成模式下使用 `lookup` 复用 Helm 已管理的 Secret，避免重复签发。
-
-## 设计细节
-
-### 总体架构
+### 整体架构
 
 ```mermaid
 flowchart LR
@@ -77,49 +104,51 @@ flowchart LR
   T[topology builder<br/>leaf/spine/core path]
   N[Kubernetes Node<br/>scale-out labels]
 
-  S -.->|dial target| C
+  S -.->|拨号目标| C
   C -->|dial WatchLLDPNeighbors| SA
-  SA -->|initial snapshot and change snapshots| C
-  C -->|update status| S
-  F -->|topology reconcile input| T
-  S -->|status as reconcile input| T
-  T -->|update labels| N
+  SA -->|初始快照与变化快照| C
+  C -->|更新 status| S
+  F -->|拓扑协调输入| T
+  S -->|status 作为协调输入| T
+  T -->|更新 labels| N
 ```
 
-### 适配范围与验证状态
+### 数据来源
 
-- 当前优先覆盖 NVIDIA Cumulus、NVIDIA SONiC 和社区 SONiC。
+输入数据分两类：
 
-### 数据源
+- 节点侧：`FabricNode.status.scaleOutNics[*].lldpNeighbor` 提供 GPU 节点与其 leaf 交换机的
+  连接关系。只使用 scale-out 网卡，忽略存储网卡和 scale-up 网卡。
+- 交换机侧：`Switch.status.hostname` 携带交换机上报的主机名，`Switch.status.lldpNeighbors`
+  保存交换机到交换机、交换机到节点链路的聚合 LLDP 关系。这些数据用于关联交换机别名、分类
+  远端对象，以及识别每个 leaf 之上的 spine 和 core 层级。
 
-数据源分两类。
+### Switch agent
 
-- 节点侧使用 `FabricNode.status.scaleOutNics[*].lldpNeighbor` 提供 GPU 节点到 leaf switch 的连接关系。只使用 scale-out NIC，不使用 storage NIC 和 scale-up NIC。
-- 交换机侧使用 `Switch.status.hostname` 保存交换机上报的 hostname，并使用 `Switch.status.lldpNeighbors` 保存按远端系统聚合后的 switch-to-switch 和 switch-to-node LLDP 连接关系。它们共同用于关联交换机别名、识别远端类型，并推导 leaf 上层的 spine/core。
+每台交换机运行 `unifabric-switch-agent`。它不需要任何 Kubernetes 权限，唯一职责是采集本地
+LLDP 邻居快照，并暴露供 Controller 订阅的 gRPC 流。核心流程：
 
-### 交换机 Agent
-
-交换机上运行 `unifabric-switch-agent`，它不需要 Kubernetes 权限，只负责采集本机 LLDP 邻居快照，并对外提供可被 Controller 订阅的 gRPC 流。
-
-核心流程如下。
-
-1. 解析本机 hostname、管理 IP、gRPC listen address、服务端证书/私钥、预期 Controller 客户端证书、采集间隔等配置。
-2. 周期性进入宿主机 mount 和 network namespace，执行宿主机上的 `lldpcli`：
+1. 解析配置：本地主机名、管理 IP、gRPC 监听地址、服务端证书与私钥、预期的 Controller
+   客户端证书，以及采集间隔。
+2. 周期性进入主机 mount 和网络命名空间，执行主机上的 `lldpcli`：
 
 ```bash
 nsenter --mount=/host/proc/1/ns/mnt --net=/host/proc/1/ns/net -- lldpcli show neighbors -f json0
 ```
 
-3. 对比上一版快照，如果 LLDP 发生变化，则生成新的全量快照。
-4. 对外暴露 gRPC server，等待 Controller 建立订阅连接。
-5. Controller 建立连接后，先返回一份当前全量快照，后续在同一 stream 上按变化推送新的全量快照。
-6. stream 断开后由 Controller 按指数退避重连，agent 不需要缓存增量事件。
+3. 与上一次快照比较，LLDP 变化时生成新的全量快照。
+4. 暴露 gRPC server，等待 Controller 建立订阅。
+5. Controller 连接后先返回当前全量快照，之后每当 LLDP 变化就在同一条流上推送新的全量快照。
+6. 流断开后由 Controller 以指数退避重连。agent 不需要缓存增量事件。
 
-Switch Agent 只在首次建连和 LLDP 变化时发送全量快照，不发送增量。Controller 收到消息后，可以直接把它视为该交换机当前的完整邻居视图，避免处理复杂的删除和乱序增量。
+agent 只发送全量快照，不发送增量。Controller 把每条消息当作该交换机当前的完整邻居视图，
+不需要删除逻辑，也不需要处理乱序的增量更新。
 
 ### gRPC 订阅接口
 
-Switch Agent 暴露一个独立的 gRPC server。Controller 作为 gRPC client 维护到每台交换机的长连接。全局回退端口、端口过滤和 pinned mTLS 模式通过 Helm values 配置，传输调优使用 Controller 默认值；每台交换机在 `Switch.spec` 中提供拨号目标。
+switch agent 暴露独立的 gRPC server。Controller 对每台交换机维护一条长连接。全局兜底端口、
+端口过滤和固定 mTLS 模式通过 Helm values 配置，传输调优使用 Controller 默认值。每台交换机
+在 `Switch.spec` 中提供拨号目标。
 
 ```yaml
 switchSubscription:
@@ -134,13 +163,17 @@ switchSubscription:
     switchAgentSecretName: switch-controller-mtls-agent
 ```
 
-这里的 `controllerSecretName` 和 `switchAgentSecretName` 不是把同一张证书拆成两份，而是分别保存 controller 和 switch-agent 的 mTLS 身份材料。技术上可以把两端私钥都放进同一个 Secret，但当前设计刻意拆成两个证书包，避免在导出 switch-agent 证书到交换机侧时把 controller 私钥一并带出集群。
+`controllerSecretName` 和 `switchAgentSecretName` 不是同一份证书的两个副本。它们分别保存
+Controller 和 switch agent 的 mTLS 身份材料。技术上两把私钥可以放进一个 Secret，但设计有意
+拆分证书包：把 switch-agent 证书导出到交换机时，不会把 Controller 私钥也带出集群。
 
-`ignorePortPatterns` 由 controller 在写入 `Switch.status` 和构建拓扑图前应用，switch-agent 始终上报全量 LLDP 快照。连接超时、重连退避、keepalive、接收大小限制和自动生成证书的有效期改为使用 Controller 与 Chart 内部默认值，不再作为公共 Helm values。
+Controller 在写 `Switch.status` 之前、构建拓扑图之前应用 `ignorePortPatterns`。switch agent
+始终上报全量 LLDP 快照。连接超时、重连退避、keepalive、接收上限和自动生成证书的有效期使用
+Controller 和 chart 的默认值，不作为公开 Helm values。
 
 #### 订阅服务
 
-建议定义独立 proto，例如
+服务定义为独立的 proto：
 
 ```proto
 service SwitchReporter {
@@ -165,50 +198,79 @@ message LLDPNeighbor {
 }
 ```
 
-订阅语义如下。
+订阅语义：
 
-- Controller 通过 list/watch `Switch` 资源读取每台交换机的 `spec.mgmtIP` 和可选 `spec.grpcPort`，并据此建立 gRPC 连接。
-- 当 `spec.mgmtIP` 为空时，Controller 不为该交换机建立订阅流。
-- 实际拨号地址为 `spec.mgmtIP:spec.grpcPort`，若 `grpcPort` 为空，则使用全局 `defaultGrpcPort`。
-- `metadata.name` 不需要与交换机上报的 hostname 一致。Controller 会把返回的 `switch_name` 持久化到 `Switch.status.hostname`，并把这个上报 hostname 作为拓扑关联时的交换机别名来源。
-- 如果 `Switch.spec.mgmtIP` 或 `Switch.spec.grpcPort` 发生变化，Controller 需要关闭旧连接并按新配置重建订阅。
-- `expected_switch_name` 仍然是可选请求字段。当前 Controller 不设置它；当调用方显式设置时，agent 会用它校验本机 hostname，不匹配时可返回 `FailedPrecondition`。
-- agent 建连成功后立即返回一份当前全量快照，后续每次 LLDP 变化时再推送新的全量快照。
-- `lldp_neighbors` 使用结构化数组，而不是透传原始 `lldpcli json0`。
-- 每个邻居项至少包含 `local_device_name`、`local_port`、`remote_system_name`、`remote_port_id`。
-- `switch_name` 必须与每个邻居项中的 `local_device_name` 一致，或标准化后得到同一个 DNS-1123 名称。
-- `generation` 在每台交换机内单调递增，便于 Controller 丢弃乱序或重复快照。
+- Controller 通过对 `Switch` 资源的 list/watch 读取每台交换机的 `spec.mgmtIP` 和可选的
+  `spec.grpcPort`，用它们建立 gRPC 连接。
+- `spec.mgmtIP` 为空时，Controller 不为该交换机建立订阅流。
+- 实际拨号目标是 `spec.mgmtIP:spec.grpcPort`。`grpcPort` 为空时使用全局 `defaultGrpcPort`。
+- `metadata.name` 不必与交换机上报的主机名一致。Controller 把返回的 `switch_name` 持久化到
+  `Switch.status.hostname`，并在拓扑协调时把该上报主机名作为别名来源。
+- `Switch.spec.mgmtIP` 或 `Switch.spec.grpcPort` 变化时，Controller 必须关闭旧连接，用新
+  配置重建订阅。
+- `expected_switch_name` 是可选请求字段。当前 Controller 留空。调用方设置后，agent 用本地
+  交换机主机名校验，不匹配时可以返回 `FailedPrecondition`。
+- agent 接受连接后立即返回当前全量快照，之后每当 LLDP 变化推送新的全量快照。
+- `lldp_neighbors` 是结构化数组，不透传原始 `lldpcli json0` 输出。
+- 每个邻居条目至少包含 `local_device_name`、`local_port`、`remote_system_name` 和
+  `remote_port_id`。
+- `switch_name` 必须与每个邻居条目中的 `local_device_name` 一致，或两者归一化为同一个
+  DNS-1123 名称。
+- `generation` 按交换机单调递增，Controller 据此丢弃重复或乱序快照。
 
-接口约束如下。
+接口约束：
 
-- 使用 server-streaming RPC，由 Controller 主动建连、agent 在 stream 上推送快照。
-- 每条消息都表示该交换机当前的完整 LLDP 邻居视图，Controller 收到后直接覆盖旧状态即可。
-- Controller client 需要设置 `maxRecvMsgSize`，agent server 需要设置匹配的发送上限，防止大型交换机邻居表被默认限制拒绝。
-- 在没有 LLDP 变化时，不发送空快照，链路存活依赖 gRPC keepalive 和 Controller 侧重连机制。
-- 后续如需要让 Controller 在同一连接里下发调试指令或动态过滤条件，可以扩展为 bidi streaming，但不在当前提案范围内。
+- 使用 server-streaming RPC。Controller 主动连接，agent 在流上推送快照。
+- 每条消息代表该交换机当前的完整 LLDP 邻居视图，Controller 直接覆盖旧状态。
+- Controller 客户端必须设置 `maxRecvMsgSize`，agent 服务端必须设置匹配的发送上限，避免
+  大型邻居表被默认大小限制拒绝。
+- LLDP 无变化时不发送空快照。链路存活依赖 gRPC keepalive 和 Controller 侧的重连行为。
+- 如果 Controller 之后需要在同一连接上发送调试命令或动态过滤器，API 可以扩展为双向流，
+  但不在本设计范围内。
 
-#### 认证和暴露方式
+#### 认证与暴露
 
-本提案采用全局 pinned mTLS。
+本设计使用全局固定 mTLS：
 
-- Chart 默认通过 Helm 模板自动生成两套 pinned mTLS 身份材料：一套给 Controller 作为客户端证书和私钥，另一套给 switch agent 作为服务端证书和私钥。有效期为 `106751` 天，这是 Helm/Sprig 使用的 Go `time.Duration` 计算能够容纳的最大整数天数，约等于 `292` 年。
-- 自动生成时，chart 在安装阶段使用 Helm 证书 helper 生成两套 pinned 证书包，并通过 `lookup` 复用 Helm 已管理的 Secret，避免每次 `helm upgrade` 都重签证书。
-- Controller 通过 `mtls.controllerSecretName` 加载自己的客户端证书、私钥和预期 switch agent 服务端证书。建议 Secret 中包含 `tls.crt`、`tls.key`、`peer.crt`。
-- Switch agent 通过 `mtls.switchAgentSecretName` 对应的证书包加载自己的服务端证书、私钥和预期 Controller 客户端证书。建议同样包含 `tls.crt`、`tls.key`、`peer.crt`。
-- Controller 侧 Secret 直接由 chart 挂载。switch agent 侧证书包由 chart 生成后通过 `kubectl get secret` 导出，再拷贝到交换机本地使用。
-- 之所以默认拆成两个 Secret，而不是把两端私钥放进同一个 Secret，是为了保持最小暴露面：交换机侧只需要 switch-agent 自己的私钥，不应该接触 controller 私钥。
-- 不要求 serverName、SNI 或 IP SAN，也不在 `Switch` 资源中保存 per-switch secret 或 TLS 字段。
-- 这种模式下，所有 switch agent 可以共用同一张服务端证书。TLS 只证明「对端是合法的 switch agent / Controller」，不直接证明是哪一台设备，因此当前实现依赖写入 `Switch.status.hostname` 的 `switch_name` 作为拓扑别名解析来源。如果后续需要更严格的设备身份钉住，可以再启用可选的 `expected_switch_name` 校验。
-- 如果管理网可信且为了开发调试需要，允许临时关闭 mTLS 使用明文 gRPC，但不作为默认部署方式。
-- 如果组织已有现成证书体系，设置 `mtls.mode=existing` 并提供已有的 `controllerSecretName` 和 `switchAgentSecretName`。只有可信开发环境确实需要明文 gRPC 时才使用 `mtls.mode=disabled`。
+- 默认情况下，chart 自动生成两套固定 mTLS 身份材料：一套作为 Controller 的客户端证书和私钥，
+  一套作为 switch agent 的服务端证书和私钥。有效期为 `106751` 天，这是 Helm/Sprig 使用的
+  Go `time.Duration` 计算所能容纳的最大整天数（约 `292` 年）。
+- 启用自动生成时，chart 在安装时用 Helm 证书辅助函数生成两个固定证书包，并用 `lookup`
+  复用已有的 Helm 所属 Secret，`helm upgrade` 不会在每次渲染时重新签发证书。
+- Controller 从 `mtls.controllerSecretName` 加载自己的客户端证书、私钥和预期的 switch-agent
+  服务端证书。该 Secret 必须包含 `tls.crt`、`tls.key` 和 `peer.crt`。
+- switch agent 从 `mtls.switchAgentSecretName` 引用的证书包加载自己的服务端证书、私钥和
+  预期的 Controller 客户端证书。该证书包同样必须包含 `tls.crt`、`tls.key` 和 `peer.crt`。
+- Controller 侧 Secret 由 chart 直接挂载。switch-agent 证书包由 chart 生成，再用
+  `kubectl get secret` 导出，拷贝到每台交换机。
+- 设计有意使用两个 Secret，而不是把两把私钥放进一个 Secret。交换机侧只需要 switch-agent
+  私钥，不能拿到 Controller 私钥。
+- 不要求 serverName、SNI 或 IP SAN，`Switch` 资源不保存按交换机的 Secret 或 TLS 字段。
+- 在该模型下，所有 switch agent 可以共享同一份服务端证书。TLS 只证明对端是合法的 switch
+  agent 或 Controller，不证明具体是哪台设备。因此当前实现依赖写入
+  `Switch.status.hostname` 的上报 `switch_name` 做拓扑别名解析。如果之后需要更严格的设备
+  身份固定，可以启用可选的 `expected_switch_name` 校验。
+- 如果管理网可信且开发调试需要临时明文 gRPC，可以关闭 mTLS，但这不是默认部署模式。
+- 如果组织已有证书基础设施，设置 `mtls.mode=existing` 并提供现有的 `controllerSecretName`
+  和 `switchAgentSecretName`。`mtls.mode=disabled` 只用于需要明文 gRPC 的可信开发环境。
 
-后续如需更细粒度的设备身份，可以扩展为每台交换机独立证书，或切回标准 CA + SAN 的 TLS 体系。
+如果之后需要更细粒度的设备身份，设计可以演进为按交换机证书，或改回标准 CA + SAN 的 TLS
+模型。
 
 ### Switch 资源模型
 
-`Switch` 是 cluster-scoped 资源，表示一台物理交换机。`spec.mgmtIP` 和 `spec.grpcPort` 可选地描述 Controller 需要连接到哪里。未配置 `mgmtIP` 的 Switch 不启动订阅；它既可以通过 `domain` label 补全 `Topology.status.domains[*].members`，也可以通过 `unifabric.io/switch-neighbors` annotation 提供手工的交换机间邻接关系。对于每个有效 role，Controller 按 annotation key 是否存在选择拓扑来源：只要有一个 Switch 不含该 key，就使用交换机上报的 LLDP 并忽略全部手工 annotation；只有所有 Switch 都含该 key，才使用 annotation 和节点发现出的虚拟 leaf，并忽略交换机上报的邻居。资源不承载 per-switch 认证材料，认证和 TLS 由 Controller/agent 的全局配置负责。配置订阅后，`status` 由 Controller 持续刷新，单独保存交换机上报的 hostname，并按远端系统聚合保存 LLDP 邻居。Switch Agent 不直接写 Kubernetes API。
+`Switch` 是表示物理交换机的集群级资源。`spec.mgmtIP` 和 `spec.grpcPort` 可选地描述
+Controller 的连接目标。没有 `mgmtIP` 的 Switch 不会启动订阅。它可以通过 `domain` label
+补充 `Topology.status.domains[*].members`，或通过 `unifabric.io/switch-neighbors`
+annotation 提供手工的交换机邻接关系。对每个有效角色，annotation key 是否存在决定拓扑来源：
+只要有一个 Switch 缺少该 key，发现就使用交换机上报的 LLDP 并忽略所有手工邻接 annotation；
+如果每个 Switch 都带该 key，发现就使用这些 annotation 加上由节点发现的合成 leaf，并忽略
+交换机上报的邻居。按交换机的认证材料不保存在资源中，认证和 TLS 由全局 Controller 和 agent
+设置处理。配置了订阅时，Controller 持续刷新 `status`，把上报的交换机主机名与 Kubernetes
+资源名分开保存，并按远端系统聚合 LLDP 邻居。switch agent 从不直接写 Kubernetes API 对象。
+当前字段以 [Switch 参考手册](../reference/switch.md)为准。
 
-示例
+示例：
 
 ```yaml
 apiVersion: unifabric.io/v1beta1
@@ -234,27 +296,32 @@ status:
       remoteSystemName: spine1
 ```
 
-建议字段
+设计字段：
 
 | 字段 | 含义 |
 | --- | --- |
-| `metadata.name` | 交换机资源名。它需要在集群内唯一，但不要求与交换机上报的 hostname 一致 |
-| `metadata.annotations[unifabric.io/switch-neighbors]` | 只包含直连交换机的 JSON 字符串数组，禁止填写 Kubernetes Node 名称；同 role 的全部 Switch 都存在该 key 时选择半自动拓扑，值为空或 `[]` 也算存在 |
-| `spec.mgmtIP` | 可选，作为 Controller 的交换机拨号目标；不填写时不启动 switch-agent 订阅 |
-| `spec.grpcPort` | 可选，该交换机 gRPC server 的端口未设置时使用全局 `defaultGrpcPort` |
-| `status.hostname` | 最近一次被接受快照中的交换机上报 hostname。它用于把交换机侧数据和节点侧 LLDP hostname 做别名关联 |
-| `status.healthy` | 交换机当前观测状态是否健康，可由连接状态、认证结果和快照新鲜度综合判断 |
-| `status.conditions` | 连接状态和数据就绪状态，例如 `Connected`、`Ready` |
-| `status.lldpNeighborCount` | 当前 `lldpNeighbors` 中按远端系统聚合后的条目数，用于快速观测和排错 |
-| `status.lldpNeighbors` | 当前交换机观测到的唯一远端邻居列表 |
-| `status.lldpNeighbors[*].remoteSystemType` | 远端系统解析后是 Kubernetes Node 还是另一台交换机 |
-| `status.lldpNeighbors[*].remoteSystemName` | 该邻居条目对应的远端主机名或交换机名 |
+| `metadata.name` | Switch 资源名。集群内必须唯一，但不必与交换机上报的主机名一致。 |
+| `metadata.annotations[unifabric.io/switch-neighbors]` | 只包含直连交换机的 JSON 字符串数组；禁止 Kubernetes Node 名。当某角色的所有 Switch 都带该 key 时选择半自动拓扑；值为空或 `[]` 也算存在。 |
+| `spec.mgmtIP` | 可选。作为拨号目标的交换机管理 IP。省略时不启动 switch-agent 订阅。 |
+| `spec.grpcPort` | 可选。交换机 gRPC 端口未设置时使用全局 `defaultGrpcPort`。 |
+| `status.hostname` | 最近一次接受的快照中交换机上报的主机名。Controller 匹配交换机侧数据与节点侧 LLDP 主机名时的别名来源。 |
+| `status.healthy` | 基于连接状态、认证结果和快照新鲜度判断当前观测到的交换机状态是否健康。 |
+| `status.conditions` | 连接状态和数据就绪状态，例如 `Connected` 和 `Ready`。 |
+| `status.lldpNeighborCount` | `lldpNeighbors` 中聚合的远端系统条目数，便于快速查看和排障。 |
+| `status.lldpNeighbors` | 该交换机观测到的去重远端邻居。 |
+| `status.lldpNeighbors[*].remoteSystemType` | 远端系统解析为 Kubernetes Node 还是另一台交换机。 |
+| `status.lldpNeighbors[*].remoteSystemName` | 该邻居条目的远端主机或交换机名。 |
 
-仅用于补全成员的 Switch 使用 `unifabric.io/domain: <domain-name>`。value 必须与 Node 拓扑 labels 已生成的某个 Domain 完全一致；leaf、spine、core 都使用同一个 key，`spec.role: ScaleOut` 选择 fabric，Controller 根据匹配到的 Domain 自动推断 tier。
+只带 label 的 Switch 使用 `unifabric.io/domain: <domain-name>`。值必须与已从 Node 拓扑
+labels 产出的性能域完全一致。leaf、spine、core 使用同一个 key。`spec.role: ScaleOut` 选择
+网络，Controller 从匹配到的性能域推断层级。
 
-#### 没有交换机侧 LLDP 时手工补充邻接关系
+#### 无交换机侧 LLDP 的手工邻接
 
-在内置 RoCE 发现模式下，主机 LLDP 提供 Node 到 leaf 的连接。半自动发现时，用户只创建更高层的 Switch 资源，并确保每一个资源都存在 `unifabric.io/switch-neighbors` key。Node LLDP 构造虚拟 leaf，annotation 再把这些 leaf 连接到声明的上层交换机。只要同一有效 role 中有一个 Switch 缺少该 key，Controller 就改用全自动交换机发现并忽略所有 neighbors annotation。
+在内置 RoCE 发现模式中，主机 LLDP 提供 Node 到 leaf 的链路。半自动发现时，运维人员只创建
+上层的 Switch 资源，并在每一个上放 `unifabric.io/switch-neighbors` key。节点 LLDP 生成
+合成 leaf 交换机，annotation 把这些 leaf 连接到声明的上层。如果同一有效角色下有任何 Switch
+缺少该 key，Controller 改为选择全自动交换机发现，忽略所有邻接 annotation。
 
 ```yaml
 apiVersion: unifabric.io/v1beta1
@@ -267,38 +334,40 @@ spec:
   role: ScaleOut
 ```
 
-annotation 必须写成带引号的 JSON 字符串数组，因为 Kubernetes annotation 的 value 只能是字符串。**数组中的每一项都必须是交换机邻居，不能填写 Kubernetes Node 名称。** 邻居名称既可以引用 FabricNode LLDP 发现出的虚拟 leaf 交换机，也可以引用相同有效 role 下另一个带 annotation 的 Switch。Node 到交换机的连接由 FabricNode LLDP 单独提供，不得把 Node 名称重复写入这里。链路按无向边处理，只在一端填写即可；重复声明会自动去重。空名称、自引用、JSON 格式错误和无法解析的引用都会中止本轮协调并保留已有拓扑 labels。annotation key 本身决定是否进入半自动模式，因此空值和 `[]` 也算存在；该模式不要求也不使用 `spec.mgmtIP`、gRPC 字段或 `status.lldpNeighbors` 作为拓扑输入。
+annotation 是带引号的 JSON 字符串数组，因为 Kubernetes annotation 是字符串。每个条目都是
+交换机邻居，不允许 Kubernetes Node 名。邻居可以指向由 FabricNode LLDP 发现的合成 leaf
+交换机，也可以指向另一台带 annotation 的同角色 Switch。FabricNode LLDP 单独提供 Node 到
+交换机的链路，因此 Node 名不能在这里重复。发现把链路视为无向，声明一端即可；重复声明会被
+去重。空名称、自引用、非法 JSON 和无法解析的引用会终止本轮协调并保留现有拓扑 labels。
+annotation key 本身选择半自动模式，值为空和 `[]` 也算存在。该模式下 `spec.mgmtIP`、gRPC
+字段和 `status.lldpNeighbors` 不是必需的，也不作为拓扑输入。
 
 ### 拓扑计算流程
 
-新增 `SwitchTopologyDiscoveryController`，作为 scale-out 网络拓扑的目标控制器，负责计算 leaf、spine、core 拓扑分组，维护分层结果，并写回节点标签。
+`SwitchTopologyDiscoveryController` 计算 leaf、spine、core 拓扑分组，维护拓扑层级，并把
+labels 写回 Node。它是 scale-out 拓扑 labels 的唯一 Unifabric 写入方。
 
-该控制器统一负责 leaf、spine、core 标签写回。
-
-#### 触发条件
-
-触发条件如下。
+控制器在以下事件时协调：
 
 1. `FabricNode` 创建、删除或 status 变化。
 2. `Switch` 创建、删除或 status 变化。
-3. 周期性 resync，用于重新计算拓扑和补偿漏事件。
-4. Controller 配置变更后重启。
+3. 周期性 resync，重算拓扑并补偿漏掉的事件。
+4. 配置变更后的 Controller 重启。
 
-#### 主流程
+每次协调执行以下步骤：
 
-每次 reconcile 执行以下步骤。
+1. 列出所有 `FabricNode` 对象。
+2. 列出所有 `Switch` 对象。
+3. 按 `Switch.spec.role` 划分交换机，为每个角色构建一张拓扑图。
+4. 为每张角色拓扑图计算 leaf、spine、core 拓扑分组。
+5. 根据 `ScaleOut` 图更新对应 Kubernetes Node 上的拓扑 labels。
 
-1. List 所有 `FabricNode`。
-2. List 所有 `Switch`。
-3. 按 `Switch.spec.role` 对交换机分区，并为每个 role 单独构建拓扑图。
-4. 针对每个 role 对应的拓扑图，计算 leaf、spine、core 拓扑分组。
-5. 从 `ScaleOut` 这一批结果中更新对应 Kubernetes Node 的拓扑 label。
+![Reconcile flow](images/scaleup-reconcile-flow.png)
 
-![img](images/scaleup-reconcile-flow.png)
+### 拓扑 label 命名
 
-### 拓扑 label value 命名
-
-写回到 Kubernetes Node 时包含标签 key 和标签 value。Scale-out 的写入模式和 label key 模板统一配置如下：
+把结果写回 Kubernetes Node 分两部分：label key 和 label value。scale-out 写入方和 label key
+模板一起配置：
 
 ```yaml
 topoDiscovery:
@@ -308,15 +377,14 @@ topoDiscovery:
       keyTemplate: "scale-out.unifabric.io/tier-{{ .Tier }}"
 ```
 
-部署时可以按集群约定修改该模板。Tier 1 是最靠近 Node 的层级，更高层依次递增且没有固定上限。
+模板可以按集群定制。Tier 1 最靠近 Node，更高层级递增且没有固定上限。内置发现分配
+`tier${N}-group${M}` 形式的稳定值。普通协调期间已有分配被锁定：Controller 补齐缺失的
+labels，不重命名也不删除已有分配。日志、指标和 `Topology/scaleout` status 保留每个性能域
+与其 Switch 成员的关系（见 [Topology CRD 设计](./topology-crd.md)）。
 
-内置发现使用 `tier${N}-group${M}` 形式分配稳定值。普通协调会锁定已有归属，只补齐缺失 label，不会重命名或删除已有归属。
+### RBAC 与权限
 
-日志、指标和 `Topology/scaleout` status 会保留性能域与 Switch members 的对应关系。
-
-### RBAC 和权限
-
-Controller 需要新增权限。
+Controller 需要以下额外权限：
 
 ```yaml
 - apiGroups: ["unifabric.io"]
@@ -332,53 +400,80 @@ Controller 需要新增权限。
 
 ### 可观测性
 
-Controller 暴露以下指标。
+Controller 暴露以下指标：
 
-| Metric | 类型 | 含义 |
+| 指标 | 类型 | 含义 |
 | --- | --- | --- |
-| `unifabric_switch_count` | Gauge | 当前纳入控制面管理并参与拓扑计算的交换机数量。 |
-| `unifabric_switch_lldp_parse_success_total` | Counter | Controller 成功解析并接受交换机上报 LLDP 邻居信息的次数。 |
-| `unifabric_switch_lldp_parse_failure_total` | Counter | Controller 解析交换机上报 LLDP 邻居信息失败的次数，包括字段缺失、格式错误或校验失败等情况。 |
+| `unifabric_switch_count` | Gauge | 控制面当前管理并参与拓扑计算的交换机数量。 |
+| `unifabric_switch_lldp_parse_success_total` | Counter | Controller 成功解析并接受交换机上报 LLDP 邻居数据的次数。 |
+| `unifabric_switch_lldp_parse_failure_total` | Counter | Controller 解析或校验交换机 LLDP 邻居数据失败的次数，包括缺字段、格式错误或校验失败。 |
 
-日志中需要包含以下内容。
+日志必须包含：
 
-- 交换机订阅与邻居更新摘要，包含 switch name、peer address、generation、link count。
-- 拓扑计算摘要，包含 switch 数、node 数、link 数、拓扑分组数以及节点 label 更新结果。
+- 每台交换机的订阅和邻居更新摘要：交换机名、对端地址、generation 和链路数。
+- 拓扑计算摘要：交换机数、节点数、链路数、拓扑分组数和 Node label 更新数。
 
 ### 测试计划
 
-#### 单元测试
+单元测试：
 
-- Switch-side LLDP JSON0 parser 单元测试，覆盖字段缺失和大小写标准化。
-- proto 编解码测试和快照 generation 去重/乱序处理测试。
-- 配置测试，验证启用交换机拓扑链路后只处理交换机拓扑逻辑。
-- `Switch.spec.mgmtIP` / `spec.grpcPort` 变更触发重拨逻辑测试。
-- 拓扑构建、拓扑分组投影与节点 label 写回逻辑测试。
+- 交换机侧 LLDP JSON0 解析器，覆盖缺字段和大小写归一化。
+- proto 编解码，以及 generation 去重和乱序快照处理。
+- 配置测试：启用交换机驱动发现时，Controller 走交换机驱动路径。
+- `Switch.spec.mgmtIP` 和 `spec.grpcPort` 变化触发重新拨号。
+- 拓扑图构建、拓扑分组投影和 Node label 协调。
 
-#### e2e 测试
+端到端测试：
 
-- 验证启用交换机拓扑链路后，leaf 标签由交换机拓扑链路生成。
-- 验证 Controller 能否与 switch agent 建立 gRPC stream，并将首次全量快照写入 `Switch.status`。
-- 验证 Helm 自动生成的 pinned mTLS Secret 在 `helm upgrade` 后不会因为模板重渲染而发生非预期轮换。
-- 验证 GPU Node 拓扑 label 是否由 `topoDiscovery.scaleOut.nodeLabel.keyTemplate` 渲染，并使用稳定的 `tier${N}-group${M}` value。
-- 模拟某台 switch agent 停止或 gRPC stream 断开后，验证重连和拓扑结果更新是否正确。
+- 启用交换机驱动发现时，leaf labels 由交换机驱动路径生成。
+- Controller 能与 switch agent 建立 gRPC 流，并把初始全量快照写入 `Switch.status`。
+- Helm 生成的固定 mTLS Secret 不会因模板重渲染在 `helm upgrade` 后意外轮换。
+- GPU Node 拓扑 labels 按 `topoDiscovery.scaleOut.nodeLabel.keyTemplate` 渲染，使用稳定的
+  `tier${N}-group${M}` 值。
+- 模拟 switch-agent 停止或 gRPC 流断开，重连行为和拓扑结果更新正确。
 
 ### 验收标准
 
-该能力应至少满足以下条件。
+该能力至少满足以下条件：
 
-- leaf、spine、core scale-out 拓扑结果都通过 Node label 表达。
-- Controller 能够稳定维护到交换机的 gRPC 订阅连接，并在断连后自动恢复。
-- `Switch.status` 可以持续反映最新 LLDP 快照、连接状态和健康状态。
-- 目标平台上的 GPU 节点能够正确获得 leaf、spine、core 相关标签。
-- 自动生成的 pinned mTLS 证书在安装、升级和恢复流程中不会发生非预期轮换。
+- leaf、spine、core 的 scale-out 拓扑结果通过 Node labels 表达。
+- Controller 能维持到交换机的稳定 gRPC 订阅连接，断开后自动恢复。
+- `Switch.status` 持续反映最新的 LLDP 快照、连接状态和健康状态。
+- 目标平台上的 GPU 节点获得正确的 leaf、spine、core labels。
+- 自动生成的固定 mTLS 证书在安装、升级和恢复流程中不会意外轮换。
 
-## 实现历史
+## 风险与缓解
 
-## 缺点
-
-- 该方案要求在交换机侧额外部署并维护 `unifabric-switch-agent`。
+- 长连接断开或交换机侧采集失败时，`Switch.status` 中的邻居数据过期，延迟 Node label 更新。
+  缓解：Controller 侧指数退避重连和周期性 resync，并通过 `status.healthy` 和 conditions
+  暴露数据新鲜度和连接状态。
+- 全局固定 mTLS 证明对端角色，但不证明具体设备身份。当前实现把返回的 `switch_name`
+  持久化到 `Switch.status.hostname`，并以该上报主机名作为别名来源来缓解拓扑关联问题。
+  如果之后需要更严格的设备身份固定，可以启用可选的 `expected_switch_name` 请求字段拒绝
+  不匹配。
+- 超大交换机邻居表可能导致超大消息或 CRD 膨胀。缓解：在 gRPC 两侧显式设置
+  `maxRecvMsgSize`，并只长期保存结构化邻居表而非完整原始 JSON。
+- 自动生成的证书可能在 `helm upgrade` 时意外轮换。缓解：启用自动生成时，chart 通过
+  `lookup` 复用 Helm 所属 Secret，而不是每次渲染重新签发。
+- 本方案需要在每台交换机上部署和运维 `unifabric-switch-agent`。这一运维成本是已接受的
+  已知缺点。
 
 ## 备选方案
 
-- 通过 gNMI 接口获取 LLDP 信息，厂商支持参次不齐。
+- 通过 gNMI 获取 LLDP 信息，而不是部署 switch agent。否决，因为厂商支持不一致。
+- 以下条目根据本设计所反对的决策事后重建，并非决策时的记录：
+  - switch agent 直接写 Kubernetes API 对象。否决，因为那样每台交换机都需要 Kubernetes
+    凭据，连接和认证逻辑会分散到设备上。Controller 主动外呼的模型把凭据和生命周期集中在
+    一处。
+  - 带 SNI 或 IP SAN 的按交换机证书。因运维复杂度否决：按交换机的 Secret 和证书分发不符合
+    可接受的接入成本。最终选择全局固定 mTLS 加可选的 `expected_switch_name` 校验。
+  - 用专门的 leaf-group 或拓扑分组 CRD 作为面向调度器的输出。本阶段否决，因为 Kueue 等
+    调度器直接消费 Node labels，拓扑分组保持为内部投影。更高层的只读 `Topology` CRD 后来
+    另行加入。
+
+## 实现历史
+
+- 2026-05-26：交换机驱动的 scale-out 拓扑发现与 labels 实现。
+- 2026-07-17：随拓扑 status 汇总与自动 label 发现一起更新。`Topology` CRD 现在暴露只读的
+  汇总视图。
+- 2026-10-13：文档按设计模板重构。备选方案一节的部分内容为事后重建。
