@@ -508,7 +508,7 @@ ebpfFlowEventCollector:
         # -- Delete backing indices this long after rollover.
         deleteMinAge: 3d
     grafanaDatasource:
-      # -- Create a GrafanaDatasource for the data stream so the flow-sends-es dashboard works. Requires grafanaDashboard.kind GrafanaDashboard.
+      # -- Create a GrafanaDatasource for the data stream so the RDMA Pod and Workload send-detail panels work. Requires grafanaDashboard.kind GrafanaDashboard.
       enabled: true
     # -- Bundled single node Elasticsearch deployed only when endpoints is empty. FOR TESTING ONLY: single node, security without TLS, fixed credentials, disk watermarks disabled.
     bundled:

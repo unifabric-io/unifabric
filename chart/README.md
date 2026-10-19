@@ -234,7 +234,7 @@ meant for testing only. See [docs/usage/rdma-flow.md](../docs/usage/rdma-flow.md
 | ebpfFlowEventCollector.elasticsearch.enabled | bool | `false` | Write send events to Elasticsearch as a data stream. |
 | ebpfFlowEventCollector.elasticsearch.endpoints | list | `[]` | HTTP endpoints of an external Elasticsearch, for example http://elasticsearch.data.svc:9200. Leave empty to deploy the bundled test instance described under bundled instead. |
 | ebpfFlowEventCollector.elasticsearch.existingSecret | string | `""` | Existing Secret with a password key used instead of password. |
-| ebpfFlowEventCollector.elasticsearch.grafanaDatasource.enabled | bool | `true` | Create a GrafanaDatasource for the data stream so the flow-sends-es dashboard works. Requires grafanaDashboard.kind GrafanaDashboard. |
+| ebpfFlowEventCollector.elasticsearch.grafanaDatasource.enabled | bool | `true` | Create a GrafanaDatasource for the data stream so the RDMA Pod and Workload send-detail panels work. Requires grafanaDashboard.kind GrafanaDashboard. |
 | ebpfFlowEventCollector.elasticsearch.index | string | `"rdma-sends"` | Data stream receiving the documents. |
 | ebpfFlowEventCollector.elasticsearch.password | string | `""` | Elasticsearch password. Defaults to rdma-flow for the bundled test instance. Prefer existingSecret for an external cluster. |
 | ebpfFlowEventCollector.elasticsearch.schema.create | bool | `true` | Write the index template and ILM policy of the data stream before the Collector starts. The template maps every attribute as keyword or number, disables dynamic mapping and uses date_nanos timestamps. |
