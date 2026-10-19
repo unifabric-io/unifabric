@@ -32,6 +32,51 @@
         "options": []
       },
       {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result(count by (cluster_name) (global_cluster_info) or label_replace(vector(1) unless on() global_cluster_info, \"cluster_name\", \"Local\", \"\", \"\"))",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster_name",
+        "options": [],
+        "query": {
+          "query": "query_result(count by (cluster_name) (global_cluster_info) or label_replace(vector(1) unless on() global_cluster_info, \"cluster_name\", \"Local\", \"\", \"\"))",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/cluster_name=\"([^\"]+)\"/",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result(count by (cluster) (global_cluster_info{cluster_name=\"$cluster_name\"}) or label_replace(vector(1) unless on() global_cluster_info, \"cluster\", \"^$\", \"\", \"\"))",
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "query_result(count by (cluster) (global_cluster_info{cluster_name=\"$cluster_name\"}) or label_replace(vector(1) unless on() global_cluster_info, \"cluster\", \"^$\", \"\", \"\"))",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/cluster=\"([^\"]+)\"/",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "name": "namespace",
         "label": "Workload namespace",
         "type": "query",
@@ -39,9 +84,9 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(rdma_flow_bytes_total, src_pod_top_owner_namespace)",
+        "definition": "label_values(rdma_flow_bytes_total{cluster=~\"${cluster:raw}\"}, src_pod_top_owner_namespace)",
         "query": {
-          "query": "label_values(rdma_flow_bytes_total, src_pod_top_owner_namespace)",
+          "query": "label_values(rdma_flow_bytes_total{cluster=~\"${cluster:raw}\"}, src_pod_top_owner_namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -60,9 +105,9 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\"}, src_pod_top_owner_kind)",
+        "definition": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", cluster=~\"${cluster:raw}\"}, src_pod_top_owner_kind)",
         "query": {
-          "query": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\"}, src_pod_top_owner_kind)",
+          "query": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", cluster=~\"${cluster:raw}\"}, src_pod_top_owner_kind)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -81,9 +126,9 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\"}, src_pod_top_owner_name)",
+        "definition": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", cluster=~\"${cluster:raw}\"}, src_pod_top_owner_name)",
         "query": {
-          "query": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\"}, src_pod_top_owner_name)",
+          "query": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", cluster=~\"${cluster:raw}\"}, src_pod_top_owner_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -102,9 +147,9 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\"}, src_pod_name)",
+        "definition": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", cluster=~\"${cluster:raw}\"}, src_pod_name)",
         "query": {
-          "query": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\"}, src_pod_name)",
+          "query": "label_values(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", cluster=~\"${cluster:raw}\"}, src_pod_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -153,7 +198,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum(rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval]))",
+          "expr": "sum(rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval]))",
           "legendFormat": "",
           "format": "time_series",
           "instant": true,
@@ -209,7 +254,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum(rate(rdma_flow_wrs_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval]))",
+          "expr": "sum(rate(rdma_flow_wrs_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval]))",
           "legendFormat": "",
           "format": "time_series",
           "instant": true,
@@ -265,7 +310,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum(rdma_flow_qps{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"})",
+          "expr": "sum(rdma_flow_qps{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"})",
           "legendFormat": "",
           "format": "time_series",
           "instant": true,
@@ -321,7 +366,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "count(\n  sum by (dst_pod_namespace, dst_pod_name) (\n    rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n  ) > 0\n)",
+          "expr": "count(\n  sum by (dst_pod_namespace, dst_pod_name) (\n    rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n  ) > 0\n)",
           "legendFormat": "",
           "format": "time_series",
           "instant": true,
@@ -377,7 +422,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum(increase(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__range]))",
+          "expr": "sum(increase(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__range]))",
           "legendFormat": "",
           "format": "time_series",
           "instant": true,
@@ -433,7 +478,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (dst_pod_namespace, dst_pod_name) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (dst_pod_namespace, dst_pod_name) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "{{dst_pod_namespace}}/{{dst_pod_name}}",
           "format": "time_series",
           "instant": false,
@@ -495,7 +540,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "{{dst_pod_top_owner_kind}} {{dst_pod_top_owner_namespace}}/{{dst_pod_top_owner_name}}",
           "format": "time_series",
           "instant": false,
@@ -557,7 +602,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sort_desc(sum by (dst_pod_namespace, dst_pod_name) (\n  increase(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__range])\n))",
+          "expr": "sort_desc(sum by (dst_pod_namespace, dst_pod_name) (\n  increase(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__range])\n))",
           "legendFormat": "{{dst_pod_namespace}}/{{dst_pod_name}}",
           "format": "time_series",
           "instant": true,
@@ -626,7 +671,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "",
           "format": "table",
           "instant": true,
@@ -638,7 +683,7 @@
             "uid": "${datasource}"
           },
           "refId": "B",
-          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  rate(rdma_flow_wrs_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  rate(rdma_flow_wrs_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "",
           "format": "table",
           "instant": true,
@@ -650,7 +695,7 @@
             "uid": "${datasource}"
           },
           "refId": "C",
-          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  increase(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__range])\n)",
+          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  increase(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__range])\n)",
           "legendFormat": "",
           "format": "table",
           "instant": true,
@@ -662,7 +707,7 @@
             "uid": "${datasource}"
           },
           "refId": "D",
-          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  rdma_flow_qps{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}\n)",
+          "expr": "sum by (dst_pod_namespace, dst_pod_name, dst_pod_top_owner_kind, dst_pod_top_owner_namespace, dst_pod_top_owner_name, src_device, dst_device) (\n  rdma_flow_qps{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}\n)",
           "legendFormat": "",
           "format": "table",
           "instant": true,
@@ -833,7 +878,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (src_pod_namespace, src_pod_name) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (src_pod_namespace, src_pod_name) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "{{src_pod_namespace}}/{{src_pod_name}}",
           "format": "time_series",
           "instant": false,
@@ -895,7 +940,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (src_pod_namespace, src_pod_name) (\n  rate(rdma_flow_bytes_total{dst_pod_top_owner_namespace=\"$namespace\", dst_pod_top_owner_kind=\"$kind\", dst_pod_top_owner_name=\"$workload\", dst_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (src_pod_namespace, src_pod_name) (\n  rate(rdma_flow_bytes_total{dst_pod_top_owner_namespace=\"$namespace\", dst_pod_top_owner_kind=\"$kind\", dst_pod_top_owner_name=\"$workload\", dst_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "{{src_pod_namespace}}/{{src_pod_name}}",
           "format": "time_series",
           "instant": false,
@@ -957,7 +1002,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (src_device, dst_pod_namespace, dst_pod_name, dst_device) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (src_device, dst_pod_namespace, dst_pod_name, dst_device) (\n  rate(rdma_flow_bytes_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "{{src_device}} -> {{dst_pod_namespace}}/{{dst_pod_name}} {{dst_device}}",
           "format": "time_series",
           "instant": false,
@@ -1019,7 +1064,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (dst_pod_namespace, dst_pod_name) (\n  rate(rdma_flow_sends_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval])\n)",
+          "expr": "sum by (dst_pod_namespace, dst_pod_name) (\n  rate(rdma_flow_sends_total{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval])\n)",
           "legendFormat": "{{dst_pod_namespace}}/{{dst_pod_name}}",
           "format": "time_series",
           "instant": false,
@@ -1081,7 +1126,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (dst_pod_namespace, dst_pod_name) (rate(rdma_flow_send_bytes_sum{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval]))\n/\nsum by (dst_pod_namespace, dst_pod_name) (rate(rdma_flow_send_bytes_count{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval]))",
+          "expr": "sum by (dst_pod_namespace, dst_pod_name) (rate(rdma_flow_send_bytes_sum{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval]))\n/\nsum by (dst_pod_namespace, dst_pod_name) (rate(rdma_flow_send_bytes_count{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval]))",
           "legendFormat": "{{dst_pod_namespace}}/{{dst_pod_name}}",
           "format": "time_series",
           "instant": false,
@@ -1144,7 +1189,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (le) (rate(rdma_flow_send_bytes_bucket{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__rate_interval]))",
+          "expr": "sum by (le) (rate(rdma_flow_send_bytes_bucket{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__rate_interval]))",
           "legendFormat": "{{le}}",
           "format": "heatmap",
           "instant": false,
@@ -1214,7 +1259,7 @@
             "uid": "${datasource}"
           },
           "refId": "A",
-          "expr": "sum by (le) (increase(rdma_flow_send_bytes_bucket{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\"}[$__range]))",
+          "expr": "sum by (le) (increase(rdma_flow_send_bytes_bucket{src_pod_top_owner_namespace=\"$namespace\", src_pod_top_owner_kind=\"$kind\", src_pod_top_owner_name=\"$workload\", src_pod_name=~\"$pod\", cluster=~\"${cluster:raw}\"}[$__range]))",
           "legendFormat": "{{le}}",
           "format": "heatmap",
           "instant": true,
