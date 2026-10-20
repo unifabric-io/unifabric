@@ -198,6 +198,17 @@ controller:
     type: ClusterIP
     # -- Service port for controller metrics.
     port: 8080
+  serviceMonitor:
+    # -- Create a Prometheus Operator ServiceMonitor for the controller metrics. Rendered only when controller.enabled and controller.service.enabled are true.
+    enabled: true
+    # -- Prometheus scrape interval for the controller metrics.
+    interval: 15s
+    # -- Prometheus scrape timeout for the controller metrics.
+    scrapeTimeout: 10s
+    # -- HTTP path scraped by the ServiceMonitor.
+    path: /metrics
+    # -- Extra labels added to the ServiceMonitor for Prometheus selection.
+    labels: {}
   config:
     # -- Controller log level. Valid values are debug, info, warn, and error.
     logLevel: info

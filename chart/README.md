@@ -115,6 +115,11 @@ auto-generated, existing, or disabled mTLS.
 | controller.serviceAccount.annotations | object | `{}` | Annotations added to the controller ServiceAccount. |
 | controller.serviceAccount.create | bool | `true` | Create a ServiceAccount for the controller. |
 | controller.serviceAccount.name | string | `""` | Controller ServiceAccount name. Defaults to the generated controller name when empty. |
+| controller.serviceMonitor.enabled | bool | `true` | Create a Prometheus Operator ServiceMonitor for the controller metrics. Rendered only when controller.enabled and controller.service.enabled are true. |
+| controller.serviceMonitor.interval | string | `"15s"` | Prometheus scrape interval for the controller metrics. |
+| controller.serviceMonitor.labels | object | `{}` | Extra labels added to the ServiceMonitor for Prometheus selection. |
+| controller.serviceMonitor.path | string | `"/metrics"` | HTTP path scraped by the ServiceMonitor. |
+| controller.serviceMonitor.scrapeTimeout | string | `"10s"` | Prometheus scrape timeout for the controller metrics. |
 | controller.tolerations | list | `[]` | Tolerations for scheduling controller pods. |
 | agent.affinity.nodeAffinity | object | See chart/values.yaml for the full default node affinity. | Default Linux node affinity for agent pods. |
 | agent.config.healthProbe.bindAddress | string | `":8083"` | Agent health and readiness bind address inside the container. |
