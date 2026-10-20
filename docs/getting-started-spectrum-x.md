@@ -128,7 +128,7 @@ curl -s "http://${POD_IP}:8082/metrics" | grep 'kind="scaleOut"'
 - Confirm that the Agent Pod is running and RDMA devices are visible under `/sys/class/infiniband` on the node.
 - Confirm that `fabricNode.scaleOutInterfaceSelector` matches the RDMA NIC name or CIDR.
 - Confirm that `nodeMetrics.enabled=true`.
-- If using Prometheus Operator, confirm that `nodeMetrics.serviceMonitor.enabled=true` and the `ServiceMonitor` is selected by Prometheus.
+- If using Prometheus Operator, confirm that `serviceMonitor.enabled=true` and the `ServiceMonitor` is selected by Prometheus.
 
 ### topograph Cannot Reach NetQ
 

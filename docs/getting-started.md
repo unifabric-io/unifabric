@@ -42,7 +42,7 @@ If the cluster does not have Prometheus Operator or Grafana Operator, add the co
 to the installation command:
 
 ```bash
---set nodeMetrics.serviceMonitor.enabled=false \
+--set serviceMonitor.enabled=false \
 --set grafanaDashboard.enabled=false
 ```
 
@@ -159,7 +159,7 @@ kubectl -n unifabric-system get service unifabric-agent-metrics
 kubectl -n unifabric-system get servicemonitor unifabric-agent-metrics
 ```
 
-If `nodeMetrics.serviceMonitor.enabled` was disabled during installation, the absence of a
+If `serviceMonitor.enabled` was disabled during installation, the absence of a
 `ServiceMonitor` is expected. Access the Agent metrics endpoint directly to confirm whether the
 collector is producing metrics:
 

@@ -54,7 +54,6 @@ auto-generated, existing, or disabled mTLS.
 | nodeMetrics.port | int | `8082` | Container port used by the agent metrics endpoint. |
 | nodeMetrics.service.port | int | `8086` | Service port used by Prometheus to scrape agent RDMA metrics. |
 | nodeMetrics.service.type | string | `"ClusterIP"` | Kubernetes Service type for agent RDMA metrics. |
-| nodeMetrics.serviceMonitor.enabled | bool | `true` | Create a Prometheus Operator ServiceMonitor for agent RDMA metrics. |
 | nodeMetrics.serviceMonitor.interval | string | `"15s"` | Prometheus scrape interval for agent RDMA metrics. |
 | nodeMetrics.serviceMonitor.labels | object | `{}` | Extra labels added to the ServiceMonitor for Prometheus selection. |
 | nodeMetrics.serviceMonitor.path | string | `"/metrics"` | HTTP path scraped by the ServiceMonitor. |
@@ -261,7 +260,6 @@ meant for testing only. See [docs/usage/rdma-flow.md](../docs/usage/rdma-flow.md
 | ebpfFlowEventCollector.resources.limits.memory | string | `"2Gi"` | Collector memory limit. memory_limiter is derived from it. |
 | ebpfFlowEventCollector.resources.requests.cpu | string | `"500m"` | Collector CPU request. |
 | ebpfFlowEventCollector.resources.requests.memory | string | `"512Mi"` | Collector memory request. |
-| ebpfFlowEventCollector.serviceMonitor.enabled | bool | `true` | Create a ServiceMonitor for the Collector's own metrics on port 8888. |
 | ebpfFlowEventCollector.serviceMonitor.interval | string | `"15s"` | Scrape interval for the Collector metrics. |
 | ebpfFlowEventCollector.serviceMonitor.labels | object | `{}` | Extra labels added to the ServiceMonitor. |
 | ebpfFlowEventCollector.tolerations | list | `[]` | Tolerations for the Collector Pod. |

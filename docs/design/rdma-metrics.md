@@ -134,7 +134,7 @@ The Agent metrics endpoint is configured by `agent.config.metrics.bindAddress`, 
 The Helm chart can render:
 
 - Agent metrics `Service` when `agent.enabled` and `nodeMetrics.enabled` are true.
-- Agent `ServiceMonitor` in the Helm release namespace when `agent.enabled`, `nodeMetrics.enabled`, and `nodeMetrics.serviceMonitor.enabled` are true.
+- Agent `ServiceMonitor` in the Helm release namespace when `agent.enabled`, `nodeMetrics.enabled`, and `serviceMonitor.enabled` are true.
 - RDMA Grafana dashboards when `grafanaDashboard.enabled` and `nodeMetrics.enabled` are true.
 
 Current implementation detail: the Go Agent always registers the RDMA collector when the Agent starts. `nodeMetrics.enabled` controls the Helm resources around scraping and dashboards, not collector registration inside the Agent.

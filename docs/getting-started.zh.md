@@ -38,7 +38,7 @@ scale-out，`eth5` 用于 storage，只需在安装命令中增加：
 如果集群没有 Prometheus Operator 或 Grafana Operator，在安装命令中增加对应参数：
 
 ```bash
---set nodeMetrics.serviceMonitor.enabled=false \
+--set serviceMonitor.enabled=false \
 --set grafanaDashboard.enabled=false
 ```
 
@@ -152,7 +152,7 @@ kubectl -n unifabric-system get service unifabric-agent-metrics
 kubectl -n unifabric-system get servicemonitor unifabric-agent-metrics
 ```
 
-如果安装时关闭了 `nodeMetrics.serviceMonitor.enabled`，没有 `ServiceMonitor` 属于正常
+如果安装时关闭了 `serviceMonitor.enabled`，没有 `ServiceMonitor` 属于正常
 情况。可以直接访问 Agent metrics 端点，确认采集器是否已经产生指标：
 
 ```bash

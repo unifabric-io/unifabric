@@ -509,7 +509,7 @@ status:
 
 - Confirm that the Agent Pod is running and RDMA devices are visible under `/sys/class/infiniband` on the node.
 - Confirm that `nodeMetrics.enabled=true`.
-- If using Prometheus Operator, confirm that `nodeMetrics.serviceMonitor.enabled=true` and that the `ServiceMonitor` is selected by the Prometheus selector.
+- If using Prometheus Operator, confirm that `serviceMonitor.enabled=true` and that the `ServiceMonitor` is selected by the Prometheus selector.
 - Query the Agent metrics endpoint directly first. If `unifabric_` metrics exist there, troubleshoot Prometheus target discovery next.
 
 ## Uninstall

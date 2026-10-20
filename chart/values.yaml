@@ -67,8 +67,6 @@ nodeMetrics:
   path: /metrics
   # -- ServiceMonitor settings used by Prometheus Operator to scrape node metrics.
   serviceMonitor:
-    # -- Create a Prometheus Operator ServiceMonitor for agent RDMA metrics.
-    enabled: true
     # -- Prometheus scrape interval for agent RDMA metrics.
     interval: 15s
     # -- Prometheus scrape timeout for agent RDMA metrics.
@@ -423,8 +421,6 @@ ebpfFlowEventCollector:
     # -- Maximum time a partial batch waits.
     timeout: 1s
   serviceMonitor:
-    # -- Create a ServiceMonitor for the Collector's own metrics on port 8888.
-    enabled: true
     # -- Scrape interval for the Collector metrics.
     interval: 15s
     # -- Extra labels added to the ServiceMonitor.
