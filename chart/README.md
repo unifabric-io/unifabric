@@ -72,6 +72,7 @@ auto-generated, existing, or disabled mTLS.
 | grafanaInstance.image.tag | string | `""` | Container image tag. Defaults to the chart appVersion when empty. |
 | grafanaInstance.labels | object | `{}` | Extra labels added to the Grafana instance. |
 | grafanaInstance.serviceType | string | `"NodePort"` | Kubernetes Service type for the bundled Grafana instance. |
+| serviceMonitor.enabled | bool | `true` | Apply ServiceMonitor CRs when enabled. |
 
 ## Controller and Agent
 
@@ -115,7 +116,6 @@ auto-generated, existing, or disabled mTLS.
 | controller.serviceAccount.annotations | object | `{}` | Annotations added to the controller ServiceAccount. |
 | controller.serviceAccount.create | bool | `true` | Create a ServiceAccount for the controller. |
 | controller.serviceAccount.name | string | `""` | Controller ServiceAccount name. Defaults to the generated controller name when empty. |
-| controller.serviceMonitor.enabled | bool | `true` | Create a Prometheus Operator ServiceMonitor for the controller metrics. Rendered only when controller.enabled and controller.service.enabled are true. |
 | controller.serviceMonitor.interval | string | `"15s"` | Prometheus scrape interval for the controller metrics. |
 | controller.serviceMonitor.labels | object | `{}` | Extra labels added to the ServiceMonitor for Prometheus selection. |
 | controller.serviceMonitor.path | string | `"/metrics"` | HTTP path scraped by the ServiceMonitor. |

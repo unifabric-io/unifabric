@@ -121,6 +121,10 @@ grafanaInstance:
   # -- Extra labels added to the Grafana instance.
   labels: {}
 
+serviceMonitor:
+  # -- Apply ServiceMonitor CRs when enabled.
+  enabled: true
+
 controller:
   # -- Deploy the Unifabric controller.
   enabled: true
@@ -199,8 +203,6 @@ controller:
     # -- Service port for controller metrics.
     port: 8080
   serviceMonitor:
-    # -- Create a Prometheus Operator ServiceMonitor for the controller metrics. Rendered only when controller.enabled and controller.service.enabled are true.
-    enabled: true
     # -- Prometheus scrape interval for the controller metrics.
     interval: 15s
     # -- Prometheus scrape timeout for the controller metrics.
