@@ -2,162 +2,144 @@
 
 English version: [switch.md](./switch.md)
 
-`Switch` 表示一台物理交换机。用户声明 `metadata` 和 `spec`；配置 switch-agent
-连接后，Controller 将连接状态和 LLDP 快照写入 `status`。switch-agent 不直接访问
-Kubernetes API。
+## 概述
 
-## 示例
+`Switch` 声明一台物理交换机，并保存 Controller 观测到的 switch-agent 连接状态和
+LLDP 邻居。它在拓扑发现中的角色见[架构概览](../concepts/architecture.zh.md)。
 
-### 全自动 LLDP 发现
+## 资源信息
 
-该模式下 Switch CR 对应真实交换机，并配置 switch-agent 地址：
+| 项 | 值 |
+| --- | --- |
+| API group | `unifabric.io` |
+| API version | `v1beta1` |
+| Kind | `Switch` |
+| Scope | Cluster |
+| 复数名 | `switches` |
+| 单数名 | `switch` |
+| 缩写 | `sw` |
+| Status subresource | 是 |
+| Printer columns | `MgmtIP`、`Role`、`Healthy`、`Neighbors` |
+
+## 示例 YAML
+
+用户编写 `metadata` 和 `spec`，Controller 写入 `status`。
 
 ```yaml
 apiVersion: unifabric.io/v1beta1
 kind: Switch
 metadata:
   name: leaf01
-spec:
-  mgmtIP: 10.0.0.1
-  role: ScaleOut
-  grpcPort: 8090
-```
-
-### 半自动发现
-
-Node LLDP 已发现 `leaf01` 和 `leaf02` 时，只需为更上层的交换机创建 CR：
-
-```yaml
-apiVersion: unifabric.io/v1beta1
-kind: Switch
-metadata:
-  name: spine01
+  labels:
+    # 交换机所属性能域。由拓扑发现写入，或由管理员手工设置。
+    unifabric.io/domain: tier1-group1
   annotations:
-    unifabric.io/switch-neighbors: '["leaf01", "leaf02"]'
+    # 仅半自动模式使用：直连交换机名称，JSON 字符串数组。
+    # 禁止填写 Node 名称。
+    unifabric.io/switch-neighbors: '["spine01"]'
 spec:
+  # switch-agent 订阅的连接地址。省略则只声明交换机，不建立订阅。
+  mgmtIP: 10.0.0.1
+  # 交换机所属网络域。
   role: ScaleOut
+  # 覆盖该交换机的 switch-agent gRPC 端口。
+  grpcPort: 8090
+status:
+  conditions:
+    # Connected 表示 gRPC 流的状态。
+    - lastTransitionTime: "2026-07-24T01:00:00Z"
+      message: controller is receiving LLDP snapshots from switch agent
+      reason: StreamReady
+      status: "True"
+      type: Connected
+    # Ready 表示已存 LLDP 数据的新鲜度。
+    - lastTransitionTime: "2026-07-24T01:00:00Z"
+      message: accepted LLDP snapshot generation 7
+      reason: SnapshotAccepted
+      status: "True"
+      type: Ready
+  # 最新接受快照上报的 hostname。
+  hostname: leaf01
+  healthy: true
+  # 按远端系统去重后的 LLDP 邻居。
+  lldpNeighborCount: 2
+  lldpNeighbors:
+    - remoteSystemType: KubernetesNode
+      remoteSystemName: node1
+      linkCount: 1
+    - remoteSystemType: Switch
+      remoteSystemName: spine01
+      linkCount: 2
 ```
 
-## 资源信息
+## 字段定义
 
-| 字段 | 值 |
-| --- | --- |
-| API group | `unifabric.io` |
-| API version | `v1beta1` |
-| Kind | `Switch` |
-| Scope | Cluster |
-| 资源名 | `switches` |
-| 单数名 | `switch` |
-| 缩写 | `sw` |
-| Status subresource | 是 |
-
-## Switch 字段
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `apiVersion` | string | `unifabric.io/v1beta1` |
-| `kind` | string | `Switch` |
-| `metadata` | `metav1.ObjectMeta` | 标准 Kubernetes metadata；支持 Unifabric 的 label 和 annotation |
-| `spec` | `SwitchSpec` | 用户声明的交换机连接和网络角色 |
-| `status` | `SwitchStatus` | Controller 维护的观测状态，只读 |
-
-## SwitchSpec
+### Metadata
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
-| `mgmtIP` | string | 否 | 无 | Controller 连接 switch-agent 的管理地址；不填写时不建立订阅 |
-| `role` | string | 否 | `ScaleOut` | 网络角色：`ScaleOut`、`ScaleUp` 或 `Storage` |
-| `grpcPort` | int32 | 否 | 全局端口 | 覆盖该交换机的 switch-agent gRPC 端口，范围 `1`～`65535` |
+| `metadata.name` | string | 是 | 无 | 交换机名称。拓扑发现用它匹配 LLDP 的系统名。 |
+| `metadata.labels["unifabric.io/domain"]` | label | 否 | 无 | 交换机所属性能域，例如 `tier1-group1`。由发现写入；手工设置时值必须是已存在的域。 |
+| `metadata.annotations["unifabric.io/switch-neighbors"]` | annotation | 否 | 无 | 半自动模式下的直连交换机名称，JSON 字符串数组。禁止填写 Kubernetes Node 名称。 |
 
-未设置 `grpcPort` 时使用 `switchSubscription.defaultGrpcPort`，其 chart 默认值为
-`8090`。
+同一 `role` 的交换机按 `unifabric.io/switch-neighbors` key 是否存在选择发现模式。
+所有交换机都有该 key 时进入半自动模式；任一交换机缺少该 key 时进入全自动模式，并
+忽略所有该 annotation。空值和 `[]` 都视为 key 存在。
 
-不设置 `mgmtIP` 的 Switch 仍可通过 metadata 声明半自动邻接关系，或补充
-`Topology.status.domains[*].members`，但 Controller 不会连接 switch-agent。
+### Spec
 
-## SwitchStatus
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `mgmtIP` | string | 否 | 无 | switch-agent 订阅的连接地址。省略时 Controller 不建立订阅，交换机仍可通过 metadata 提供拓扑成员和手工邻接。 |
+| `role` | string | 否 | `ScaleOut` | 交换机所属网络域。可选值为 `ScaleOut`、`ScaleUp`、`Storage`。 |
+| `grpcPort` | integer | 否 | 无 | 覆盖该交换机的 switch-agent gRPC 端口，范围 `1`～`65535`。省略时使用 Controller 配置的 `defaultGrpcPort`（chart 默认 `8090`）。 |
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `hostname` | string | 否 | switch-agent 最新快照上报的 hostname |
-| `healthy` | boolean | 否 | 当前订阅和 LLDP 数据是否健康 |
-| `conditions` | `[]metav1.Condition` | 否 | 连接和数据新鲜度状态，按 `type` 唯一 |
-| `lldpNeighborCount` | int32 | 否 | 已保存的唯一 LLDP 邻居数量 |
-| `lldpNeighbors` | `[]SwitchNeighbor` | 否 | 最新接受的 LLDP 邻居 |
+### Status
 
-已知的 condition 类型和 reason：
+`status` 由 Controller 维护。不要手工编辑。删除 `spec.mgmtIP` 后，Controller 停止
+订阅并清空整个 `status`。
 
-| 类别 | 值 |
-| --- | --- |
-| Type | `Connected`、`Ready` |
-| 正常 reason | `StreamReady`、`SnapshotAccepted` |
-| 异常 reason | `DialFailed`、`AuthenticationFailed`、`SnapshotRejected`、`DataStale` |
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `hostname` | string | 否 | 无 | 最新接受快照上报的系统名。 |
+| `healthy` | boolean | 否 | 无 | 接受快照后为 `true`，订阅失败后为 `false`。 |
+| `conditions` | `[]metav1.Condition` | 否 | 无 | 流和数据新鲜度的 condition，按 `type` 唯一。见 [Conditions](#conditions)。 |
+| `lldpNeighborCount` | integer | 否 | 无 | 已保存的 LLDP 邻居条目数量。 |
+| `lldpNeighbors` | `[]SwitchNeighbor` | 否 | 无 | 该交换机观测到的唯一远端邻居。见 [SwitchNeighbor](#switchneighbor)。 |
 
-## SwitchNeighbor
+#### SwitchNeighbor
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `remoteSystemType` | string | 否 | 邻居类型：`KubernetesNode` 或 `Switch` |
-| `remoteSystemName` | string | 是 | 邻居的 Node 名称或交换机名称 |
-| `linkCount` | int32 | 否 | 与该邻居之间的物理链路(本地端口)数量；同一邻居的多条链路会合并为一条记录 |
+`lldpNeighbors` 的元素类型。
 
-## Events（事件）
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `remoteSystemType` | string | 否 | 无 | 远端系统是 Kubernetes Node 还是另一台交换机。可选值为 `KubernetesNode`、`Switch`。 |
+| `remoteSystemName` | string | 是 | 无 | 该 LLDP 条目对应的远端系统名称。 |
+| `linkCount` | integer | 否 | 无 | 到该远端系统的物理链路（本地端口）数量。同一远端系统的多条链路合并为这一条记录。 |
 
-当两次接受的快照之间 LLDP 邻居集合发生变化时（邻居以 `remoteSystemType` +
-`remoteSystemName` 标识），控制器会在对应的 `Switch` 对象上记录一条
-`reason` 为 `NeighborsChanged` 的 `Normal` 事件，内容会汇总新增/消失的邻居数量，例如：
+#### Conditions
 
-```text
-LLDP neighbors changed: 1 added, 1 removed
-```
+Controller 设置两种 condition 类型。下表穷举每个 status、reason 及其触发条件。
 
-如果只是某个已知邻居的 `linkCount`（物理链路数）发生变化（例如新增/断开了到同一邻居的第二条链路），
-不会触发该事件；只有邻居本身的出现或消失才会触发。可以通过
-`kubectl describe switch <name>` 或
-`kubectl get events --field-selector involvedObject.name=<name>` 查看这些事件。
+`Connected`：
 
-## Labels 和 annotations
-
-| Key | 类型 | 说明 |
+| Status | Reason | 触发条件 |
 | --- | --- | --- |
-| `unifabric.io/domain` | Label | Switch 所属性能域，例如 `tier1-group1` |
-| `unifabric.io/switch-neighbors` | Annotation | 半自动模式下的直连**交换机**名称，值为 JSON 字符串数组；禁止填写 Kubernetes Node 名称 |
+| `True` | `StreamReady` | Controller 正在接收 switch-agent 的 LLDP 快照。 |
+| `False` | `DialFailed` | gRPC 连接或流失败，且不属于下面两类。message 包含错误。 |
+| `False` | `AuthenticationFailed` | 订阅失败且 gRPC code 为 `FailedPrecondition`、`Unauthenticated` 或 `PermissionDenied`，或错误与 TLS、证书相关。 |
+| `False` | `SnapshotRejected` | switch-agent 以 gRPC `InvalidArgument` 拒绝了请求。 |
 
-内置拓扑发现可以写入 `unifabric.io/domain`。管理员也可手工设置该 label 来补充
-`Topology.status.domains[*].members`，但 value 必须匹配一个已有性能域。
+`Ready`：
 
-`unifabric.io/switch-neighbors` 的值示例：
+| Status | Reason | 触发条件 |
+| --- | --- | --- |
+| `True` | `SnapshotAccepted` | Controller 接受并保存了最新 LLDP 快照。message 包含快照 generation。 |
+| `False` | `DataStale` | 订阅失败，已存 LLDP 数据不再新鲜。与 `Connected=False` 同时设置。 |
 
-```yaml
-metadata:
-  annotations:
-    unifabric.io/switch-neighbors: '["leaf01", "leaf02"]'
-```
+两次接受的快照之间邻居集合变化时，Controller 还会发出 reason 为 `NeighborsChanged`
+的 `Normal` Kubernetes Event。邻居以 `remoteSystemType` 加 `remoteSystemName` 标识，
+仅 `linkCount` 变化不触发该事件。
 
-**重要：该 annotation 只填写交换机邻居，不包含节点邻居。** Node LLDP 发现出的虚拟
-leaf 仍代表一台交换机，可以填写；Kubernetes Node 名称绝不能写入该数组。Node 到交换机
-的连接由 FabricNode LLDP 单独提供。
-
-同一 `role` 的 Switch 按 annotation **key 是否存在**选择发现模式：
-
-- 所有 Switch 都存在该 key：进入半自动模式，使用 Node LLDP 生成虚拟 leaf，
-  使用 annotation 连接更上层交换机。
-- 任一 Switch 缺少该 key：进入全自动模式，使用交换机上报的 LLDP，并忽略所有
-  `unifabric.io/switch-neighbors` annotation。
-- 空值和 `[]` 也表示 key 存在。
-
-## 常用命令
-
-```bash
-kubectl get sw
-kubectl get sw leaf01 -o yaml
-
-kubectl get sw leaf01 \
-  -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\t"}{.reason}{"\n"}{end}'
-
-kubectl get sw leaf01 \
-  -o jsonpath='{range .status.lldpNeighbors[*]}{.remoteSystemType}{"\t"}{.remoteSystemName}{"\n"}{end}'
-```
-
-发现模式和名称匹配规则请参阅
-[Scale-Out 网络拓扑发现设计](../design/scaleout-topology.zh.md)。
+switch-agent 的部署和接入方法见
+[switch-agent 部署指南](../usage/switch-agent-deployment.zh.md)。
