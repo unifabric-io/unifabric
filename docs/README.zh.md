@@ -39,6 +39,8 @@ SONiC 交换机接入方式、label 语义和发现链路排查，参见
   `RDMAEndpoint` 并存储逐次发送事件。
 - [拓扑感知调度](./usage/workload-tas.zh.md)：配合 Kueue TAS 等调度器做拓扑感知调度。
 - [Switch Agent 部署](./usage/switch-agent-deployment.zh.md)：在 SONiC 交换机上部署 Switch Agent。
+- [交换机 sFlow 流量观测](./usage/sflow.zh.md)：接收交换机 sFlow 采样，把流归因到 Pod 和
+  workload，并在 Grafana 查看。
 
 ## 参考手册
 
@@ -56,6 +58,7 @@ SONiC 交换机接入方式、label 语义和发现链路排查，参见
 - [Scale-out 拓扑发现设计](./design/scaleout-topology.zh.md)
 - [Topology CRD 设计](./design/topology-crd.zh.md)
 - [拓扑可视化设计](./design/topology-visualization.zh.md)
+- [sFlow 处理设计](./design/sflow.zh.md)
 
 ## 开发
 

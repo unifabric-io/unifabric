@@ -1,0 +1,270 @@
+{
+  "uid": "unifabric-workload-pair-sflow",
+  "title": "Unifabric Workload src to dst sFlow",
+  "description": "Traffic between a pair of workloads from sampled sFlow data stored in Elasticsearch.",
+  "tags": [
+    "unifabric",
+    "sflow"
+  ],
+  "schemaVersion": 37,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "",
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "templating": {
+    "list": [
+      {
+        "name": "src_workload",
+        "label": "Source workload",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "unifabric-sflow-elasticsearch"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"src_workload\", \"size\": 100}",
+        "definition": "{\"find\": \"terms\", \"field\": \"src_workload\", \"size\": 100}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {},
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "dst_workload",
+        "label": "Destination workload",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "unifabric-sflow-elasticsearch"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"dst_workload\", \"size\": 100}",
+        "definition": "{\"find\": \"terms\", \"field\": \"dst_workload\", \"size\": 100}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {},
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "src to dst by Switch",
+      "description": "Traffic rate from the source workload to the destination workload broken down by observing switch.",
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "unifabric-sflow-elasticsearch"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "unifabric-sflow-elasticsearch"
+          },
+          "query": "src_workload:\"${src_workload}\" AND dst_workload:\"${dst_workload}\"",
+          "timeField": "@timestamp",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "rate",
+              "field": "scaled_bytes",
+              "settings": {
+                "unit": "second"
+              }
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "3",
+              "type": "terms",
+              "field": "sampler_ip",
+              "settings": {
+                "order": "desc",
+                "orderBy": "_count",
+                "size": "10",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0",
+                "trimEdges": "0"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 1
+    },
+    {
+      "type": "timeseries",
+      "title": "dst to src by Switch",
+      "description": "Traffic rate from the destination workload back to the source workload broken down by observing switch.",
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "unifabric-sflow-elasticsearch"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "unifabric-sflow-elasticsearch"
+          },
+          "query": "src_workload:\"${dst_workload}\" AND dst_workload:\"${src_workload}\"",
+          "timeField": "@timestamp",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "rate",
+              "field": "scaled_bytes",
+              "settings": {
+                "unit": "second"
+              }
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "3",
+              "type": "terms",
+              "field": "sampler_ip",
+              "settings": {
+                "order": "desc",
+                "orderBy": "_count",
+                "size": "10",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0",
+                "trimEdges": "0"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 2
+    }
+  ]
+}

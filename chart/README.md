@@ -75,6 +75,61 @@ auto-generated, existing, or disabled mTLS.
 | grafanaInstance.serviceType | string | `"NodePort"` | Kubernetes Service type for the bundled Grafana instance. |
 | serviceMonitor.enabled | bool | `true` | Apply ServiceMonitor CRs when enabled. |
 
+## sFlow Processing
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| sflow.affinity | object | `{}` | Affinity rules applied to the sFlow collector Pod. |
+| sflow.config.logLevel | string | `"info"` | Log level used by the sFlow collector. |
+| sflow.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Allow privilege escalation in the sFlow collector container. |
+| sflow.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Linux capabilities dropped from the sFlow collector container. |
+| sflow.containerSecurityContext.readOnlyRootFilesystem | bool | `true` | Mount the sFlow collector root filesystem as read-only. |
+| sflow.elasticsearch.grafanaDatasource.enabled | bool | `true` | Create a GrafanaDatasource for the sFlow data stream so the sFlow dashboards work. Requires grafanaDashboard.kind GrafanaDashboard. |
+| sflow.elasticsearch.index | string | `"unifabric-switch-sflow"` | Data stream receiving sFlow flow documents. |
+| sflow.elasticsearch.schema.ilm.deleteMinAge | string | `"3d"` | Delete backing indices this long after rollover. |
+| sflow.elasticsearch.schema.ilm.rolloverMaxAge | string | `"1d"` | Roll the write index over after this age. |
+| sflow.elasticsearch.schema.ilm.rolloverMaxPrimaryShardSize | string | `"10gb"` | Roll the write index over when a primary shard reaches this size. |
+| sflow.enabled | bool | `false` | Enable the sFlow collector deployment and UDP service. |
+| sflow.healthProbe.bindAddress | string | `":8085"` | Health probe bind address used by the sFlow collector. |
+| sflow.healthProbe.port | int | `8085` | Health probe container port exposed by the sFlow collector. |
+| sflow.image.pullPolicy | string | `"IfNotPresent"` | Container image pull policy for the sFlow collector. |
+| sflow.image.registry | string | `"ghcr.io"` | Container image registry for the sFlow collector. |
+| sflow.image.repository | string | `"unifabric-io/unifabric-sflow"` | Container image repository for the sFlow collector. |
+| sflow.image.tag | string | `""` | Container image tag for the sFlow collector. Defaults to the chart appVersion when empty. |
+| sflow.listen.bindAddress | string | `":6343"` | UDP bind address used by the sFlow collector container. |
+| sflow.listen.port | int | `6343` | UDP container port used by the sFlow collector. |
+| sflow.metrics.bindAddress | string | `":8084"` | Metrics bind address used by the sFlow collector. |
+| sflow.metrics.path | string | `"/metrics"` | Metrics path exposed by the sFlow collector. |
+| sflow.metrics.port | int | `8084` | Metrics container port exposed by the sFlow collector. |
+| sflow.nodeSelector | object | `{}` | Node selector applied to the sFlow collector Pod. |
+| sflow.otel.endpoint | string | `""` | OTLP gRPC endpoint. Empty uses the in-release ebpfFlowEventCollector sFlow port. |
+| sflow.otel.insecure | bool | `true` | Disable TLS for the OTLP connection. The in-release Collector listens without TLS. |
+| sflow.otel.timeout | string | `"10s"` | Per-export timeout for OTLP requests. |
+| sflow.podAnnotations | object | `{}` | Additional annotations added to the sFlow collector Pod. |
+| sflow.podLabels | object | `{}` | Additional labels added to the sFlow collector Pod. |
+| sflow.podSecurityContext.fsGroup | int | `65532` | Filesystem group ID used by the sFlow collector Pod. |
+| sflow.podSecurityContext.runAsGroup | int | `65532` | Group ID used by the sFlow collector container. |
+| sflow.podSecurityContext.runAsNonRoot | bool | `true` | Run the sFlow collector as a non-root user. |
+| sflow.podSecurityContext.runAsUser | int | `65532` | User ID used by the sFlow collector container. |
+| sflow.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | Seccomp profile type applied to the sFlow collector Pod. |
+| sflow.replicaCount | int | `1` | Number of sFlow collector replicas to run. |
+| sflow.resources.limits.cpu | string | `"500m"` | CPU limit for the sFlow collector container. |
+| sflow.resources.limits.memory | string | `"512Mi"` | Memory limit for the sFlow collector container. |
+| sflow.resources.requests.cpu | string | `"100m"` | CPU requested by the sFlow collector container. |
+| sflow.resources.requests.memory | string | `"128Mi"` | Memory requested by the sFlow collector container. |
+| sflow.service.annotations | object | `{}` | Additional annotations added to the sFlow UDP Service. |
+| sflow.service.enabled | bool | `true` | Enable the UDP Service for switch sFlow exporters. |
+| sflow.service.nodePort | int | `0` | Optional UDP nodePort used by switch sFlow exporters. Set to 0 to let Kubernetes allocate one. |
+| sflow.service.port | int | `6343` | UDP Service port used by switch sFlow exporters. |
+| sflow.service.type | string | `"NodePort"` | Service type used for switch sFlow exporters. NodePort is the default because sFlow datagrams usually arrive from switches outside the cluster. |
+| sflow.serviceAccount.annotations | object | `{}` | Additional annotations added to the sFlow collector ServiceAccount. |
+| sflow.serviceAccount.create | bool | `true` | Create a dedicated ServiceAccount for the sFlow collector. |
+| sflow.serviceAccount.name | string | `""` | ServiceAccount name for the sFlow collector. Defaults to the release-derived name when empty. |
+| sflow.tolerations | list | `[]` | Tolerations applied to the sFlow collector Pod. |
+| sflow.writer.batchSize | int | `2000` | Maximum sFlow records per OTLP export batch. |
+| sflow.writer.flushInterval | string | `"2s"` | Maximum delay before flushing a non-empty export batch. |
+| sflow.writer.queueSize | int | `65536` | Maximum records buffered before overload drops begin. |
+
 ## Controller and Agent
 
 | Key | Type | Default | Description |
