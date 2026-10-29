@@ -148,7 +148,7 @@ jobs:
             echo "Platform: linux/${ARTIFACT_ARCH}"
             echo "Version: ${IMAGE_VERSION}"
             echo
-            echo "See docs/usage/switch-agent-systemd.md for systemd installation."
+            echo "See docs/usage/topology/roce-lldp-discovery.md for systemd installation."
           } > "dist/${artifact}/README.md"
           tar -C dist -czf "dist/${artifact}.tar.gz" "${artifact}"
           (cd dist && sha256sum "${artifact}.tar.gz" > "${artifact}.tar.gz.sha256")

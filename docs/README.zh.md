@@ -28,17 +28,17 @@ Node 供调度器消费，通过 `FabricNode`、`Switch` 和 `Topology` 资源�
 | Spectrum-X | Scale-out | NVIDIA Topograph + NetQ |
 
 SONiC 交换机接入方式、label 语义和发现链路排查，参见
-[拓扑发现指南](./usage/topology-discovery.zh.md)。需要调整其他 Chart 参数时，可查看
+[拓扑发现指南](./usage/topology/README.zh.md)。需要调整其他 Chart 参数时，可查看
 [Helm values 参考](../chart/README.md)中的默认值和配置说明。
 
 ## 功能使用
 
-- [拓扑可视化](./usage/topology-visualization.zh.md)：在 Grafana 中渲染发现的网络拓扑。
+- [拓扑可视化](./usage/topology/topology-visualization.zh.md)：在 Grafana 中渲染发现的网络拓扑。
 - [RDMA 指标](./usage/rdma-metrics.zh.md)：RDMA 流量、拥塞和错误指标，归因到 Pod 和 workload。
 - [RDMA 流归因](./usage/rdma-flow.zh.md)：用 eBPF 把 RDMA 发送归因为 Pod 间流，发布
   `RDMAEndpoint` 并存储逐次发送事件。
-- [拓扑感知调度](./usage/workload-tas.zh.md)：配合 Kueue TAS 等调度器做拓扑感知调度。
-- [Switch Agent 部署](./usage/switch-agent-deployment.zh.md)：在 SONiC 交换机上部署 Switch Agent。
+- [拓扑感知调度](./usage/topology/README.zh.md#在调度器中使用-node-label)：配合 Kueue TAS 等调度器做拓扑感知调度。
+- [Switch Agent 部署](./usage/topology/roce-lldp-discovery.zh.md)：在 SONiC 交换机上部署 Switch Agent。
 
 ## 参考手册
 

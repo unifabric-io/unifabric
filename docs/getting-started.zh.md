@@ -13,7 +13,7 @@ English version: [getting-started.md](./getting-started.md)
 - 每个节点都有对应的 `FabricNode` 资源,按用途列出其 RDMA 网卡:scale-out、
   storage 或 scale-up。
 - 拓扑发现和 RDMA 指标采集组件已就绪。Node 拓扑 label 和 RDMA 指标属于功能
-  结果,分别参见[拓扑发现指南](./usage/topology-discovery.zh.md)和
+  结果,分别参见[拓扑发现指南](./usage/topology/README.zh.md)和
   [RDMA 指标指南](./usage/rdma-metrics.zh.md)。
 
 ## 前提条件
@@ -27,7 +27,7 @@ English version: [getting-started.md](./getting-started.md)
 - [ ] 集群已安装 Prometheus Operator 和 Grafana Operator(v5 及以上,提供
       `grafana.integreatly.org/v1beta1` API),用于采集 RDMA 指标和加载
       Grafana 看板。拓扑可视化还要求 Grafana 12.1 及以上,参见
-      [拓扑可视化指南](./usage/topology-visualization.zh.md)。
+      [拓扑可视化指南](./usage/topology/topology-visualization.zh.md)。
 
 ## 安装
 
@@ -53,7 +53,7 @@ SONiC 交换机承载 RoCE 网络的集群。RoCE 是在融合以太网上运行
 
 > 只依靠节点侧 LLDP 时,发现结果只包含 tier 1(节点直连的 leaf 交换机)。要发现
 leaf 以上的 spine、core 等层级,在安装完成后按
-[拓扑发现指南](./usage/topology-discovery.zh.md)声明上层交换机,或在交换机上
+[拓扑发现指南](./usage/topology/README.zh.md)声明上层交换机,或在交换机上
 运行 switch-agent 自动发现。
 
 2. 默认情况下,Unifabric 把节点上的所有 RDMA 网卡归类为 scale-out。如果节点上存在
@@ -63,7 +63,7 @@ selector。
 > 例如,一个节点有 `eth1` 到 `eth6` 六张 RDMA 网卡,其中 `eth1` 到 `eth4` 承载
 scale-out 流量,`eth5` 和 `eth6` 承载 storage 流量。标准 GPU 服务器
 (如 DGX H100/B200、GB200/GB300 NVL72)的参考架构通常配备 2 张专用存储网卡。
-执行以下命令,同时打开 storage 网络的拓扑发现:
+执行以下命令,同时打开 Storage 网络的拓扑发现:
 
 ```bash
 helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
@@ -93,82 +93,15 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 
 ## 其他网络环境
 
-默认安装面向 SONiC RoCE 网络。如果集群使用 InfiniBand 或 Spectrum-X,安装流程
-不变,只需按下面对应的小节修改拓扑发现参数。
+默认安装面向 SONiC RoCE 网络,并使用
+[RoCE 网络中 LLDP 发现](./usage/topology/roce-lldp-discovery.zh.md)。如果集群使用其他网络设备,
+保持相同的安装流程。只修改对应发现方式的拓扑发现参数:
 
-### InfiniBand 网络
+- InfiniBand 网络:参见 [InfiniBand 网络发现](./usage/topology/infiniband-discovery.zh.md)。
+- 由 NetQ 管理的 Spectrum-X 网络:参见 [RoCE 网络中 NVIDIA NetQ 发现](./usage/topology/roce-netq-discovery.zh.md)。
 
-适用于使用 NVIDIA InfiniBand 组网的集群,例如 Mellanox 网卡运行在 IB 模式并
-连接 IB 交换机。确认节点上存在 IB 模式的 RDMA 设备。
-
-完成基础安装后,执行以下命令,为 scale-up 和 scale-out 网络选择 NVIDIA
-Topograph 作为拓扑写入器:
-
-```bash
-helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --namespace unifabric-system \
-  --reuse-values \
-  --set topoDiscovery.scaleUp.mode=nv-topograph \
-  --set topoDiscovery.scaleOut.mode=nv-topograph \
-  --wait
-```
-
-### Spectrum-X 网络
-
-适用于使用 Spectrum-X 交换机组网并由 NetQ 管理网络的集群。NetQ 是 NVIDIA 面向
-Spectrum-X 网络的网络管理平台,NVIDIA Topograph 通过 NetQ API 读取 fabric
-拓扑。确认以下各项均成立:
-
-- [ ] Spectrum-X fabric 已由 NetQ 管理,且 NetQ 中有对应的 fabric 拓扑数据。
-- [ ] 集群可以访问 NetQ API。
-- [ ] 已准备 NetQ API URL、用户名和密码。
-
-先创建 namespace 和 NetQ 凭据 Secret。下面的命令不会把凭据写入本地文件、Helm
-values 或 ConfigMap。Secret 必须包含名为 `credentials.yaml` 的 key:
-
-```bash
-kubectl create namespace unifabric-system --dry-run=client -o yaml | kubectl apply -f -
-
-read -r -p "NetQ username: " NETQ_USERNAME
-read -r -s -p "NetQ password: " NETQ_PASSWORD
-printf '\n'
-printf 'username: %s\npassword: %s\n' "${NETQ_USERNAME}" "${NETQ_PASSWORD}" |
-  kubectl -n unifabric-system create secret generic netq-credentials \
-    --from-file=credentials.yaml=/dev/stdin
-unset NETQ_USERNAME NETQ_PASSWORD
-```
-
-```text
-namespace/unifabric-system created
-NetQ username: admin
-NetQ password:
-secret/netq-credentials created
-```
-
-生产集群还必须为 Kubernetes Secret 启用静态加密,并限制读取该 Secret 的 RBAC
-权限。
-
-然后执行:
-
-```bash
-helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --namespace unifabric-system \
-  --reuse-values \
-  --set topoDiscovery.scaleOut.mode=nv-topograph \
-  --set nvidiaTopograph.provider.name=netq \
-  --set-string nvidiaTopograph.provider.params.apiUrl=https://netq.example.com \
-  --set-string nvidiaTopograph.credentialsSecretName=netq-credentials \
-  --wait
-```
-
-参数说明:
-
-| Helm value | 用途 |
-| --- | --- |
-| `topoDiscovery.scaleOut.mode` | 设置为 `nv-topograph`,由 NVIDIA Topograph 写入 scale-out label。 |
-| `nvidiaTopograph.provider.name` | 设置为 `netq`,表示通过 NetQ API 发现拓扑。 |
-| `nvidiaTopograph.provider.params.apiUrl` | NetQ API URL。 |
-| `nvidiaTopograph.credentialsSecretName` | 已有 NetQ 凭据 Secret 的名称,Secret 必须包含 `credentials.yaml` key。凭据仅以只读方式挂载到 Topograph Pod。 |
+各网络在不同网络设备下应选择哪种发现方式,参见
+[网络拓扑发现](./usage/topology/README.zh.md#按网络选择发现方式)。
 
 ## 验证
 
@@ -238,9 +171,9 @@ Pod 正常运行且 `FabricNode` 状态符合预期,说明部署已经完成。
 部署完成后,按功能使用文档继续:
 
 - 深入拓扑发现:声明 SONiC 上层交换机、部署 switch-agent、理解 label 语义与
-  `Topology` 资源,参见[拓扑发现指南](./usage/topology-discovery.zh.md)。
-- 在调度器中使用这些 label:参见 [Kueue TAS 工作负载示例](./usage/workload-tas.zh.md)。
-- 渲染拓扑:参见[拓扑可视化指南](./usage/topology-visualization.zh.md)。
+  `Topology` 资源,参见[拓扑发现指南](./usage/topology/README.zh.md)。
+- 在调度器中使用这些 label:参见[在调度器中使用 Node label](./usage/topology/README.zh.md#在调度器中使用-node-label)。
+- 渲染拓扑:参见[拓扑可视化指南](./usage/topology/topology-visualization.zh.md)。
 - 观测 RDMA 指标:参见 [RDMA 指标指南](./usage/rdma-metrics.zh.md)。
 - 调整安装配置:参见 [Helm values 参考](../chart/README.md)。
 

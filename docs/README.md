@@ -33,21 +33,21 @@ Spectrum-X fabric, the guide lists the Helm options to change:
 | Spectrum-X | Scale-out | NVIDIA Topograph with NetQ |
 
 For the SONiC switch onboarding options, the label semantics, and discovery
-troubleshooting, see the [topology discovery guide](./usage/topology-discovery.md).
+troubleshooting, see the [topology discovery guide](./usage/topology/README.md).
 For other Chart parameters, see the defaults and descriptions in the
 [Helm values reference](../chart/README.md).
 
 ## Usage
 
-- [Topology visualization](./usage/topology-visualization.md): render the discovered
+- [Topology visualization](./usage/topology/topology-visualization.md): render the discovered
   fabric in Grafana.
 - [RDMA metrics](./usage/rdma-metrics.md): RDMA traffic, congestion, and error
   metrics with Pod and workload attribution.
 - [RDMA flow attribution](./usage/rdma-flow.md): attribute RDMA sends to Pod-to-Pod
   flows with eBPF, publish `RDMAEndpoint`, and store per-send events.
-- [Workload TAS](./usage/workload-tas.md): topology-aware scheduling with Kueue TAS
-  and similar schedulers.
-- [Switch Agent deployment](./usage/switch-agent-deployment.md): deploy the Switch
+- [Use the Node labels in a scheduler](./usage/topology/README.md#use-the-node-labels-in-a-scheduler):
+  topology-aware scheduling with Kueue TAS and similar schedulers.
+- [Switch Agent deployment](./usage/topology/roce-lldp-discovery.md): deploy the Switch
   Agent on SONiC switches.
 
 ## Reference

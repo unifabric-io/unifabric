@@ -15,7 +15,7 @@ After you finish this guide, the cluster will show the following results:
   purpose: scale-out, storage, or scale-up.
 - The topology-discovery and RDMA-metrics components are ready. Node topology
   labels and RDMA metrics are feature results; see the
-  [topology discovery guide](./usage/topology-discovery.md) and the
+  [topology discovery guide](./usage/topology/README.md) and the
   [RDMA metrics guide](./usage/rdma-metrics.md).
 
 ## Prerequisites
@@ -32,7 +32,7 @@ Make sure that each item below is true before you continue:
       the `grafana.integreatly.org/v1beta1` API) are installed in the cluster
       to collect RDMA metrics and load the Grafana dashboards. Topology
       visualization also requires Grafana 12.1 or later; see the
-      [topology visualization guide](./usage/topology-visualization.md).
+      [topology visualization guide](./usage/topology/topology-visualization.md).
 
 ## Installation
 
@@ -61,7 +61,7 @@ topology-discovery options as described in
 > With node-side LLDP alone, discovery produces only tier 1: the leaf switches
 that the nodes connect to. To discover the spine and core tiers above the
 leaves, declare the upper switches or run the switch-agent on the switches after
-the installation. The [topology discovery guide](./usage/topology-discovery.md)
+the installation. The [topology discovery guide](./usage/topology/README.md)
 describes both options.
 
 2. By default, Unifabric classifies all RDMA NICs on a node as scale-out. If a node
@@ -72,7 +72,7 @@ has RDMA NICs for different purposes, add the matching selector with
 `eth1` through `eth4` carry scale-out traffic, and `eth5` and `eth6` carry
 storage traffic. Reference architectures of standard GPU servers, such as
 DGX H100/B200 and GB200/GB300 NVL72, commonly provide two dedicated storage
-NICs. Run this command, which also enables topology discovery for the storage
+NICs. Run this command, which also enables topology discovery for the Storage
 network:
 
 ```bash
@@ -105,87 +105,16 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 
 ## Other Network Environments
 
-The default installation is for a SONiC RoCE fabric. If the cluster uses
-InfiniBand or Spectrum-X, keep the same installation flow and change only the
-topology-discovery options in the matching subsection below.
+The default installation is for a SONiC RoCE network and uses
+[LLDP discovery in RoCE networks](./usage/topology/roce-lldp-discovery.md). If the cluster uses a
+different network device, keep the same installation flow. Change only the
+topology discovery parameters for the matching discovery method:
 
-### InfiniBand Fabric
+- InfiniBand network: see [InfiniBand network discovery](./usage/topology/infiniband-discovery.md).
+- Spectrum-X network that NetQ manages: see [NVIDIA NetQ discovery in RoCE networks](./usage/topology/roce-netq-discovery.md).
 
-Use this section when the cluster uses an NVIDIA InfiniBand fabric, for example
-Mellanox NICs in IB mode connected to IB switches. Make sure that RDMA devices
-in IB mode exist on the nodes.
-
-After the base installation, run this command to select NVIDIA Topograph as
-the topology writer for the scale-up and scale-out networks:
-
-```bash
-helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --namespace unifabric-system \
-  --reuse-values \
-  --set topoDiscovery.scaleUp.mode=nv-topograph \
-  --set topoDiscovery.scaleOut.mode=nv-topograph \
-  --wait
-```
-
-### Spectrum-X Fabric
-
-Use this section when the cluster uses Spectrum-X switches and NetQ manages the
-network. NetQ is the NVIDIA network management platform for Spectrum-X fabrics,
-and NVIDIA Topograph reads the fabric topology through the NetQ API. Make sure
-that each item below is true:
-
-- [ ] NetQ manages the Spectrum-X fabric, and NetQ holds the fabric topology
-      data.
-- [ ] The cluster can reach the NetQ API.
-- [ ] You have the NetQ API URL, the username, and the password.
-
-First create the namespace and the NetQ credentials Secret. The commands below
-do not write the credentials to local files, Helm values, or ConfigMaps. The
-Secret must contain a key named `credentials.yaml`:
-
-```bash
-kubectl create namespace unifabric-system --dry-run=client -o yaml | kubectl apply -f -
-
-read -r -p "NetQ username: " NETQ_USERNAME
-read -r -s -p "NetQ password: " NETQ_PASSWORD
-printf '\n'
-printf 'username: %s\npassword: %s\n' "${NETQ_USERNAME}" "${NETQ_PASSWORD}" |
-  kubectl -n unifabric-system create secret generic netq-credentials \
-    --from-file=credentials.yaml=/dev/stdin
-unset NETQ_USERNAME NETQ_PASSWORD
-```
-
-```text
-namespace/unifabric-system created
-NetQ username: admin
-NetQ password:
-secret/netq-credentials created
-```
-
-A production cluster must also enable encryption at rest for Kubernetes Secrets
-and restrict the RBAC permissions that read this Secret.
-
-Then run:
-
-```bash
-helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
-  --namespace unifabric-system \
-  --reuse-values \
-  --set topoDiscovery.scaleOut.mode=nv-topograph \
-  --set nvidiaTopograph.provider.name=netq \
-  --set-string nvidiaTopograph.provider.params.apiUrl=https://netq.example.com \
-  --set-string nvidiaTopograph.credentialsSecretName=netq-credentials \
-  --wait
-```
-
-Option description:
-
-| Helm value | Purpose |
-| --- | --- |
-| `topoDiscovery.scaleOut.mode` | Set to `nv-topograph` so that NVIDIA Topograph writes the scale-out labels. |
-| `nvidiaTopograph.provider.name` | Set to `netq` to discover the topology through the NetQ API. |
-| `nvidiaTopograph.provider.params.apiUrl` | The NetQ API URL. |
-| `nvidiaTopograph.credentialsSecretName` | The name of the existing NetQ credentials Secret. The Secret must contain the `credentials.yaml` key. The credentials are mounted read-only into the Topograph Pod. |
+For the discovery method to use for each network on each network device, see
+[Network topology discovery](./usage/topology/README.md#choose-a-discovery-method-by-network).
 
 ## Verification
 
@@ -259,11 +188,11 @@ After the deployment, continue with the feature guides:
 
 - Go deeper into topology discovery: declare upper SONiC switches, deploy the
   switch-agent, and understand the label semantics and the `Topology` resource
-  with the [topology discovery guide](./usage/topology-discovery.md).
-- Use the labels in a scheduler with the
-  [Kueue TAS workload example](./usage/workload-tas.md).
+  with the [topology discovery guide](./usage/topology/README.md).
+- Use the labels in a scheduler with
+  [Use the Node labels in a scheduler](./usage/topology/README.md#use-the-node-labels-in-a-scheduler).
 - Render the topology with the
-  [topology visualization guide](./usage/topology-visualization.md).
+  [topology visualization guide](./usage/topology/topology-visualization.md).
 - Observe RDMA metrics with the [RDMA metrics guide](./usage/rdma-metrics.md).
 - Tune the installation with the [Helm values reference](../chart/README.md).
 
