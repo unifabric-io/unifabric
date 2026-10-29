@@ -12,3 +12,9 @@ Unifabric 提供 3 个集群级和 1 个命名空间级 `unifabric.io/v1beta1` �
 | `RDMAEndpoint` | 单个 Pod 的 RDMA 设备、地址和 queue pair,在启用 `agent.ebpfFlow` 时由 Agent 发布 | [rdmaendpoint.zh.md](./rdmaendpoint.zh.md) |
 
 CRD 的 OpenAPI schema 以 [`chart/crds`](../../chart/crds/) 中生成的清单为准。
+
+## 指标
+
+| 指标集 | 参考 |
+| --- | --- |
+| 主机与 Pod 的 RDMA 网卡指标、RDMA tracing 指标和 RDMA 发送事件字段 | [metrics.zh.md](./metrics.zh.md) |

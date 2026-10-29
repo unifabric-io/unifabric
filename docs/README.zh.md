@@ -34,9 +34,11 @@ SONiC 交换机接入方式、label 语义和发现链路排查，参见
 ## 功能使用
 
 - [拓扑可视化](./usage/topology-visualization.zh.md)：在 Grafana 中渲染发现的网络拓扑。
-- [RDMA 指标](./usage/rdma-metrics.zh.md)：RDMA 流量、拥塞和错误指标，归因到 Pod 和 workload。
-- [RDMA 流归因](./usage/rdma-flow.zh.md)：用 eBPF 把 RDMA 发送归因为 Pod 间流，发布
-  `RDMAEndpoint` 并存储逐次发送事件。
+- [AI 高速网络流量观测](./usage/traffic-observability/README.zh.md)：流量观测范围、各位置的观测方式，以及 Pod 身份的关联。
+- [主机与 Pod 的 RDMA 网卡指标](./usage/traffic-observability/rdma-metrics.zh.md)：主机网卡和 Pod RDMA 设备的流量、拥塞和错误指标，关联到 Pod 和任务。
+- [基于 eBPF 的 RDMA tracing](./usage/traffic-observability/rdma-flow.zh.md)：用 eBPF 把 RDMA 发送归因为 Pod 间流，发布
+  `RDMAEndpoint`。
+- [RDMA 发送事件存储](./usage/traffic-observability/rdma-flow-events.zh.md)：把逐次发送事件存入 ClickHouse 或 Elasticsearch。
 - [拓扑感知调度](./usage/workload-tas.zh.md)：配合 Kueue TAS 等调度器做拓扑感知调度。
 - [Switch Agent 部署](./usage/switch-agent-deployment.zh.md)：在 SONiC 交换机上部署 Switch Agent。
 

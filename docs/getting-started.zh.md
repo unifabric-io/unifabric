@@ -14,7 +14,7 @@ English version: [getting-started.md](./getting-started.md)
   storage 或 scale-up。
 - 拓扑发现和 RDMA 指标采集组件已就绪。Node 拓扑 label 和 RDMA 指标属于功能
   结果,分别参见[拓扑发现指南](./usage/topology-discovery.zh.md)和
-  [RDMA 指标指南](./usage/rdma-metrics.zh.md)。
+  [主机与 Pod 的 RDMA 网卡指标指南](./usage/traffic-observability/rdma-metrics.zh.md)。
 
 ## 前提条件
 
@@ -241,7 +241,7 @@ Pod 正常运行且 `FabricNode` 状态符合预期,说明部署已经完成。
   `Topology` 资源,参见[拓扑发现指南](./usage/topology-discovery.zh.md)。
 - 在调度器中使用这些 label:参见 [Kueue TAS 工作负载示例](./usage/workload-tas.zh.md)。
 - 渲染拓扑:参见[拓扑可视化指南](./usage/topology-visualization.zh.md)。
-- 观测 RDMA 指标:参见 [RDMA 指标指南](./usage/rdma-metrics.zh.md)。
+- 观测 RDMA 指标:参见 [主机与 Pod 的 RDMA 网卡指标指南](./usage/traffic-observability/rdma-metrics.zh.md)。
 - 调整安装配置:参见 [Helm values 参考](../chart/README.md)。
 
 ## 故障排查

@@ -14,3 +14,9 @@ resource in `unifabric.io/v1beta1`.
 
 The generated manifests in [`chart/crds`](../../chart/crds/) are the source of truth
 for the CRD OpenAPI schemas.
+
+## Metrics
+
+| Metric set | Reference |
+| --- | --- |
+| Host and Pod RDMA NIC metrics, RDMA tracing metrics, and RDMA send event fields | [metrics.md](./metrics.md) |

@@ -41,10 +41,14 @@ For other Chart parameters, see the defaults and descriptions in the
 
 - [Topology visualization](./usage/topology-visualization.md): render the discovered
   fabric in Grafana.
-- [RDMA metrics](./usage/rdma-metrics.md): RDMA traffic, congestion, and error
-  metrics with Pod and workload attribution.
-- [RDMA flow attribution](./usage/rdma-flow.md): attribute RDMA sends to Pod-to-Pod
-  flows with eBPF, publish `RDMAEndpoint`, and store per-send events.
+- [AI high-speed network traffic observability](./usage/traffic-observability/README.md):
+  the traffic observability scope, the observation method of each location, and the Pod identity association.
+- [Host and Pod RDMA NIC metrics](./usage/traffic-observability/rdma-metrics.md): RDMA traffic, congestion, and error
+  metrics of host NICs and Pod RDMA devices, associated with Pods and jobs.
+- [eBPF-based RDMA tracing](./usage/traffic-observability/rdma-flow.md): attribute RDMA sends to Pod-to-Pod
+  flows with eBPF and publish `RDMAEndpoint`.
+- [RDMA send event storage](./usage/traffic-observability/rdma-flow-events.md): store per-send events
+  in ClickHouse or Elasticsearch.
 - [Workload TAS](./usage/workload-tas.md): topology-aware scheduling with Kueue TAS
   and similar schedulers.
 - [Switch Agent deployment](./usage/switch-agent-deployment.md): deploy the Switch

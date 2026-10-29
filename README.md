@@ -67,9 +67,9 @@ Applicability:
   and InfiniBand (imported from NVIDIA Topograph)
 - Supports bare-metal and cloud environments
 
-### High-speed network traffic observability
+### AI high-speed network traffic observability
 
-High-speed network traffic observability collects traffic data for the three high-speed
+AI high-speed network traffic observability collects traffic data for the three high-speed
 networks by reading NIC counters, collecting switch metrics, and attaching eBPF
 probes, and attributes it to
 Pods, namespaces, workloads, and hosts, turning device-level traffic into
@@ -141,8 +141,7 @@ After installation, refer to the following guides for each feature:
 
 - Topology discovery and visualization: [topology visualization](./docs/usage/topology-visualization.md)
 - Topology-aware scheduling: [Kueue / Volcano / KAI scheduling integration](./docs/usage/workload-tas.md)
-- RDMA metrics observability: [RDMA metrics](./docs/usage/rdma-metrics.md)
-- RDMA flow attribution: [RDMA flow attribution](./docs/usage/rdma-flow.md)
+- AI high-speed network traffic observability: [AI high-speed network traffic observability](./docs/usage/traffic-observability/README.md)
 - Switch traffic observability: [Switch Agent deployment](./docs/usage/switch-agent-deployment.md)
 
 ## Roadmap

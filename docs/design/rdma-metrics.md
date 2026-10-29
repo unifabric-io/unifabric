@@ -10,7 +10,7 @@ host and Pod RDMA state from Linux sysfs, container namespaces, and ethtool, the
 labels every sample with topology and workload metadata from the local `FabricNode`
 snapshot. This document records the data sources, the scrape flow, the metric model,
 and the design decisions behind them. How to enable scraping, dashboards, and alerts
-is in [RDMA metrics usage](../usage/rdma-metrics.md).
+is in [host and Pod RDMA NIC metrics usage](../usage/traffic-observability/rdma-metrics.md).
 
 ## Motivation
 
@@ -179,7 +179,7 @@ dashboards, gated by `nodeMetrics` and `grafanaDashboard` values. It renders the
 registers the RDMA collector when the Agent starts. `nodeMetrics.enabled` controls the
 Helm resources around scraping and dashboards, not collector registration inside the
 Agent. The enable steps and verification commands are in
-[RDMA metrics usage](../usage/rdma-metrics.md).
+[host and Pod RDMA NIC metrics usage](../usage/traffic-observability/rdma-metrics.md).
 
 ### Failure handling
 

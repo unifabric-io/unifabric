@@ -27,8 +27,8 @@ a controller-runtime `Runnable` inside the existing Agent DaemonSet.
 
 Compatibility depends on the final network submission path, not just the
 communication library name or version. Support details and the versions they
-apply to are maintained in the "Inference framework view" and "Communication
-library support matrix" sections of the [usage guide](../usage/rdma-flow.md).
+apply to are maintained in the "Inference frameworks" and "Communication
+libraries" sections of the [usage guide](../usage/traffic-observability/rdma-flow.md#scope).
 After upgrading a communication library, check the actual backend configuration
 and logs to confirm the submission path.
 
@@ -208,7 +208,7 @@ OpenTelemetry log record sent over OTLP gRPC:
   are strings.
 
 The Event Collector manages the storage backends. See the
-[usage guide](../usage/rdma-flow.md) for configuration details.
+[usage guide](../usage/traffic-observability/rdma-flow-events.md) for configuration details.
 
 ## 7. Limitations
 

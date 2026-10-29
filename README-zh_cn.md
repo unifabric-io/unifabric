@@ -53,9 +53,9 @@ NVIDIA Topograph、NetQ 导入拓扑，以统一的 Kubernetes 资源模型对�
   InfiniBand（从 NVIDIA Topograph 导入）
 - 支持裸金属与云化环境
 
-### 高速网络流量观测
+### AI 高速网络流量观测
 
-高速网络流量观测功能通过读取网卡计数器、采集交换机指标、挂载 eBPF 探针等方式，
+AI 高速网络流量观测功能通过读取网卡计数器、采集交换机指标、挂载 eBPF 探针等方式，
 采集三张高速网络的流量数据，并统一归因到 Pod、namespace、workload 和主机，把设备视角的流量变成
 业务视角的可观测指标。观测的目的，是让网络问题可以用业务语言回答——任务变慢是否
 由网络引起、是谁的流量影响了谁——为 AI 训练与推理的性能分析和故障定位提供依据。
@@ -111,8 +111,7 @@ SONiC RoCE 网络，也支持 InfiniBand 和 NVIDIA Spectrum-X 两种环境。
 
 - 拓扑识别与可视化：[拓扑可视化](./docs/usage/topology-visualization.zh.md)
 - 拓扑感知调度：[Kueue / Volcano / KAI 调度集成](./docs/usage/workload-tas.zh.md)
-- RDMA 指标观测：[RDMA 指标](./docs/usage/rdma-metrics.zh.md)
-- RDMA 流归因：[RDMA 流归因](./docs/usage/rdma-flow.zh.md)
+- AI 高速网络流量观测：[AI 高速网络流量观测](./docs/usage/traffic-observability/README.zh.md)
 - 交换机流量观测：[Switch Agent 部署](./docs/usage/switch-agent-deployment.zh.md)
 
 ## 路线图
