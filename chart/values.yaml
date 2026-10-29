@@ -7,14 +7,14 @@ global:
 # -- Independently selects one discovery implementation and label contract for each topology. Mode is the only enablement switch for its topology writer.
 topoDiscovery:
   scaleUp:
-    # -- Scale-up discovery mode. Options: nv-topograph (NVIDIA Topograph) or manual (labels are managed externally).
-    mode: manual
+    # -- Scale-up discovery mode. Only external is supported: an external system such as NVIDIA Topograph, or an administrator, writes the labels.
+    mode: external
     nodeLabel:
       # -- Go text/template for scale-up topology label keys. It must contain exactly one {{ .Tier }} action.
       keyTemplate: "scale-up.unifabric.io/tier-{{ .Tier }}"
 
   scaleOut:
-    # -- Scale-out discovery mode. Options: nv-topograph (NVIDIA Topograph) or unifabric-roce (built-in LLDP discovery).
+    # -- Scale-out discovery mode. Options: unifabric-roce (built-in LLDP discovery) or external (an external system such as NVIDIA Topograph writes the labels).
     mode: unifabric-roce
     nodeLabel:
       # -- Go text/template for scale-out topology label keys. It must contain exactly one {{ .Tier }} action.
@@ -570,30 +570,3 @@ ebpfFlowEventCollector:
       nodeSelector: {}
       # -- Tolerations for the bundled Elasticsearch Pod.
       tolerations: []
-
-nvidiaTopograph:
-  # -- Topology provider settings passed to NVIDIA Topograph.
-  provider:
-    # -- Provider name. Use infiniband-k8s for InfiniBand or netq for Spectrum-X.
-    name: infiniband-k8s
-    # -- Provider-specific parameters, such as apiUrl for netq.
-    params: {}
-  # -- Existing Secret containing a credentials.yaml key. Required by the netq provider; credentials are mounted only into the topograph Pod.
-  credentialsSecretName: ""
-  # -- Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s.
-  useGpuCliqueLabel: true
-  # -- Shared image used by topograph, node-observer, and node-data-broker.
-  image:
-    # -- NVIDIA Topograph image registry.
-    registry: ghcr.io
-    # -- NVIDIA Topograph image repository.
-    repository: nvidia/topograph
-    # -- NVIDIA Topograph image tag.
-    tag: v0.5.0
-    # -- NVIDIA Topograph image pull policy.
-    pullPolicy: IfNotPresent
-  # -- Selects GPU Nodes observed by node-observer and running node-data-broker.
-  gpuNodeSelector:
-    nvidia.com/gpu.present: "true"
-  # -- Tolerations applied to node-data-broker on selected GPU Nodes.
-  gpuNodeTolerations: []

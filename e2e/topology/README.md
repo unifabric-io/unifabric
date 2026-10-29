@@ -100,7 +100,7 @@ SWITCH_AGENT_IMAGE="ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG" \
 
 ### E2E Coverage
 
-CI runs three isolated flows against the same NVAIR infrastructure:
+CI runs four isolated flows against the same NVAIR infrastructure:
 
 1. **roce-lldp-full-auto**
    - Install the Chart with pinned mTLS.
@@ -118,17 +118,31 @@ CI runs three isolated flows against the same NVAIR infrastructure:
      Node LLDP; no leaf Switch CR is created.
    - Verify that Node LLDP plus the annotations regenerate the same Node/Switch labels and
      `Topology/scaleout` without switch-agent status.
-3. **nv-topograph**
+3. **external**
    - Uninstall the `roce-lldp-node-only` release and clean its CRs and managed labels.
-   - Reinstall with `scaleUp.mode=manual` and without NVIDIA Topograph.
-   - Apply Scale-up accelerator labels to simulate the labels that an InfiniBand Topograph source
-     would write.
+   - Reinstall with `scaleUp.mode=external`; the chart never deploys NVIDIA Topograph.
+   - Apply Scale-up accelerator labels to simulate the labels that an externally deployed
+     topology writer such as NVIDIA Topograph would write.
    - Verify `Topology/scaleup` domains, Node groups, and empty-status behavior, then uninstall and
      clean again.
+4. **nvidia-topograph**
+   - Reinstall with `scaleUp.mode=external` and `scaleOut.mode=external`.
+   - Deploy the real upstream NVIDIA Topograph chart with its `test` provider (embedded
+     `medium.yaml` model) and the `k8s` engine configured with the Unifabric label keys. The
+     engine and the node-observer trigger are scoped to nodes labeled
+     `e2e.unifabric.io/topograph-model=true`.
+   - Create eight kubelet-less Node objects named after the model hosts (`1101`..`1402`).
+     Topograph detects the new nodes, computes the model topology, and writes real scale-up and
+     scale-out labels through the Kubernetes API.
+   - Verify the written Node labels, the aggregated `Topology/scaleup` (four `nvl` domains), and
+     the aggregated `Topology/scaleout` (three switch tiers and four node groups), then delete the
+     model nodes and verify both statuses drain.
 
-The `nv-topograph` flow validates the label-to-Topology contract in a fresh installation. It
-simulates Topograph's labels and does not claim to validate a real InfiniBand fabric or a running
-NVIDIA Topograph deployment.
+The `external` flow validates the label-to-Topology contract in a fresh installation. It
+simulates externally written labels and does not claim to validate a real InfiniBand fabric or a
+running NVIDIA Topograph deployment. The `nvidia-topograph` flow closes that gap: a real upstream
+Topograph deployment computes a deterministic test model and labels Node objects through the same
+code path used in production, and Unifabric aggregates those labels into Topology resources.
 
 Between flows, `step6-uninstall-unifabric` uninstalls the Helm release. Because the Controller is
 no longer running, the cleanup removes finalizers from the disposable E2E Topology objects before

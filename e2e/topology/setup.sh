@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
-  bash e2e/topology/setup.sh [all|step1-install-topology|step-load-images|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric] [args...]
+  bash e2e/topology/setup.sh [all|step1-install-topology|step-load-images|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric|step-install-nvidia-topograph|step-uninstall-nvidia-topograph] [args...]
 
 Examples:
   CONTROLLER_REGISTRY=ghcr.io CONTROLLER_REPOSITORY=unifabric-io/unifabric-controller CONTROLLER_TAG=YOU_TAG \
@@ -28,6 +28,9 @@ Examples:
   SWITCH_AGENT_IMAGE=ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG \
     bash e2e/topology/setup.sh step5-deploy-switch-agent
   bash e2e/topology/setup.sh step6-uninstall-unifabric
+  # Deploy the upstream NVIDIA Topograph chart for the nvidia-topograph closed-loop scenario.
+  bash e2e/topology/setup.sh step-install-nvidia-topograph
+  bash e2e/topology/setup.sh step-uninstall-nvidia-topograph
 EOF
 }
 
@@ -109,6 +112,12 @@ case "${stage}" in
     ;;
   step6-uninstall-unifabric)
     run_step uninstall-unifabric.sh "$@"
+    ;;
+  step-install-nvidia-topograph)
+    run_step install-nvidia-topograph.sh "$@"
+    ;;
+  step-uninstall-nvidia-topograph)
+    run_step uninstall-nvidia-topograph.sh "$@"
     ;;
   *)
     echo "Unknown stage: ${stage}" >&2

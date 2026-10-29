@@ -11,20 +11,22 @@
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| topoDiscovery.scaleOut.mode | string | `"unifabric-roce"` | Scale-out discovery mode. Options: nv-topograph (NVIDIA Topograph) or unifabric-roce (built-in LLDP discovery). |
+| topoDiscovery.scaleOut.mode | string | `"unifabric-roce"` | Scale-out discovery mode. Options: unifabric-roce (built-in LLDP discovery) or external (an external system such as NVIDIA Topograph writes the labels). |
 | topoDiscovery.scaleOut.nodeLabel.keyTemplate | string | `"scale-out.unifabric.io/tier-{{ .Tier }}"` | Go text/template for scale-out topology label keys. It must contain exactly one {{ .Tier }} action. |
-| topoDiscovery.scaleUp.mode | string | `"manual"` | Scale-up discovery mode. Options: nv-topograph (NVIDIA Topograph) or manual (labels are managed externally). |
+| topoDiscovery.scaleUp.mode | string | `"external"` | Scale-up discovery mode. Only external is supported: an external system such as NVIDIA Topograph, or an administrator, writes the labels. |
 | topoDiscovery.scaleUp.nodeLabel.keyTemplate | string | `"scale-up.unifabric.io/tier-{{ .Tier }}"` | Go text/template for scale-up topology label keys. It must contain exactly one {{ .Tier }} action. |
 | topoDiscovery.storage.mode | string | `"unifabric-roce"` | Storage discovery mode. Currently supported: unifabric-roce (RoCE storage). |
 | topoDiscovery.storage.nodeLabel.keyTemplate | string | `"storage.unifabric.io/tier-{{ .Tier }}"` | Go text/template for storage topology label keys. It must contain exactly one {{ .Tier }} action. |
 
-`topoDiscovery.*.mode` is the only topology-writer switch. The former
-`topologyLabels`, `internalTopologyLabelWriter.enabled`,
+`topoDiscovery.*.mode` is the only topology-writer switch. The chart no longer
+bundles NVIDIA Topograph; set `topoDiscovery.scaleUp.mode` or
+`topoDiscovery.scaleOut.mode` to `external` and deploy NVIDIA Topograph
+separately (see [docs/usage/nvidia-topograph.md](../docs/usage/nvidia-topograph.md)).
+The former `topologyLabels`, `internalTopologyLabelWriter.enabled`,
 `switchTopologyDiscovery`, `switchDiscovery`, `switchAgent`,
-`nodeTopologyDiscovery`, `nodeDiscovery`, and `nvidiaTopograph.enable` values
-are rejected with migration errors instead of being silently ignored. The
-former component-level NVIDIA blocks are replaced by the shared
-`nvidiaTopograph.image` and GPU-node values.
+`nodeTopologyDiscovery`, `nodeDiscovery`, `nvidiaTopograph`, and the
+`nv-topograph` mode values are rejected with migration errors instead of being
+silently ignored.
 
 ## Switch Subscription
 
@@ -263,18 +265,3 @@ meant for testing only. See [docs/usage/rdma-flow.md](../docs/usage/rdma-flow.md
 | ebpfFlowEventCollector.serviceMonitor.interval | string | `"15s"` | Scrape interval for the Collector metrics. |
 | ebpfFlowEventCollector.serviceMonitor.labels | object | `{}` | Extra labels added to the ServiceMonitor. |
 | ebpfFlowEventCollector.tolerations | list | `[]` | Tolerations for the Collector Pod. |
-
-## NVIDIA Topograph
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| nvidiaTopograph.credentialsSecretName | string | `""` | Existing Secret containing a credentials.yaml key. Required by the netq provider; credentials are mounted only into the topograph Pod. |
-| nvidiaTopograph.gpuNodeSelector | object | `{"nvidia.com/gpu.present":"true"}` | Selects GPU Nodes observed by node-observer and running node-data-broker. |
-| nvidiaTopograph.gpuNodeTolerations | list | `[]` | Tolerations applied to node-data-broker on selected GPU Nodes. |
-| nvidiaTopograph.image.pullPolicy | string | `"IfNotPresent"` | NVIDIA Topograph image pull policy. |
-| nvidiaTopograph.image.registry | string | `"ghcr.io"` | NVIDIA Topograph image registry. |
-| nvidiaTopograph.image.repository | string | `"nvidia/topograph"` | NVIDIA Topograph image repository. |
-| nvidiaTopograph.image.tag | string | `"v0.5.0"` | NVIDIA Topograph image tag. |
-| nvidiaTopograph.provider.name | string | `"infiniband-k8s"` | Provider name. Use infiniband-k8s for InfiniBand or netq for Spectrum-X. |
-| nvidiaTopograph.provider.params | object | `{}` | Provider-specific parameters, such as apiUrl for netq. |
-| nvidiaTopograph.useGpuCliqueLabel | bool | `true` | Use the GPU Operator clique label as the accelerator topology source for infiniband-k8s. |

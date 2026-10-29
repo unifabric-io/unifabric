@@ -34,28 +34,28 @@ var scaleUpScenarioLabels = map[string]map[string]string{
 	},
 }
 
-func runManualScaleUpScenario(_ config, deadline time.Time, rows *[]row) error {
-	stageLog("check_manual_scaleup", colorize("start", colorBold))
+func runExternalScaleUpScenario(_ config, deadline time.Time, rows *[]row) error {
+	stageLog("check_external_scaleup", colorize("start", colorBold))
 	if err := clearScaleUpScenarioLabels(); err != nil {
 		return fmt.Errorf("clear stale scale-up scenario labels: %w", err)
 	}
 	defer func() {
 		if err := clearScaleUpScenarioLabels(); err != nil {
-			stageLog("cleanup_manual_scaleup", colorize(err.Error(), colorRed))
+			stageLog("cleanup_external_scaleup", colorize(err.Error(), colorRed))
 		}
 	}()
 
 	for nodeName, labels := range scaleUpScenarioLabels {
 		for key, value := range labels {
 			if _, err := runCommand(true, "kubectl", "label", "node", nodeName, key+"="+value, "--overwrite"); err != nil {
-				return fmt.Errorf("label %s for manual scale-up scenario: %w", nodeName, err)
+				return fmt.Errorf("label %s for external scale-up scenario: %w", nodeName, err)
 			}
 		}
 	}
 
 	detail, err := waitForCheckPass(
-		"check_manual_scaleup",
-		validateManualScaleUpTopologyStatus,
+		"check_external_scaleup",
+		validateExternalScaleUpTopologyStatus,
 		deadline,
 		2*time.Second,
 	)
@@ -63,7 +63,7 @@ func runManualScaleUpScenario(_ config, deadline time.Time, rows *[]row) error {
 		return err
 	}
 	*rows = append(*rows, row{
-		"nv-topograph label aggregation",
+		"external label aggregation",
 		"one accelerator tier and two clique groups",
 		detail,
 		"PASS",
@@ -309,7 +309,7 @@ func runScaleOutResetScenario(cfg config, deadline time.Time, rows *[]row) error
 	return nil
 }
 
-func validateManualScaleUpTopologyStatus() (bool, string) {
+func validateExternalScaleUpTopologyStatus() (bool, string) {
 	var topology topologyResource
 	if err := fetchResourceJSON("topologies.unifabric.io/scaleup", &topology); err != nil {
 		return false, fmt.Sprintf("failed to read Topology/scaleup: %v", err)

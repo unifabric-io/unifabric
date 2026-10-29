@@ -303,7 +303,7 @@ jobs:
           set -euo pipefail
           bash e2e/topology/setup.sh step6-uninstall-unifabric
 
-      - name: nv-topograph - Install label simulation
+      - name: external - Install label simulation
         shell: bash
         env:
           CONTROLLER_REGISTRY: ${{ env.IMAGE_REGISTRY }}
@@ -317,19 +317,56 @@ jobs:
           set -euo pipefail
           bash e2e/topology/setup.sh step4-install-unifabric
 
-      - name: nv-topograph - Manual label E2E check
+      - name: external - External label E2E check
         shell: bash
         run: |
           set -euo pipefail
           go run ./e2e \
-            --scenario nv-topograph \
+            --scenario external \
             --timeout-minutes "${E2E_WAIT_TIMEOUT_MINUTES}" \
             --topology-dir "${TOPOLOGY_DIR}"
 
-      - name: nv-topograph - Uninstall and clean
+      - name: external - Uninstall and clean
         shell: bash
         run: |
           set -euo pipefail
+          bash e2e/topology/setup.sh step6-uninstall-unifabric
+
+      - name: nvidia-topograph - Install Unifabric
+        shell: bash
+        env:
+          CONTROLLER_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          CONTROLLER_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-controller
+          CONTROLLER_TAG: ${{ steps.vars.outputs.image_tag }}
+          AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
+          AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SWITCH_MTLS_MODE: disabled
+          SCALEOUT_MODE: external
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step4-install-unifabric
+
+      - name: nvidia-topograph - Install NVIDIA Topograph
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step-install-nvidia-topograph
+
+      - name: nvidia-topograph - Closed-loop E2E check
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./e2e \
+            --scenario nvidia-topograph \
+            --timeout-minutes "${E2E_WAIT_TIMEOUT_MINUTES}" \
+            --topology-dir "${TOPOLOGY_DIR}"
+
+      - name: nvidia-topograph - Uninstall and clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step-uninstall-nvidia-topograph
           bash e2e/topology/setup.sh step6-uninstall-unifabric
 
       - name: Dump diagnostics on failure

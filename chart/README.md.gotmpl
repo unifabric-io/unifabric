@@ -46,13 +46,15 @@
 
 {{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "topoDiscovery")) }}
 
-`topoDiscovery.*.mode` is the only topology-writer switch. The former
-`topologyLabels`, `internalTopologyLabelWriter.enabled`,
+`topoDiscovery.*.mode` is the only topology-writer switch. The chart no longer
+bundles NVIDIA Topograph; set `topoDiscovery.scaleUp.mode` or
+`topoDiscovery.scaleOut.mode` to `external` and deploy NVIDIA Topograph
+separately (see [docs/usage/nvidia-topograph.md](../docs/usage/nvidia-topograph.md)).
+The former `topologyLabels`, `internalTopologyLabelWriter.enabled`,
 `switchTopologyDiscovery`, `switchDiscovery`, `switchAgent`,
-`nodeTopologyDiscovery`, `nodeDiscovery`, and `nvidiaTopograph.enable` values
-are rejected with migration errors instead of being silently ignored. The
-former component-level NVIDIA blocks are replaced by the shared
-`nvidiaTopograph.image` and GPU-node values.
+`nodeTopologyDiscovery`, `nodeDiscovery`, `nvidiaTopograph`, and the
+`nv-topograph` mode values are rejected with migration errors instead of being
+silently ignored.
 
 ## Switch Subscription
 
@@ -79,10 +81,6 @@ chart deploys the single replica instances described under `bundled`, which are
 meant for testing only. See [docs/usage/rdma-flow.md](../docs/usage/rdma-flow.md).
 
 {{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "ebpfFlowEventCollector")) }}
-
-## NVIDIA Topograph
-
-{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "nvidiaTopograph")) }}
 {{- end -}}
 
 {{ template "unifabric.valuesSection" . }}

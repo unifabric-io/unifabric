@@ -172,7 +172,7 @@ func parseFlags() config {
 	flag.IntVar(&cfg.sleepSeconds, "sleep-seconds", 20, "sleep seconds between check attempts")
 	flag.IntVar(&cfg.expectedFabricNodes, "expected-fabricnodes", 4, "expected FabricNode resource count")
 	flag.StringVar(&cfg.topologyDir, "topology-dir", "e2e/topology", "topology directory containing node-gpu-*.yaml")
-	flag.StringVar(&cfg.scenario, "scenario", "roce-lldp-full-auto", "E2E scenario: roce-lldp-full-auto, roce-lldp-node-only, or nv-topograph")
+	flag.StringVar(&cfg.scenario, "scenario", "roce-lldp-full-auto", "E2E scenario: roce-lldp-full-auto, roce-lldp-node-only, external, or nvidia-topograph")
 	flag.Parse()
 	return cfg
 }
@@ -191,13 +191,23 @@ func runChecks(cfg config, deadline time.Time, rows *[]row) error {
 	}
 	*rows = append(*rows, row{"fabricnodes count", strconv.Itoa(cfg.expectedFabricNodes), strconv.Itoa(actualFabricNodes), "PASS"})
 
-	if cfg.scenario == "nv-topograph" {
+	if cfg.scenario == "nvidia-topograph" {
 		stageLog("check_topograph_absent", colorize("start", colorBold))
 		topographDetail, err := validateNvidiaTopographNotDeployed()
 		if err != nil {
 			return err
 		}
-		*rows = append(*rows, row{"NVIDIA Topograph", "not deployed", topographDetail, "PASS"})
+		*rows = append(*rows, row{"NVIDIA Topograph", "not deployed by the chart", topographDetail, "PASS"})
+		return runNvidiaTopographScenario(cfg, deadline, rows)
+	}
+
+	if cfg.scenario == "external" {
+		stageLog("check_topograph_absent", colorize("start", colorBold))
+		topographDetail, err := validateNvidiaTopographNotDeployed()
+		if err != nil {
+			return err
+		}
+		*rows = append(*rows, row{"NVIDIA Topograph", "not deployed by the chart", topographDetail, "PASS"})
 
 		stageLog("check_fabricnode_interfaces", colorize("start", colorBold))
 		nicDetail, err := waitForCheckPass(
@@ -212,7 +222,7 @@ func runChecks(cfg config, deadline time.Time, rows *[]row) error {
 			return err
 		}
 		*rows = append(*rows, row{"fabricnode interfaces", "agents report the simulated nodes", nicDetail, "PASS"})
-		return runManualScaleUpScenario(cfg, deadline, rows)
+		return runExternalScaleUpScenario(cfg, deadline, rows)
 	}
 
 	expectedSwitchCRs := 0
@@ -222,7 +232,7 @@ func runChecks(cfg config, deadline time.Time, rows *[]row) error {
 	case "roce-lldp-node-only":
 		expectedSwitchCRs = 1
 	default:
-		return fmt.Errorf("unsupported E2E scenario %q: expected roce-lldp-full-auto, roce-lldp-node-only, or nv-topograph", cfg.scenario)
+		return fmt.Errorf("unsupported E2E scenario %q: expected roce-lldp-full-auto, roce-lldp-node-only, external, or nvidia-topograph", cfg.scenario)
 	}
 
 	stageLog("wait_declared_switch_crs", colorize("start", colorBold))

@@ -85,14 +85,6 @@ true
 {{- end -}}
 {{- end -}}
 
-{{- define "unifabric.nvidiaTopograph.enabled" -}}
-{{- $scaleUpMode := include "unifabric.topoDiscovery.scaleUpMode" . -}}
-{{- $scaleOutMode := include "unifabric.topoDiscovery.scaleOutMode" . -}}
-{{- if or (eq $scaleUpMode "nv-topograph") (eq $scaleOutMode "nv-topograph") -}}
-true
-{{- end -}}
-{{- end -}}
-
 {{- define "unifabric.switchMTLS.enabled" -}}
 {{- if and (eq (include "unifabric.switchSubscription.enabled" .) "true") (ne (lower .Values.switchSubscription.mtls.mode) "disabled") -}}
 true
@@ -200,46 +192,26 @@ true
 {{- if and (eq $switchMTLSMode "existing") (or (empty .Values.switchSubscription.mtls.controllerSecretName) (empty .Values.switchSubscription.mtls.switchAgentSecretName)) -}}
 {{- fail "switchSubscription.mtls.mode=existing requires controllerSecretName and switchAgentSecretName" -}}
 {{- end -}}
-{{- if hasKey .Values.nvidiaTopograph "enable" -}}
-{{- fail "nvidiaTopograph.enable has been replaced by topoDiscovery.scaleUp.mode and topoDiscovery.scaleOut.mode" -}}
-{{- end -}}
-{{- range $key := list "engine" "service" "imagePullSecrets" "topograph" "nodeObserver" "nodeDataBroker" -}}
-{{- if hasKey $.Values.nvidiaTopograph $key -}}
-{{- fail (printf "nvidiaTopograph.%s has been removed; use the simplified provider, image, gpuNodeSelector, and gpuNodeTolerations values" $key) -}}
-{{- end -}}
-{{- end -}}
-{{- if hasKey .Values.nvidiaTopograph "credentialsSecret" -}}
-{{- fail "nvidiaTopograph.credentialsSecret has been replaced by nvidiaTopograph.credentialsSecretName" -}}
-{{- end -}}
-{{- if hasKey .Values.nvidiaTopograph.provider "creds" -}}
-{{- fail "nvidiaTopograph.provider.creds is not supported because it stores credentials in plaintext; use nvidiaTopograph.credentialsSecretName" -}}
-{{- end -}}
-{{- if and
-  (eq (include "unifabric.nvidiaTopograph.enabled" .) "true")
-  (eq (lower .Values.nvidiaTopograph.provider.name) "netq")
-  (empty .Values.nvidiaTopograph.credentialsSecretName) -}}
-{{- fail "nvidiaTopograph.credentialsSecretName is required when provider.name=netq" -}}
+{{- if hasKey .Values "nvidiaTopograph" -}}
+{{- fail "nvidiaTopograph has been removed; deploy NVIDIA Topograph separately with its upstream Helm chart and set topoDiscovery.scaleUp.mode or topoDiscovery.scaleOut.mode to external (see docs/usage/nvidia-topograph.md)" -}}
 {{- end -}}
 {{- if hasKey .Values.agent.lldp "image" -}}
 {{- fail "agent.lldp.image has been removed; the lldpd sidecar now reuses agent.image" -}}
 {{- end -}}
-{{- if hasKey (.Values.nvidiaTopograph.provider.params | default dict) "useGpuCliqueLabel" -}}
-{{- fail "nvidiaTopograph.provider.params.useGpuCliqueLabel has moved to nvidiaTopograph.useGpuCliqueLabel" -}}
-{{- end -}}
 {{- $scaleUpMode := include "unifabric.topoDiscovery.scaleUpMode" . -}}
 {{- $scaleOutMode := include "unifabric.topoDiscovery.scaleOutMode" . -}}
 {{- $storageMode := include "unifabric.topoDiscovery.storageMode" . -}}
-{{- if eq $scaleUpMode "nvswitch" -}}
-{{- fail "topoDiscovery.scaleUp.mode=nvswitch has been renamed to topoDiscovery.scaleUp.mode=nv-topograph" -}}
+{{- if has $scaleUpMode (list "nvswitch" "nv-topograph" "manual") -}}
+{{- fail (printf "topoDiscovery.scaleUp.mode=%s has been replaced by topoDiscovery.scaleUp.mode=external; the chart no longer deploys NVIDIA Topograph, deploy it separately or manage the labels yourself (see docs/usage/nvidia-topograph.md)" $scaleUpMode) -}}
 {{- end -}}
-{{- if not (has $scaleUpMode (list "nv-topograph" "manual")) -}}
-{{- fail (printf "topoDiscovery.scaleUp.mode %q is invalid; expected nv-topograph or manual" .Values.topoDiscovery.scaleUp.mode) -}}
+{{- if ne $scaleUpMode "external" -}}
+{{- fail (printf "topoDiscovery.scaleUp.mode %q is invalid; expected external" .Values.topoDiscovery.scaleUp.mode) -}}
 {{- end -}}
-{{- if eq $scaleOutMode "topograph" -}}
-{{- fail "topoDiscovery.scaleOut.mode=topograph has been renamed to topoDiscovery.scaleOut.mode=nv-topograph" -}}
+{{- if has $scaleOutMode (list "topograph" "nv-topograph") -}}
+{{- fail (printf "topoDiscovery.scaleOut.mode=%s has been replaced by topoDiscovery.scaleOut.mode=external; the chart no longer deploys NVIDIA Topograph, deploy it separately (see docs/usage/nvidia-topograph.md)" $scaleOutMode) -}}
 {{- end -}}
-{{- if not (has $scaleOutMode (list "nv-topograph" "unifabric-roce")) -}}
-{{- fail (printf "topoDiscovery.scaleOut.mode %q is invalid; expected nv-topograph or unifabric-roce" .Values.topoDiscovery.scaleOut.mode) -}}
+{{- if not (has $scaleOutMode (list "external" "unifabric-roce")) -}}
+{{- fail (printf "topoDiscovery.scaleOut.mode %q is invalid; expected external or unifabric-roce" .Values.topoDiscovery.scaleOut.mode) -}}
 {{- end -}}
 {{- if not (has $storageMode (list "unifabric-roce" "unifabric-ib")) -}}
 {{- fail (printf "topoDiscovery.storage.mode %q is invalid; expected unifabric-roce or unifabric-ib" .Values.topoDiscovery.storage.mode) -}}
@@ -265,54 +237,6 @@ true
 {{- $repository := $image.repository | default $defaultRepository -}}
 {{- $tag := $image.tag | default $defaultTag -}}
 {{- printf "%s/%s:%s" $registry $repository $tag -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.topographName" -}}
-{{- printf "%s-nvidia-topograph" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.nodeObserverName" -}}
-{{- printf "%s-nvidia-node-observer" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.nodeDataBrokerName" -}}
-{{- printf "%s-nvidia-node-data-broker" (include "unifabric.fullname" .) | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.topographServiceAccountName" -}}
-{{- include "unifabric.nvidiaTopograph.topographName" . -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.nodeObserverServiceAccountName" -}}
-{{- include "unifabric.nvidiaTopograph.nodeObserverName" . -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.nodeDataBrokerServiceAccountName" -}}
-{{- include "unifabric.nvidiaTopograph.nodeDataBrokerName" . -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.selectorLabels" -}}
-app.kubernetes.io/name: {{ .name }}
-app.kubernetes.io/instance: {{ .root.Release.Name }}
-app.kubernetes.io/component: {{ .component }}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.labels" -}}
-helm.sh/chart: {{ include "unifabric.chart" .root }}
-{{ include "unifabric.nvidiaTopograph.selectorLabels" . }}
-app.kubernetes.io/version: {{ .root.Chart.AppVersion | quote }}
-app.kubernetes.io/managed-by: {{ .root.Release.Service }}
-app.kubernetes.io/part-of: {{ include "unifabric.name" .root }}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.url" -}}
-{{- printf "http://%s.%s.svc.cluster.local:49021" (include "unifabric.nvidiaTopograph.topographName" .) .Release.Namespace -}}
-{{- end -}}
-
-{{- define "unifabric.nvidiaTopograph.useGpuCliqueLabel" -}}
-{{- if and (eq .Values.nvidiaTopograph.provider.name "infiniband-k8s") (eq (lower (toString .Values.nvidiaTopograph.useGpuCliqueLabel)) "true") -}}
-true
-{{- end -}}
 {{- end -}}
 
 {{- define "unifabric.ebpfFlowEventCollectorName" -}}
