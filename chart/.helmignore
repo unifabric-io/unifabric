@@ -1,0 +1,14 @@
+.git/
+.github/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.swo
+*.log
+*.secret.yaml
+secrets/
+.kube/
+kubeconfig*

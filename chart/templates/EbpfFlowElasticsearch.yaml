@@ -53,6 +53,12 @@ spec:
       labels:
         {{- include "unifabric.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: unifabric-elasticsearch
+      annotations:
+        # Restart Elasticsearch when the schema inputs change so the schema
+        # sidecar re-applies the index templates and ILM policies. Without a
+        # restart a changed or added index name gets no template and the
+        # exporter auto-creates a wrongly mapped plain index.
+        checksum/schema: {{ list $es .Values.sflow | toJson | sha256sum | trunc 32 }}
     spec:
       securityContext:
         fsGroup: 1000
@@ -204,6 +210,12 @@ spec:
                 path: es-ilm.json
               - key: es-template.json
                 path: es-template.json
+              {{- if and .Values.sflow.enabled (not .Values.sflow.otel.endpoint) }}
+              - key: es-sflow-ilm.json
+                path: es-sflow-ilm.json
+              - key: es-sflow-template.json
+                path: es-sflow-template.json
+              {{- end }}
         {{- end }}
 ---
 apiVersion: v1

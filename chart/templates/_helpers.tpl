@@ -305,7 +305,7 @@ that backend and no external endpoint is configured.
 
 {{- define "unifabric.ebpfFlow.elasticsearchBundled" -}}
 {{- $es := .Values.ebpfFlowEventCollector.elasticsearch -}}
-{{- if and .Values.agent.ebpfFlow.flowEvents.enabled $es.enabled (not $es.endpoints) -}}true{{- end -}}
+{{- if and (or .Values.agent.ebpfFlow.flowEvents.enabled .Values.sflow.enabled) $es.enabled (not $es.endpoints) -}}true{{- end -}}
 {{- end -}}
 
 {{- define "unifabric.ebpfFlow.clickhouseEndpoint" -}}
@@ -361,4 +361,24 @@ rdma-flow
 {{- end -}}
 {{- define "unifabric.ebpfFlow.elasticsearchSecretKey" -}}
 {{- ternary "password" "elasticsearch-password" (ne .Values.ebpfFlowEventCollector.elasticsearch.existingSecret "") -}}
+{{- end -}}
+{{- define "unifabric.sflowName" -}}
+{{- printf "%s-sflow" (include "unifabric.fullname" .) -}}
+{{- end -}}
+
+
+{{- define "unifabric.sflowServiceAccountName" -}}
+{{- default (include "unifabric.sflowName" .) .Values.sflow.serviceAccount.name -}}
+{{- end -}}
+
+{{/*
+OTLP gRPC endpoint the sFlow collector exports to. Defaults to the sFlow
+port of the in-release ebpfFlowEventCollector.
+*/}}
+{{- define "unifabric.sflowOtelEndpoint" -}}
+{{- if .Values.sflow.otel.endpoint -}}
+{{- .Values.sflow.otel.endpoint -}}
+{{- else -}}
+{{- printf "%s.%s.svc:4319" (include "unifabric.ebpfFlowEventCollectorName" .) .Release.Namespace -}}
+{{- end -}}
 {{- end -}}

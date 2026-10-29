@@ -41,7 +41,7 @@ for command in nvair kubectl; do
   fi
 done
 
-for image in unifabric-controller unifabric-agent unifabric-switch-agent; do
+for image in unifabric-controller unifabric-agent unifabric-switch-agent unifabric-sflow unifabric-hsflowd; do
   if [[ ! -s "${IMAGE_ARTIFACT_DIR}/${image}.tar" ]]; then
     echo "Image archive not found or empty: ${IMAGE_ARTIFACT_DIR}/${image}.tar" >&2
     exit 1
@@ -88,8 +88,10 @@ printf '%s\n' ${password_quoted} | sudo -S -p '' -- docker load -i ${path_quoted
 for node in "${KUBE_NODES[@]}"; do
   load_image "${node}" unifabric-controller containerd
   load_image "${node}" unifabric-agent containerd
+  load_image "${node}" unifabric-sflow containerd
 done
 
 for node in "${SWITCHES[@]}"; do
   load_image "${node}" unifabric-switch-agent docker
+  load_image "${node}" unifabric-hsflowd docker
 done
