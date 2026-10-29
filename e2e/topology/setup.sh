@@ -9,12 +9,13 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
-  bash e2e/topology/setup.sh [all|step1-install-topology|step-load-images|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric|step-install-nvidia-topograph|step-uninstall-nvidia-topograph] [args...]
+  bash e2e/topology/setup.sh [all|step1-install-topology|step-load-images|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric|step7-deploy-hsflowd|step8-install-spiderpool-macvlan|step9-deploy-pd-macvlan-test|step10-run-sflow-mock|step-install-nvidia-topograph|step-uninstall-nvidia-topograph] [args...]
 
 Examples:
   CONTROLLER_REGISTRY=ghcr.io CONTROLLER_REPOSITORY=unifabric-io/unifabric-controller CONTROLLER_TAG=YOU_TAG \
   AGENT_REGISTRY=ghcr.io AGENT_REPOSITORY=unifabric-io/unifabric-agent AGENT_TAG=YOU_TAG \
   SWITCH_AGENT_IMAGE=ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG \
+  HSFLOWD_IMAGE=ghcr.io/unifabric-io/unifabric-hsflowd:YOU_TAG \
     bash e2e/topology/setup.sh all --delete-if-exists
   bash e2e/topology/setup.sh step1-install-topology --delete-if-exists --bootstrap-node node-gpu-1
   IMAGE_ARTIFACT_DIR=/tmp/images bash e2e/topology/setup.sh step-load-images
@@ -28,6 +29,12 @@ Examples:
   SWITCH_AGENT_IMAGE=ghcr.io/unifabric-io/unifabric-switch-agent:YOU_TAG \
     bash e2e/topology/setup.sh step5-deploy-switch-agent
   bash e2e/topology/setup.sh step6-uninstall-unifabric
+  HSFLOWD_IMAGE=ghcr.io/unifabric-io/unifabric-hsflowd:YOU_TAG \
+    bash e2e/topology/setup.sh step7-deploy-hsflowd
+  bash e2e/topology/setup.sh step8-install-spiderpool-macvlan
+  bash e2e/topology/setup.sh step9-deploy-pd-macvlan-test
+  SFLOW_MOCK_IMAGE=ghcr.io/unifabric-io/unifabric-sflow:YOU_TAG \
+    bash e2e/topology/setup.sh step10-run-sflow-mock
   # Deploy the upstream NVIDIA Topograph chart for the nvidia-topograph closed-loop scenario.
   bash e2e/topology/setup.sh step-install-nvidia-topograph
   bash e2e/topology/setup.sh step-uninstall-nvidia-topograph
@@ -91,6 +98,7 @@ case "${stage}" in
     run_step install-monitoring-operators.sh
     run_step install-unifabric.sh
     run_step deploy-switch-agent.sh
+    run_step deploy-hsflowd.sh
     ;;
   step1-install-topology)
     run_step install-topology.sh "$@"
@@ -112,6 +120,18 @@ case "${stage}" in
     ;;
   step6-uninstall-unifabric)
     run_step uninstall-unifabric.sh "$@"
+    ;;
+  step7-deploy-hsflowd)
+    run_step deploy-hsflowd.sh "$@"
+    ;;
+  step8-install-spiderpool-macvlan)
+    run_step install-spiderpool-macvlan.sh "$@"
+    ;;
+  step9-deploy-pd-macvlan-test)
+    run_step deploy-pd-macvlan-test.sh "$@"
+    ;;
+  step10-run-sflow-mock)
+    run_step run-sflow-mock.sh "$@"
     ;;
   step-install-nvidia-topograph)
     run_step install-nvidia-topograph.sh "$@"

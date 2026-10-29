@@ -1,0 +1,3 @@
+{{- if and .Values.grafanaDashboard.enabled .Values.sflow.enabled -}}
+{{- include "unifabric.dashboards" (dict "root" . "pattern" "*-sflow.json") }}
+{{- end }}

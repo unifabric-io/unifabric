@@ -23,6 +23,8 @@ IMAGE_TAG ?= dev
 IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
 CONTROLLER_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-controller:$(IMAGE_TAG)
 AGENT_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-agent:$(IMAGE_TAG)
+SFLOW_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-sflow:$(IMAGE_TAG)
+HSFLOWD_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-hsflowd:$(IMAGE_TAG)
 SWITCH_AGENT_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-switch-agent:$(IMAGE_TAG)
 GRAFANA_PLUGINS_IMAGE ?= $(IMAGE_REGISTRY)/unifabric-grafana:$(IMAGE_TAG)
 
@@ -56,12 +58,25 @@ build:
 	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/agent ./cmd/agent
 	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/switch-agent ./cmd/switch-agent
 
+.PHONY: build-sflow
+build-sflow:
+	mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BIN_DIR)/sflow ./cmd/sflow
+
 .PHONY: image
 image:
 	docker buildx build -t $(CONTROLLER_IMAGE) -f image/controller/Dockerfile .
 	docker buildx build -t $(AGENT_IMAGE) -f image/agent/Dockerfile .
 	docker buildx build -t $(SWITCH_AGENT_IMAGE) -f image/switch-agent/Dockerfile .
 	docker buildx build -t $(GRAFANA_PLUGINS_IMAGE) -f image/grafana-plugins/Dockerfile .
+
+.PHONY: image-sflow
+image-sflow:
+	docker buildx build -t $(SFLOW_IMAGE) -f image/sflow/Dockerfile .
+
+.PHONY: image-hsflowd
+image-hsflowd:
+	docker buildx build -t $(HSFLOWD_IMAGE) -f image/hsflowd/Dockerfile .
 
 .PHONY: image-push
 image-push:
@@ -71,6 +86,8 @@ image-push:
 	docker buildx build --platform $(IMAGE_PLATFORMS) --provenance=false --sbom=false --push -t $(AGENT_IMAGE) -f image/agent/Dockerfile .
 	docker buildx build --platform $(IMAGE_PLATFORMS) --provenance=false --sbom=false --push -t $(SWITCH_AGENT_IMAGE) -f image/switch-agent/Dockerfile .
 	docker buildx build --platform $(IMAGE_PLATFORMS) --provenance=false --sbom=false --push -t $(GRAFANA_PLUGINS_IMAGE) -f image/grafana-plugins/Dockerfile .
+	docker buildx build --platform $(IMAGE_PLATFORMS) --provenance=false --sbom=false --push -t $(SFLOW_IMAGE) -f image/sflow/Dockerfile .
+	docker buildx build --platform $(IMAGE_PLATFORMS) --provenance=false --sbom=false --push -t $(HSFLOWD_IMAGE) -f image/hsflowd/Dockerfile .
 
 .PHONY: image-grafana
 image-grafana:

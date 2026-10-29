@@ -68,6 +68,10 @@ auto-generated, existing, or disabled mTLS.
 
 {{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "fabricNode" "nodeMetrics" "topologyAPI" "grafanaDashboard" "grafanaInstance" "serviceMonitor")) }}
 
+## sFlow Processing
+
+{{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "sflow")) }}
+
 ## Controller and Agent
 
 {{ template "unifabric.valuesTableForPrefixes" (dict "values" .Values "prefixes" (list "controller" "agent")) }}

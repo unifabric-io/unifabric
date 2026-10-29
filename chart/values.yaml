@@ -122,6 +122,170 @@ grafanaInstance:
 serviceMonitor:
   # -- Apply ServiceMonitor CRs when enabled.
   enabled: true
+# -- Controls switch sFlow ingestion and OTLP export to Elasticsearch.
+# @default -- See child values.
+sflow:
+  # -- Enable the sFlow collector deployment and UDP service.
+  enabled: false
+  # -- Number of sFlow collector replicas to run.
+  replicaCount: 1
+  # -- Container image settings for the sFlow collector.
+  # @default -- See child values.
+  image:
+    # -- Container image registry for the sFlow collector.
+    registry: ghcr.io
+    # -- Container image repository for the sFlow collector.
+    repository: unifabric-io/unifabric-sflow
+    # -- Container image tag for the sFlow collector. Defaults to the chart appVersion when empty.
+    tag: ""
+    # -- Container image pull policy for the sFlow collector.
+    pullPolicy: IfNotPresent
+  # -- ServiceAccount settings for the sFlow collector.
+  # @default -- See child values.
+  serviceAccount:
+    # -- Create a dedicated ServiceAccount for the sFlow collector.
+    create: true
+    # -- ServiceAccount name for the sFlow collector. Defaults to the release-derived name when empty.
+    name: ""
+    # -- Additional annotations added to the sFlow collector ServiceAccount.
+    annotations: {}
+  # -- Additional annotations added to the sFlow collector Pod.
+  podAnnotations: {}
+  # -- Additional labels added to the sFlow collector Pod.
+  podLabels: {}
+  # -- Node selector applied to the sFlow collector Pod.
+  nodeSelector: {}
+  # -- Tolerations applied to the sFlow collector Pod.
+  tolerations: []
+  # -- Affinity rules applied to the sFlow collector Pod.
+  affinity: {}
+  # -- Pod security context applied to the sFlow collector Pod.
+  # @default -- See child values.
+  podSecurityContext:
+    # -- Run the sFlow collector as a non-root user.
+    runAsNonRoot: true
+    # -- User ID used by the sFlow collector container.
+    runAsUser: 65532
+    # -- Group ID used by the sFlow collector container.
+    runAsGroup: 65532
+    # -- Filesystem group ID used by the sFlow collector Pod.
+    fsGroup: 65532
+    # -- Seccomp profile applied to the sFlow collector Pod.
+    # @default -- See child values.
+    seccompProfile:
+      # -- Seccomp profile type applied to the sFlow collector Pod.
+      type: RuntimeDefault
+  # -- Container security context applied to the sFlow collector container.
+  # @default -- See child values.
+  containerSecurityContext:
+    # -- Allow privilege escalation in the sFlow collector container.
+    allowPrivilegeEscalation: false
+    # -- Mount the sFlow collector root filesystem as read-only.
+    readOnlyRootFilesystem: true
+    # -- Linux capabilities settings for the sFlow collector container.
+    # @default -- See child values.
+    capabilities:
+      # -- Linux capabilities dropped from the sFlow collector container.
+      drop:
+        - ALL
+  # -- Resource requests and limits for the sFlow collector container.
+  # @default -- See child values.
+  resources:
+    # -- Resource requests for the sFlow collector container.
+    # @default -- See child values.
+    requests:
+      # -- CPU requested by the sFlow collector container.
+      cpu: 100m
+      # -- Memory requested by the sFlow collector container.
+      memory: 128Mi
+    # -- Resource limits for the sFlow collector container.
+    # @default -- See child values.
+    limits:
+      # -- CPU limit for the sFlow collector container.
+      cpu: 500m
+      # -- Memory limit for the sFlow collector container.
+      memory: 512Mi
+  # -- UDP listener settings for the sFlow collector.
+  # @default -- See child values.
+  listen:
+    # -- UDP bind address used by the sFlow collector container.
+    bindAddress: ":6343"
+    # -- UDP container port used by the sFlow collector.
+    port: 6343
+  # -- Prometheus metrics settings for the sFlow collector.
+  # @default -- See child values.
+  metrics:
+    # -- Metrics bind address used by the sFlow collector.
+    bindAddress: ":8084"
+    # -- Metrics container port exposed by the sFlow collector.
+    port: 8084
+    # -- Metrics path exposed by the sFlow collector.
+    path: /metrics
+  # -- Health probe settings for the sFlow collector.
+  # @default -- See child values.
+  healthProbe:
+    # -- Health probe bind address used by the sFlow collector.
+    bindAddress: ":8085"
+    # -- Health probe container port exposed by the sFlow collector.
+    port: 8085
+  # -- UDP Service settings for switch sFlow exporters.
+  # @default -- See child values.
+  service:
+    # -- Enable the UDP Service for switch sFlow exporters.
+    enabled: true
+    # -- Service type used for switch sFlow exporters. NodePort is the default because sFlow datagrams usually arrive from switches outside the cluster.
+    type: NodePort
+    # -- UDP Service port used by switch sFlow exporters.
+    port: 6343
+    # -- Optional UDP nodePort used by switch sFlow exporters. Set to 0 to let Kubernetes allocate one.
+    nodePort: 0
+    # -- Additional annotations added to the sFlow UDP Service.
+    annotations: {}
+  # -- Runtime configuration for the sFlow collector.
+  # @default -- See child values.
+  config:
+    # -- Log level used by the sFlow collector.
+    logLevel: info
+  # -- OTLP export settings for the sFlow collector. Flow records go to the ebpfFlowEventCollector over OTLP gRPC and from there into Elasticsearch.
+  # @default -- See child values.
+  otel:
+    # -- OTLP gRPC endpoint. Empty uses the in-release ebpfFlowEventCollector sFlow port.
+    endpoint: ""
+    # -- Disable TLS for the OTLP connection. The in-release Collector listens without TLS.
+    insecure: true
+    # -- Per-export timeout for OTLP requests.
+    timeout: 10s
+  # -- Elasticsearch data stream settings for sFlow flow records. Connection endpoints and credentials reuse ebpfFlowEventCollector.elasticsearch, which must be enabled.
+  # @default -- See child values.
+  elasticsearch:
+    # -- Data stream receiving sFlow flow documents.
+    index: unifabric-switch-sflow
+    # -- Schema settings for the sFlow data stream.
+    # @default -- See child values.
+    schema:
+      # -- ILM settings for the sFlow data stream.
+      # @default -- See child values.
+      ilm:
+        # -- Roll the write index over after this age.
+        rolloverMaxAge: 1d
+        # -- Roll the write index over when a primary shard reaches this size.
+        rolloverMaxPrimaryShardSize: 10gb
+        # -- Delete backing indices this long after rollover.
+        deleteMinAge: 3d
+    # -- GrafanaDatasource settings for the sFlow data stream.
+    # @default -- See child values.
+    grafanaDatasource:
+      # -- Create a GrafanaDatasource for the sFlow data stream so the sFlow dashboards work. Requires grafanaDashboard.kind GrafanaDashboard.
+      enabled: true
+  # -- OTLP writer batching and queue settings for sFlow records.
+  # @default -- See child values.
+  writer:
+    # -- Maximum sFlow records per OTLP export batch.
+    batchSize: 2000
+    # -- Maximum delay before flushing a non-empty export batch.
+    flushInterval: 2s
+    # -- Maximum records buffered before overload drops begin.
+    queueSize: 65536
 
 controller:
   # -- Deploy the Unifabric controller.

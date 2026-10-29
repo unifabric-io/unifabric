@@ -1,11 +1,16 @@
-{{- if .Values.agent.ebpfFlow.flowEvents.enabled }}
+{{- $sflowCollector := and .Values.sflow.enabled (not .Values.sflow.otel.endpoint) }}
+{{- if or .Values.agent.ebpfFlow.flowEvents.enabled $sflowCollector }}
 {{- $ch := .Values.ebpfFlowEventCollector.clickhouse }}
 {{- $es := .Values.ebpfFlowEventCollector.elasticsearch }}
-{{- if not .Values.agent.ebpfFlow.enabled }}
+{{- $sflowEs := .Values.sflow.elasticsearch }}
+{{- if and .Values.agent.ebpfFlow.flowEvents.enabled (not .Values.agent.ebpfFlow.enabled) }}
 {{- fail "agent.ebpfFlow.flowEvents.enabled requires agent.ebpfFlow.enabled" }}
 {{- end }}
-{{- if not (or $ch.enabled $es.enabled) }}
+{{- if and .Values.agent.ebpfFlow.flowEvents.enabled (not (or $ch.enabled $es.enabled)) }}
 {{- fail "agent.ebpfFlow.flowEvents.enabled requires ebpfFlowEventCollector.clickhouse.enabled or ebpfFlowEventCollector.elasticsearch.enabled" }}
+{{- end }}
+{{- if and $sflowCollector (not $es.enabled) }}
+{{- fail "sflow.enabled requires ebpfFlowEventCollector.elasticsearch.enabled unless sflow.otel.endpoint points at an external Collector" }}
 {{- end }}
 {{- $name := include "unifabric.ebpfFlowEventCollectorName" . }}
 {{- $memoryLimitMib := include "unifabric.ebpfFlowEventCollector.memoryLimitMib" . | int }}
@@ -95,6 +100,14 @@ data:
     curl -fsS -u "$ES_USER:$ES_PASSWORD" -X PUT "$ES_URL/_index_template/{{ $es.index }}" \
       -H 'Content-Type: application/json' --data-binary @/etc/otelcol/es-template.json
     echo
+    {{- if $sflowCollector }}
+    curl -fsS -u "$ES_USER:$ES_PASSWORD" -X PUT "$ES_URL/_ilm/policy/{{ $sflowEs.index }}" \
+      -H 'Content-Type: application/json' --data-binary @/etc/otelcol/es-sflow-ilm.json
+    echo
+    curl -fsS -u "$ES_USER:$ES_PASSWORD" -X PUT "$ES_URL/_index_template/{{ $sflowEs.index }}" \
+      -H 'Content-Type: application/json' --data-binary @/etc/otelcol/es-sflow-template.json
+    echo
+    {{- end }}
     echo "elasticsearch schema applied"
   es-ilm.json: |
     {
@@ -172,6 +185,85 @@ data:
         }
       }
     }
+  {{- if $sflowCollector }}
+  es-sflow-ilm.json: |
+    {
+      "policy": {
+        "phases": {
+          "hot": {
+            "actions": {
+              "rollover": {
+                "max_age": {{ $sflowEs.schema.ilm.rolloverMaxAge | quote }},
+                "max_primary_shard_size": {{ $sflowEs.schema.ilm.rolloverMaxPrimaryShardSize | quote }}
+              }
+            }
+          },
+          "delete": {
+            "min_age": {{ $sflowEs.schema.ilm.deleteMinAge | quote }},
+            "actions": {
+              "delete": {}
+            }
+          }
+        }
+      }
+    }
+  # Fields match the attributes written by pkg/sflow/otel.go. The ecs
+  # mapping mode flattens attributes to the document root. dynamic is off,
+  # so a new attribute needs a field here followed by a _rollover.
+  es-sflow-template.json: |
+    {
+      "index_patterns": [{{ $sflowEs.index | quote }}],
+      "data_stream": {},
+      "priority": 500,
+      "template": {
+        "settings": {
+          "index.number_of_shards": 1,
+          "index.number_of_replicas": 0,
+          "index.refresh_interval": {{ $es.schema.refreshInterval | quote }},
+          "index.codec": "best_compression",
+          "index.lifecycle.name": {{ $sflowEs.index | quote }}
+        },
+        "mappings": {
+          "dynamic": false,
+          "properties": {
+            "@timestamp": {"type": "date_nanos"},
+            "message": {"type": "keyword"},
+            "event": {"properties": {"action": {"type": "keyword"}}},
+            "log": {"properties": {"level": {"type": "keyword"}}},
+            "agent": {"properties": {"name": {"type": "keyword"}}},
+            "service": {"properties": {"name": {"type": "keyword"}}},
+            "sequence_num": {"type": "long"},
+            "sampling_rate": {"type": "long"},
+            "sampler_ip": {"type": "keyword"},
+            "bytes": {"type": "long"},
+            "packets": {"type": "long"},
+            "scaled_bytes": {"type": "long"},
+            "scaled_packets": {"type": "long"},
+            "proto": {"type": "integer"},
+            "protocol": {"type": "keyword"},
+            "src_ip": {"type": "keyword"},
+            "dst_ip": {"type": "keyword"},
+            "src_port": {"type": "integer"},
+            "dst_port": {"type": "integer"},
+            "src_pod_namespace": {"type": "keyword"},
+            "src_pod_name": {"type": "keyword"},
+            "src_node_name": {"type": "keyword"},
+            "src_pod_top_owner_kind": {"type": "keyword"},
+            "src_pod_top_owner_namespace": {"type": "keyword"},
+            "src_pod_top_owner_name": {"type": "keyword"},
+            "src_workload": {"type": "keyword"},
+            "dst_pod_namespace": {"type": "keyword"},
+            "dst_pod_name": {"type": "keyword"},
+            "dst_node_name": {"type": "keyword"},
+            "dst_pod_top_owner_kind": {"type": "keyword"},
+            "dst_pod_top_owner_namespace": {"type": "keyword"},
+            "dst_pod_top_owner_name": {"type": "keyword"},
+            "dst_workload": {"type": "keyword"}
+          }
+        }
+      }
+    }
+  {{- end }}
   {{- end }}
   config.yaml: |
     receivers:
@@ -180,6 +272,15 @@ data:
           grpc:
             endpoint: 0.0.0.0:4317
             max_recv_msg_size_mib: 64
+      {{- if $sflowCollector }}
+      # Separate receiver for sFlow flow records so they route to their own
+      # Elasticsearch data stream without OTTL-based routing.
+      otlp/sflow:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4319
+            max_recv_msg_size_mib: 64
+      {{- end }}
 
     processors:
       batch:
@@ -233,6 +334,27 @@ data:
           initial_interval: 1s
           max_interval: 30s
       {{- end }}
+      {{- if and $sflowCollector $es.enabled }}
+      elasticsearch/sflow:
+        endpoints: {{ $esEndpoints }}
+        user: {{ $es.user }}
+        password: ${env:ELASTICSEARCH_PASSWORD}
+        logs_index: {{ $sflowEs.index }}
+        mapping:
+          mode: ecs
+        flush:
+          bytes: 5000000
+          interval: 5s
+        sending_queue:
+          enabled: true
+          num_consumers: 2
+          queue_size: 50
+        retry:
+          enabled: true
+          max_retries: 3
+          initial_interval: 1s
+          max_interval: 30s
+      {{- end }}
 
     service:
       telemetry:
@@ -244,10 +366,18 @@ data:
                     host: 0.0.0.0
                     port: 8888
       pipelines:
+        {{- if .Values.agent.ebpfFlow.flowEvents.enabled }}
         logs:
           receivers: [otlp]
           processors: [memory_limiter, batch]
           exporters: [{{ include "unifabric.ebpfFlowEventCollector.exporters" . }}]
+        {{- end }}
+        {{- if $sflowCollector }}
+        logs/sflow:
+          receivers: [otlp/sflow]
+          processors: [memory_limiter, batch]
+          exporters: [elasticsearch/sflow]
+        {{- end }}
 ---
 {{- if or (and $ch.enabled (not $ch.existingSecret)) (and $es.enabled (not $es.existingSecret)) }}
 apiVersion: v1
@@ -289,7 +419,7 @@ spec:
         app.kubernetes.io/component: unifabric-ebpf-flow-event-collector
       annotations:
         # Restart the Collector when its rendered settings change.
-        checksum/values: {{ toJson .Values.ebpfFlowEventCollector | sha256sum | trunc 32 }}
+        checksum/values: {{ list .Values.ebpfFlowEventCollector .Values.sflow | toJson | sha256sum | trunc 32 }}
     spec:
       {{- with .Values.ebpfFlowEventCollector.nodeSelector }}
       nodeSelector:
@@ -299,7 +429,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or (and $ch.enabled $ch.schema.create) (and $es.enabled $es.schema.create (not $esBundled)) }}
+      {{- if or (and $ch.enabled $ch.schema.create) (and $es.enabled $es.schema.create) }}
       initContainers:
       {{- end }}
       {{- if and $ch.enabled $ch.schema.create }}
@@ -337,6 +467,38 @@ spec:
             - name: config
               mountPath: /etc/otelcol
               readOnly: true
+      {{- end }}
+      {{- if and $es.enabled $es.schema.create $esBundled }}
+        # The bundled Elasticsearch applies the schema from its own Pod on
+        # startup. Wait until the index templates exist before the Collector
+        # starts, otherwise the exporter would win the race and auto-create a
+        # wrongly mapped plain index that templates can never fix. Reuses the
+        # curl image already configured for the external schema init container.
+        - name: wait-elasticsearch-schema
+          image: {{ include "unifabric.image" (dict "root" . "image" $es.schema.image) }}
+          imagePullPolicy: {{ .Values.ebpfFlowEventCollector.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              for tpl in {{ $es.index }}{{ if $sflowCollector }} {{ $sflowEs.index }}{{ end }}
+              do
+                until curl -fsS -u "$ES_USER:$ES_PASSWORD" "$ES_URL/_index_template/$tpl" >/dev/null 2>&1
+                do
+                  echo "waiting for index template $tpl"
+                  sleep 3
+                done
+              done
+          env:
+            - name: ES_URL
+              value: {{ index ($esEndpoints | fromJsonArray) 0 | quote }}
+            - name: ES_USER
+              value: {{ $es.user | quote }}
+            - name: ES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $esSecret }}
+                  key: {{ $esKey }}
       {{- end }}
       {{- if and $es.enabled $es.schema.create (not $esBundled) }}
         # The bundled Elasticsearch applies the same files from its own Pod.
@@ -386,12 +548,19 @@ spec:
             - name: otlp-grpc
               containerPort: 4317
               protocol: TCP
+            {{- if $sflowCollector }}
+            - name: otlp-sflow
+              containerPort: 4319
+              protocol: TCP
+            {{- end }}
             - name: metrics
               containerPort: 8888
               protocol: TCP
           readinessProbe:
             tcpSocket:
-              port: otlp-grpc
+              # The base otlp receiver only starts when the flow-events logs
+              # pipeline renders; probe the sFlow port otherwise.
+              port: {{ .Values.agent.ebpfFlow.flowEvents.enabled | ternary "otlp-grpc" "otlp-sflow" }}
             initialDelaySeconds: 5
             periodSeconds: 5
           {{- with .Values.ebpfFlowEventCollector.resources }}
@@ -424,6 +593,12 @@ spec:
       port: 4317
       targetPort: otlp-grpc
       protocol: TCP
+    {{- if $sflowCollector }}
+    - name: otlp-sflow
+      port: 4319
+      targetPort: otlp-sflow
+      protocol: TCP
+    {{- end }}
     - name: metrics
       port: 8888
       targetPort: metrics
@@ -457,7 +632,7 @@ spec:
     matchNames:
       - {{ .Release.Namespace | quote }}
 {{- end }}
-{{- if and $es.enabled $es.grafanaDatasource.enabled .Values.grafanaDashboard.enabled (eq .Values.grafanaDashboard.kind "GrafanaDashboard") }}
+{{- if and .Values.agent.ebpfFlow.flowEvents.enabled $es.enabled $es.grafanaDatasource.enabled .Values.grafanaDashboard.enabled (eq .Values.grafanaDashboard.kind "GrafanaDashboard") }}
 ---
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDatasource
@@ -489,6 +664,43 @@ spec:
     editable: false
     jsonData:
       index: {{ $es.index | quote }}
+      timeField: "@timestamp"
+      maxConcurrentShardRequests: 5
+    secureJsonData:
+      basicAuthPassword: {{ printf "${%s}" $esKey }}
+{{- end }}
+{{- if and $sflowCollector $sflowEs.grafanaDatasource.enabled .Values.grafanaDashboard.enabled (eq .Values.grafanaDashboard.kind "GrafanaDashboard") }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: {{ $name }}-sflow-elasticsearch
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-ebpf-flow-event-collector
+spec:
+  allowCrossNamespaceImport: {{ .Values.grafanaDashboard.allowCrossNamespaceImport }}
+  instanceSelector:
+    {{- include "unifabric.grafanaInstanceSelector" . | nindent 4 }}
+  valuesFrom:
+    - targetPath: secureJsonData.basicAuthPassword
+      valueFrom:
+        secretKeyRef:
+          name: {{ $esSecret }}
+          key: {{ $esKey }}
+  datasource:
+    name: Unifabric sFlow Flows
+    uid: unifabric-sflow-elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: {{ index ($esEndpoints | fromJsonArray) 0 | quote }}
+    basicAuth: true
+    basicAuthUser: {{ $es.user | quote }}
+    isDefault: false
+    editable: false
+    jsonData:
+      index: {{ $sflowEs.index | quote }}
       timeField: "@timestamp"
       maxConcurrentShardRequests: 5
     secureJsonData:
