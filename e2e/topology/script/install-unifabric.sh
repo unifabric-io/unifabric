@@ -13,6 +13,7 @@ AGENT_REPOSITORY="${AGENT_REPOSITORY:-}"
 AGENT_TAG="${AGENT_TAG:-}"
 CHART_PATH_INPUT="${CHART_PATH:-chart}"
 SWITCH_MTLS_MODE="${SWITCH_MTLS_MODE:-auto}"
+SCALEOUT_MODE="${SCALEOUT_MODE:-unifabric-roce}"
 
 HELM_TIMEOUT="15m"
 
@@ -32,6 +33,7 @@ Required image inputs:
 Optional environment variables:
   CHART_PATH                    Helm chart path. Default: chart
   SWITCH_MTLS_MODE              switchSubscription.mtls.mode. Default: auto
+  SCALEOUT_MODE                 topoDiscovery.scaleOut.mode. Default: unifabric-roce
   LOAD_IMAGES_FROM_ARTIFACTS     Use preloaded images without pulling. Default: false
 
 Kubeconfig:
@@ -96,6 +98,14 @@ case "${SWITCH_MTLS_MODE}" in
     ;;
 esac
 
+case "${SCALEOUT_MODE}" in
+  unifabric-roce|external) ;;
+  *)
+    echo "SCALEOUT_MODE must be unifabric-roce or external." >&2
+    exit 2
+    ;;
+esac
+
 if [[ ! -d "${CHART_PATH}" ]]; then
   echo "Helm chart path not found: ${CHART_PATH}" >&2
   exit 2
@@ -120,8 +130,8 @@ HELM_ARGS=(
   --set-string agent.image.repository="${AGENT_REPOSITORY}"
   --set-string agent.image.tag="${AGENT_TAG}"
 
-  --set-string topoDiscovery.scaleUp.mode=manual
-  --set-string topoDiscovery.scaleOut.mode=unifabric-roce
+  --set-string topoDiscovery.scaleUp.mode=external
+  --set-string topoDiscovery.scaleOut.mode="${SCALEOUT_MODE}"
   --set-string topoDiscovery.storage.mode=unifabric-roce
   --set grafanaDashboard.enabled=true
   --set-string grafanaDashboard.kind=GrafanaDashboard

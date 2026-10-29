@@ -135,8 +135,8 @@ Go `text/template`，必须且只能包含一个 `{{ .Tier }}` 动作，其余�
 
 ### 单写入方规则
 
-每个拓扑 label key 同一时刻只有一个写入方。内置发现拥有它生成的 labels。NVIDIA Topograph
-只在 `mode=nv-topograph` 的拓扑上拥有配置的 keys。只有当没有自动写入方时，管理员才接管一个
+每个拓扑 label key 同一时刻只有一个写入方。内置发现拥有它生成的 labels。外部写入方（例如独立部署的
+NVIDIA Topograph）只在 `mode=external` 的拓扑上拥有配置的 keys。只有当没有自动写入方时，管理员才接管一个
 拓扑。与其他 field manager 的冲突会被上报，不会强制覆盖。
 
 ### 控制器交互与升级兼容性

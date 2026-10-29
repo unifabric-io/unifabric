@@ -1,0 +1,100 @@
+# Kubelet-less Node objects named after the hosts in NVIDIA Topograph's
+# embedded "medium.yaml" test model. Topograph's k8s engine labels nodes by
+# the model host names, so these objects receive the real topology labels in
+# the nvidia-topograph closed-loop scenario. The taint keeps DaemonSet pods
+# away from these never-ready nodes.
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1101"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1102"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1201"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1202"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1301"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1302"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1401"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1402"
+  labels:
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule

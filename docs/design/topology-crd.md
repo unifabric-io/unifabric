@@ -156,9 +156,10 @@ names groups again from `group1`.
 ### Single-writer rules
 
 Each topology label key has exactly one writer at a time. Built-in discovery owns the
-labels it generates. NVIDIA Topograph owns the configured keys only for a topology
-with `mode=nv-topograph`. An administrator manages a topology only when no automatic
-writer owns it. A conflict with another field manager is reported, not forced.
+labels it generates. An external writer, such as a separately deployed NVIDIA
+Topograph, owns the configured keys only for a topology with `mode=external`. An
+administrator manages a topology only when no automatic writer owns it. A conflict
+with another field manager is reported, not forced.
 
 ### Controller interactions and upgrade compatibility
 
