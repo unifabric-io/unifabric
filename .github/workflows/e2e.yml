@@ -240,6 +240,9 @@ jobs:
           AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
           AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SFLOW_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          SFLOW_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-sflow
+          SFLOW_TAG: ${{ steps.vars.outputs.image_tag }}
         run: |
           set -euo pipefail
           bash e2e/topology/setup.sh step4-install-unifabric
@@ -251,6 +254,34 @@ jobs:
         run: |
           set -euo pipefail
           bash e2e/topology/setup.sh step5-deploy-switch-agent
+
+      - name: roce-lldp-full-auto - Deploy hsflowd
+        shell: bash
+        env:
+          HSFLOWD_IMAGE: ${{ env.IMAGE_REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/unifabric-hsflowd:${{ steps.vars.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step7-deploy-hsflowd
+
+      - name: roce-lldp-full-auto - Install Spiderpool macvlan
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step8-install-spiderpool-macvlan
+
+      - name: roce-lldp-full-auto - Deploy macvlan test pods
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step9-deploy-pd-macvlan-test
+
+      - name: roce-lldp-full-auto - Run sFlow mock sender
+        shell: bash
+        env:
+          SFLOW_MOCK_IMAGE: ${{ env.IMAGE_REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/unifabric-sflow:${{ steps.vars.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          bash e2e/topology/setup.sh step10-run-sflow-mock
 
       - name: roce-lldp-full-auto - Display cluster pods
         shell: bash
@@ -282,6 +313,9 @@ jobs:
           AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
           AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SFLOW_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          SFLOW_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-sflow
+          SFLOW_TAG: ${{ steps.vars.outputs.image_tag }}
           SWITCH_MTLS_MODE: disabled
         run: |
           set -euo pipefail
@@ -312,6 +346,9 @@ jobs:
           AGENT_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           AGENT_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-agent
           AGENT_TAG: ${{ steps.vars.outputs.image_tag }}
+          SFLOW_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          SFLOW_REPOSITORY: ${{ steps.vars.outputs.image_namespace }}/unifabric-sflow
+          SFLOW_TAG: ${{ steps.vars.outputs.image_tag }}
           SWITCH_MTLS_MODE: disabled
         run: |
           set -euo pipefail

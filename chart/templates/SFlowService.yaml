@@ -1,0 +1,27 @@
+{{- if and .Values.sflow.enabled .Values.sflow.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "unifabric.sflowName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+  {{- with .Values.sflow.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.sflow.service.type }}
+  selector:
+    {{- include "unifabric.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+  ports:
+    - name: sflow
+      port: {{ .Values.sflow.service.port }}
+      targetPort: sflow
+      protocol: UDP
+      {{- if and (gt (int .Values.sflow.service.nodePort) 0) (or (eq .Values.sflow.service.type "NodePort") (eq .Values.sflow.service.type "LoadBalancer")) }}
+      nodePort: {{ .Values.sflow.service.nodePort }}
+      {{- end }}
+{{- end }}

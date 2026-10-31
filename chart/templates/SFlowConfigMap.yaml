@@ -1,0 +1,30 @@
+{{- if .Values.sflow.enabled }}
+{{- if and (not .Values.sflow.otel.endpoint) (not .Values.ebpfFlowEventCollector.elasticsearch.enabled) }}
+{{- fail "sflow.enabled requires ebpfFlowEventCollector.elasticsearch.enabled unless sflow.otel.endpoint points at an external Collector" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "unifabric.sflowName" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unifabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: unifabric-sflow
+data:
+  sflow.yaml: |-
+    logLevel: {{ .Values.sflow.config.logLevel | quote }}
+    listen:
+      bindAddress: {{ .Values.sflow.listen.bindAddress | quote }}
+    metrics:
+      bindAddress: {{ .Values.sflow.metrics.bindAddress | quote }}
+    healthProbe:
+      bindAddress: {{ .Values.sflow.healthProbe.bindAddress | quote }}
+    otel:
+      endpoint: {{ include "unifabric.sflowOtelEndpoint" . | quote }}
+      insecure: {{ .Values.sflow.otel.insecure }}
+      timeout: {{ .Values.sflow.otel.timeout | quote }}
+    writer:
+      batchSize: {{ .Values.sflow.writer.batchSize }}
+      flushInterval: {{ .Values.sflow.writer.flushInterval | quote }}
+      queueSize: {{ .Values.sflow.writer.queueSize }}
+{{- end }}

@@ -49,6 +49,8 @@ For other Chart parameters, see the defaults and descriptions in the
   and similar schedulers.
 - [Switch Agent deployment](./usage/switch-agent-deployment.md): deploy the Switch
   Agent on SONiC switches.
+- [Switch sFlow flow observability](./usage/sflow.md): ingest switch sFlow samples,
+  attribute flows to Pods and workloads, and view them in Grafana.
 
 ## Reference
 
@@ -66,6 +68,7 @@ For other Chart parameters, see the defaults and descriptions in the
 - [Scale-out topology discovery design](./design/scaleout-topology.md)
 - [Topology CRD design](./design/topology-crd.md)
 - [Topology visualization design](./design/topology-visualization.md)
+- [sFlow processing design](./design/sflow.md)
 
 ## Development
 

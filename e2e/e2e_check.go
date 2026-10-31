@@ -263,6 +263,21 @@ func runChecks(cfg config, deadline time.Time, rows *[]row) error {
 			return err
 		}
 		*rows = append(*rows, row{"switch subscription status", "healthy switches with LLDP snapshots", switchStatusDetail, "PASS"})
+
+		// The sFlow mock sender Job replays datagrams whose sampled packets
+		// carry the macvlan test pod IPs, so Elasticsearch must hold flow
+		// documents attributed to the pd-prefill/pd-decoder workloads.
+		stageLog("check_sflow_pipeline", colorize("start", colorBold))
+		sflowDetail, err := waitForCheckPass(
+			"check_sflow_pipeline",
+			validateSFlowPipeline,
+			deadline,
+			time.Duration(cfg.sleepSeconds)*time.Second,
+		)
+		if err != nil {
+			return err
+		}
+		*rows = append(*rows, row{"sflow pipeline", "flows attributed to macvlan test pods in Elasticsearch", sflowDetail, "PASS"})
 	case "roce-lldp-node-only":
 		stageLog("check_switch_annotations", colorize("start", colorBold))
 		switchInputDetail, err := waitForCheckPass(
@@ -379,6 +394,83 @@ func runCommand(check bool, args ...string) (string, error) {
 	}
 
 	return stdout.String(), err
+}
+
+// validateSFlowPipeline confirms the sFlow data path end to end: the mock
+// sender Job emits sFlow datagrams carrying the macvlan test pod IPs, the
+// collector decodes them and attributes the flows to the pods via the pod IP
+// cache, and the enriched documents land in the Elasticsearch data stream.
+func validateSFlowPipeline() (bool, string) {
+	stdout, err := runCommand(false, "kubectl", "-n", "unifabric-system", "get", "pod",
+		"-l", "app.kubernetes.io/component=unifabric-elasticsearch",
+		"-o", "jsonpath={.items[0].metadata.name}")
+	pod := strings.TrimSpace(stdout)
+	if err != nil || pod == "" {
+		return false, "elasticsearch pod not found"
+	}
+
+	countDocs := func(query string) (int, string, bool) {
+		cmd := `curl -fsS -G -u "elastic:${ELASTIC_PASSWORD}" localhost:9200/unifabric-switch-sflow/_count`
+		if query != "" {
+			cmd += ` --data-urlencode "q=` + query + `"`
+		}
+		out, err := runCommand(false, "kubectl", "-n", "unifabric-system", "exec", pod, "-c", "elasticsearch", "--",
+			"sh", "-c", cmd)
+		if err != nil {
+			return 0, fmt.Sprintf("query sflow data stream failed: %s", strings.TrimSpace(out)), false
+		}
+		var result struct {
+			Count int `json:"count"`
+		}
+		if err := json.Unmarshal([]byte(out), &result); err != nil {
+			return 0, fmt.Sprintf("parse count response: %v", err), false
+		}
+		return result.Count, "", true
+	}
+
+	total, detail, ok := countDocs("")
+	if !ok {
+		return false, detail
+	}
+	if total == 0 {
+		return false, "unifabric-switch-sflow data stream has no documents yet"
+	}
+
+	attributed, detail, ok := countDocs(
+		"src_pod_top_owner_name:pd-prefill AND dst_pod_top_owner_name:pd-decoder")
+	if !ok {
+		return false, detail
+	}
+	if attributed == 0 {
+		return false, fmt.Sprintf(
+			"%d documents stored, but none attributed to pd-prefill -> pd-decoder yet", total)
+	}
+
+	detail = fmt.Sprintf("elasticsearch received %d documents (%d attributed to pd-prefill -> pd-decoder)",
+		total, attributed)
+	if sent, ok := mockSenderSentFlows(); ok {
+		detail = fmt.Sprintf("mock sender sent %d flow samples, %s", sent, detail)
+	}
+	return true, detail
+}
+
+// mockSenderSentFlows parses the sflow-mock-sender Job logs for the number of
+// flow samples the mock sender emitted.
+func mockSenderSentFlows() (int, bool) {
+	stdout, err := runCommand(false, "kubectl", "-n", "default",
+		"logs", "job/sflow-mock-sender", "--tail", "5")
+	if err != nil {
+		return 0, false
+	}
+	m := regexp.MustCompile(`done, sent \d+ datagrams, (\d+) flow samples`).FindStringSubmatch(stdout)
+	if m == nil {
+		return 0, false
+	}
+	sent, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return sent, true
 }
 
 func fetchResourceJSON(resource string, out any) error {
