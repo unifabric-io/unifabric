@@ -21,7 +21,7 @@ fills this gap with three capabilities:
 
 - Topology discovery: it finds the links between nodes and switches, and between
   switches, and records the network position of each node.
-- High-speed network traffic observability: it collects RDMA traffic, congestion, and
+- AI high-speed network traffic observability: it collects RDMA traffic, congestion, and
   error data, and attributes the data to Pods, namespaces, and workloads.
 - Network health checks: it reports the health of the LLDP links and of the switch
   connections continuously.

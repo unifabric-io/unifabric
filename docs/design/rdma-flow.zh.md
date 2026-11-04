@@ -14,7 +14,7 @@ English: [rdma-flow.md](./rdma-flow.md)
 
 ### 1.1 通信库兼容性
 
-兼容性取决于最终的网络提交路径，不能仅凭通信库名称或版本判断。推理框架、通信库的支持情况及信息截至版本统一见[使用指南](../usage/rdma-flow.zh.md)中的「推理框架视角」和「通信库支持矩阵」。升级通信库后，应结合实际后端配置和日志重新确认提交路径。
+兼容性取决于最终的网络提交路径，不能仅凭通信库名称或版本判断。推理框架、通信库的支持情况及信息截至版本统一见[使用指南](../usage/traffic-observability/rdma-flow.zh.md#适用范围)中的「推理框架」和「通信库」。升级通信库后，应结合实际后端配置和日志重新确认提交路径。
 
 ## 2. 数据面
 
@@ -95,7 +95,7 @@ Helm 的 `ebpfFlowEventCollector` 依赖逐次发送事件。`flowEvents.enabled
 - resource 包含 `service.name=unifabric-agent` 与 `k8s.node.name`。
 - 属性采用扁平结构，并保留类型：`tgid`、`qpn`、`bytes`、`wrs`、`count` 为 int64；`node`、`kind`、`src_device`、`dst_device` 和 10 个 Pod 标签为字符串。
 
-存储后端由 Event Collector 负责，配置方式见[使用指南](../usage/rdma-flow.zh.md)。
+存储后端由 Event Collector 负责，配置方式见[使用指南](../usage/traffic-observability/rdma-flow-events.zh.md)。
 
 ## 7. 限制
 

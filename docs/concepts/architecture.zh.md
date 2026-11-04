@@ -16,7 +16,7 @@ Unifabric 是面向 Kubernetes AI 集群高速网络的云原生可观测系统�
 因此 Kubernetes 无法把网络问题归因到具体的 Pod 或任务。Unifabric 通过三项能力补上这块空白：
 
 - 拓扑识别：发现节点与交换机、交换机与交换机之间的连接，记录每个节点在网络中的位置。
-- 高速网络流量观测：采集 RDMA 流量、拥塞和错误数据，并归因到 Pod、namespace 和 workload。
+- AI 高速网络流量观测：采集 RDMA 流量、拥塞和错误数据，并归因到 Pod、namespace 和 workload。
 - 网络健康检查：持续报告 LLDP 链路和交换机连接的健康状态。
 
 Unifabric 以统一的 Kubernetes 资源模型呈现结果：自定义资源、Node label 和 Prometheus

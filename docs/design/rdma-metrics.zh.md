@@ -8,7 +8,7 @@ English version: [rdma-metrics.md](./rdma-metrics.md)
 采集器是节点本地的：它从 Linux sysfs、容器命名空间和 ethtool 读取主机和 Pod 的 RDMA 状态，
 再用本地 `FabricNode` 快照中的拓扑和工作负载元数据给每个样本打标签。本文记录数据来源、
 抓取流程、指标模型和背后的设计决策。如何启用抓取、看板和告警见
-[RDMA 指标使用指南](../usage/rdma-metrics.md)。
+[主机与 Pod 的 RDMA 网卡指标使用指南](../usage/traffic-observability/rdma-metrics.zh.md)。
 
 ## 动机
 
@@ -157,7 +157,7 @@ Agent 指标端点由 `agent.config.metrics.bindAddress` 配置，默认 `:8082`
 值控制。只有 `agent.enabled`、`nodeMetrics.enabled` 和全局 `serviceMonitor.enabled` 都为
 true 时，才渲染 Agent `ServiceMonitor`。一个实现细节：Go Agent 启动时总是注册 RDMA 采集器。
 `nodeMetrics.enabled` 控制的是围绕抓取和看板的 Helm 资源，不控制 Agent 内部的采集器注册。
-启用步骤和验证命令见 [RDMA 指标使用指南](../usage/rdma-metrics.md)。
+启用步骤和验证命令见 [主机与 Pod 的 RDMA 网卡指标使用指南](../usage/traffic-observability/rdma-metrics.zh.md)。
 
 ### 失败处理
 

@@ -16,7 +16,7 @@ After you finish this guide, the cluster will show the following results:
 - The topology-discovery and RDMA-metrics components are ready. Node topology
   labels and RDMA metrics are feature results; see the
   [topology discovery guide](./usage/topology-discovery.md) and the
-  [RDMA metrics guide](./usage/rdma-metrics.md).
+  [host and Pod RDMA NIC metrics guide](./usage/traffic-observability/rdma-metrics.md).
 
 ## Prerequisites
 
@@ -264,7 +264,7 @@ After the deployment, continue with the feature guides:
   [Kueue TAS workload example](./usage/workload-tas.md).
 - Render the topology with the
   [topology visualization guide](./usage/topology-visualization.md).
-- Observe RDMA metrics with the [RDMA metrics guide](./usage/rdma-metrics.md).
+- Observe RDMA metrics with the [host and Pod RDMA NIC metrics guide](./usage/traffic-observability/rdma-metrics.md).
 - Tune the installation with the [Helm values reference](../chart/README.md).
 
 ## Troubleshooting
