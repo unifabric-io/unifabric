@@ -1668,11 +1668,8 @@ export const TopologyPanel: React.FC<Props> = ({ options, data, width, height, f
   // rebuilt (which would reset dragged node positions and close the hover card).
   const rawGraphData = useMemo(() => toGraphData(data.series), [data.series]);
   const graphSignature = JSON.stringify(rawGraphData ?? null);
-  const stableGraph = useRef<{ signature: string; value: typeof rawGraphData }>();
-  if (stableGraph.current?.signature !== graphSignature) {
-    stableGraph.current = { signature: graphSignature, value: rawGraphData };
-  }
-  const graphData = stableGraph.current.value;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const graphData = useMemo(() => rawGraphData, [graphSignature]);
   const nodeData = graphData?.nodes ?? EMPTY_NODE_DATA;
   const edgeData = graphData?.edges ?? EMPTY_EDGE_DATA;
 
@@ -1780,7 +1777,8 @@ export const TopologyPanel: React.FC<Props> = ({ options, data, width, height, f
     }
     const target = hover.target;
     const key = resourceKey(target);
-    if (isEntryFresh(resourceCache.current.get(key))) {
+    const cache = resourceCache.current;
+    if (isEntryFresh(cache.get(key))) {
       return;
     }
 
@@ -1840,8 +1838,8 @@ export const TopologyPanel: React.FC<Props> = ({ options, data, width, height, f
       cancelled = true;
       // A cancelled request never settles the cache; drop its `loading` marker so the next hover
       // re-fetches instead of reusing it forever.
-      if (resourceCache.current.get(key)?.status === 'loading') {
-        resourceCache.current.delete(key);
+      if (cache.get(key)?.status === 'loading') {
+        cache.delete(key);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
