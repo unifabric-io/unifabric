@@ -14,6 +14,7 @@ import ReactFlow, {
   type Node,
   type NodeProps,
   type NodeMouseHandler,
+  type ReactFlowInstance,
 } from 'reactflow';
 import { Network, Server } from 'lucide-react';
 import 'reactflow/dist/style.css';
@@ -1406,6 +1407,14 @@ const BAND_GAP = 64;
 // kept equal to BAND_GAP's own 80px effective gap so within-band and between-band spacing match.
 const TIER_GAP = 80;
 
+// Minimum horizontal space between neighbouring items in one row.
+const MIN_ITEM_GAP = 24;
+
+// Width a row of `count` equally-sized items needs so none of them overlap.
+function rowRequiredWidth(count: number, itemWidth: number): number {
+  return count * (itemWidth + MIN_ITEM_GAP);
+}
+
 // Number of stacked tiers a band needs: scaleout/scaleup/storage each stack one row per distinct
 // tier (storage is always exactly one tier, by design); hosts have no tier concept and are always a
 // single flat row.
@@ -1446,8 +1455,30 @@ function buildGraph(
   const nodes: Node[] = [];
   const positions: PositionMap = new Map();
   const minimumWidth = 16 + DOMAIN_WIDTH + DETACHED_SIDE_GAP + DETACHED_GROUP_WIDTH + 16;
-  const graphWidth = detachedHosts.length > 0 ? Math.max(width, minimumWidth) : width;
   const topologyLeft = detachedHosts.length > 0 ? 16 + DETACHED_GROUP_WIDTH + DETACHED_SIDE_GAP : 16;
+  // Rows split their width evenly per item, so the canvas must be at least as wide as the most
+  // crowded row needs; otherwise neighbouring nodes overlap (fitView then scales the wider canvas down).
+  const requiredTopologyWidth = Math.max(
+    0,
+    ...BANDS.map((band) => {
+      const items = itemsByBand[band.key];
+      if (band.key === 'hosts') {
+        return rowRequiredWidth(items.length, HOST_SIZE.width);
+      }
+      const itemWidth = (node: TopologyNodeDatum) => (switchView ? domainGroupSize(node).width : DOMAIN_WIDTH);
+      return Math.max(
+        0,
+        ...Array.from(new Set(items.map((node) => node.tier))).map((tier) => {
+          const row = items.filter((node) => node.tier === tier);
+          return rowRequiredWidth(row.length, Math.max(...row.map(itemWidth)));
+        })
+      );
+    })
+  );
+  const graphWidth = Math.max(
+    detachedHosts.length > 0 ? Math.max(width, minimumWidth) : width,
+    topologyLeft + requiredTopologyWidth + 16
+  );
   const topologyRight = graphWidth - 16;
   let hostRowTop = 0;
   let offsetY = 0;
@@ -1632,7 +1663,16 @@ export const TopologyPanel: React.FC<Props> = ({ options, data, width, height, f
   // Clears any pending hide on unmount, so it never fires setHover after the panel is gone.
   useEffect(() => clearHoverHideTimeout, []);
 
-  const graphData = useMemo(() => toGraphData(data.series), [data.series]);
+  // Grafana hands over a new `data.series` reference on every refresh even when the topology is
+  // unchanged. Keep the previous graph object while its content is identical, so the layout is not
+  // rebuilt (which would reset dragged node positions and close the hover card).
+  const rawGraphData = useMemo(() => toGraphData(data.series), [data.series]);
+  const graphSignature = JSON.stringify(rawGraphData ?? null);
+  const stableGraph = useRef<{ signature: string; value: typeof rawGraphData }>();
+  if (stableGraph.current?.signature !== graphSignature) {
+    stableGraph.current = { signature: graphSignature, value: rawGraphData };
+  }
+  const graphData = stableGraph.current.value;
   const nodeData = graphData?.nodes ?? EMPTY_NODE_DATA;
   const edgeData = graphData?.edges ?? EMPTY_EDGE_DATA;
 
@@ -1659,6 +1699,13 @@ export const TopologyPanel: React.FC<Props> = ({ options, data, width, height, f
     setHover(undefined);
   }
 
+  // `fitView` on <ReactFlow> only runs on mount, so re-fit whenever the layout is rebuilt (e.g.
+  // switch view toggled changes the canvas size) or its nodes can land outside the viewport.
+  const flowInstance = useRef<ReactFlowInstance | null>(null);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => flowInstance.current?.fitView({ padding: 0.15 }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [layout]);
   const displayNodes = useMemo(
     () =>
       nodes.map((node) => ({
@@ -1791,6 +1838,11 @@ export const TopologyPanel: React.FC<Props> = ({ options, data, width, height, f
 
     return () => {
       cancelled = true;
+      // A cancelled request never settles the cache; drop its `loading` marker so the next hover
+      // re-fetches instead of reusing it forever.
+      if (resourceCache.current.get(key)?.status === 'loading') {
+        resourceCache.current.delete(key);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoverKey, data.request]);
@@ -1825,6 +1877,9 @@ export const TopologyPanel: React.FC<Props> = ({ options, data, width, height, f
         edges={displayEdges}
         nodeTypes={NODE_TYPES}
         fitView
+        onInit={(instance) => {
+          flowInstance.current = instance;
+        }}
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.1}
         nodesDraggable
