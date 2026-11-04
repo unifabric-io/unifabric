@@ -66,6 +66,7 @@ For other Chart parameters, see the defaults and descriptions in the
 - [RDMA metric model and Pod attribution design](./design/rdma-metrics.md)
 - [eBPF RDMA flow attribution design](./design/rdma-flow.md)
 - [Scale-out topology discovery design](./design/scaleout-topology.md)
+- [InfiniBand topology discovery design](./design/ib-topology.md)
 - [Topology CRD design](./design/topology-crd.md)
 - [Topology visualization design](./design/topology-visualization.md)
 - [sFlow processing design](./design/sflow.md)
