@@ -23,6 +23,9 @@ const (
 	defaultNodeTopologyInitialScanDelay = "1m"
 	defaultRouteProbeAddress            = "1.1.1.1:53"
 
+	defaultIBDiscoveryInterval  = "5m"
+	defaultIBDiscoverySwitchTTL = "30m"
+
 	defaultEBPFFlowPinDir              = "/sys/fs/bpf/unifabric"
 	defaultEBPFFlowOffsetCache         = "/var/lib/unifabric/ebpf-flow/callback-offsets.json"
 	defaultEBPFFlowDiscoveryInterval   = "5s"
@@ -57,6 +60,19 @@ type NodeTopologyDiscoveryConfig struct {
 	ScaleOutInterfaceSelector string `json:"scaleOutInterfaceSelector" yaml:"scaleOutInterfaceSelector"`
 	StorageInterfaceSelector  string `json:"storageInterfaceSelector" yaml:"storageInterfaceSelector"`
 	ScaleUpInterfaceSelector  string `json:"scaleUpInterfaceSelector" yaml:"scaleUpInterfaceSelector"`
+}
+
+// IBDiscoveryConfig controls InfiniBand switch discovery with ibnetdiscover.
+type IBDiscoveryConfig struct {
+	Enabled bool `json:"enabled" yaml:"enabled"`
+	// Namespace holds the per-subnet reporter Leases. Defaults to the POD_NAMESPACE environment value.
+	Namespace string `json:"namespace" yaml:"namespace"`
+	// Interval is the period between two scans of a subnet by its reporter.
+	Interval string `json:"interval" yaml:"interval"`
+	// SwitchTTL is how long a Switch that no scan reports anymore is kept before deletion.
+	SwitchTTL string `json:"switchTTL" yaml:"switchTTL"`
+	// IbnetdiscoverFile replays a saved ibnetdiscover output instead of probing the fabric. For environments without InfiniBand hardware.
+	IbnetdiscoverFile string `json:"ibnetdiscoverFile" yaml:"ibnetdiscoverFile"`
 }
 
 // EBPFFlowEndpointConfig controls RDMAEndpoint publishing.
@@ -120,6 +136,7 @@ type AgentConfig struct {
 	Node                  AgentNodeConfig             `json:"node" yaml:"node"`
 	NodeTopologyDiscovery NodeTopologyDiscoveryConfig `json:"nodeTopologyDiscovery" yaml:"nodeTopologyDiscovery"`
 	EBPFFlow              EBPFFlowConfig              `json:"ebpfFlow" yaml:"ebpfFlow"`
+	IBDiscovery           IBDiscoveryConfig           `json:"ibDiscovery" yaml:"ibDiscovery"`
 	KubeConfig            *rest.Config                `json:"-" yaml:"-"`
 }
 
@@ -163,6 +180,9 @@ func ReadAgentConfig(filename string) (*AgentConfig, error) {
 	if err := normalizeEBPFFlowConfig(&cfg.EBPFFlow); err != nil {
 		return nil, err
 	}
+	if err := normalizeIBDiscoveryConfig(&cfg.IBDiscovery); err != nil {
+		return nil, err
+	}
 
 	if cfg.Node.DefaultRouteProbe == "" {
 		cfg.Node.DefaultRouteProbe = defaultRouteProbeAddress
@@ -171,6 +191,35 @@ func ReadAgentConfig(filename string) (*AgentConfig, error) {
 	}
 
 	return &cfg, nil
+}
+
+func normalizeIBDiscoveryConfig(cfg *IBDiscoveryConfig) error {
+	if !cfg.Enabled {
+		return nil
+	}
+	if cfg.Namespace == "" {
+		cfg.Namespace = os.Getenv("POD_NAMESPACE")
+	}
+	if cfg.Namespace == "" {
+		return fmt.Errorf("ibDiscovery.namespace is empty and the POD_NAMESPACE environment variable is not set")
+	}
+	for _, field := range []struct {
+		name     string
+		value    *string
+		fallback string
+	}{
+		{"ibDiscovery.interval", &cfg.Interval, defaultIBDiscoveryInterval},
+		{"ibDiscovery.switchTTL", &cfg.SwitchTTL, defaultIBDiscoverySwitchTTL},
+	} {
+		if *field.value == "" {
+			*field.value = field.fallback
+		}
+		d, err := time.ParseDuration(*field.value)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("%s: %s is invalid, expect a positive duration like 5m", field.name, *field.value)
+		}
+	}
+	return nil
 }
 
 func normalizeNodeTopologyDiscoveryConfig(cfg *NodeTopologyDiscoveryConfig) error {

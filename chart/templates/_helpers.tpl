@@ -69,6 +69,15 @@ matchLabels:
 {{- .Values.topoDiscovery.scaleUp.mode | lower -}}
 {{- end -}}
 
+{{/* Fixed scale-up label key: the explicit key, else the GPU Operator default, else empty (keyTemplate is used). */}}
+{{- define "unifabric.topoDiscovery.scaleUpKey" -}}
+{{- if .Values.topoDiscovery.scaleUp.key -}}
+{{- .Values.topoDiscovery.scaleUp.key -}}
+{{- else if eq (include "unifabric.topoDiscovery.scaleUpMode" .) "nv-gpu-operator" -}}
+nvidia.com/gpu.clique
+{{- end -}}
+{{- end -}}
+
 {{- define "unifabric.topoDiscovery.scaleOutMode" -}}
 {{- .Values.topoDiscovery.scaleOut.mode | lower -}}
 {{- end -}}
@@ -204,22 +213,27 @@ true
 {{- if has $scaleUpMode (list "nvswitch" "nv-topograph" "manual") -}}
 {{- fail (printf "topoDiscovery.scaleUp.mode=%s has been replaced by topoDiscovery.scaleUp.mode=external; the chart no longer deploys NVIDIA Topograph, deploy it separately or manage the labels yourself (see docs/usage/nvidia-topograph.md)" $scaleUpMode) -}}
 {{- end -}}
-{{- if ne $scaleUpMode "external" -}}
-{{- fail (printf "topoDiscovery.scaleUp.mode %q is invalid; expected external" .Values.topoDiscovery.scaleUp.mode) -}}
+{{- if not (has $scaleUpMode (list "external" "nv-gpu-operator")) -}}
+{{- fail (printf "topoDiscovery.scaleUp.mode %q is invalid; expected external or nv-gpu-operator" .Values.topoDiscovery.scaleUp.mode) -}}
 {{- end -}}
 {{- if has $scaleOutMode (list "topograph" "nv-topograph") -}}
 {{- fail (printf "topoDiscovery.scaleOut.mode=%s has been replaced by topoDiscovery.scaleOut.mode=external; the chart no longer deploys NVIDIA Topograph, deploy it separately (see docs/usage/nvidia-topograph.md)" $scaleOutMode) -}}
 {{- end -}}
-{{- if not (has $scaleOutMode (list "external" "unifabric-roce")) -}}
-{{- fail (printf "topoDiscovery.scaleOut.mode %q is invalid; expected external or unifabric-roce" .Values.topoDiscovery.scaleOut.mode) -}}
+{{- if not (has $scaleOutMode (list "external" "unifabric-roce" "unifabric-ib-with-topograph")) -}}
+{{- fail (printf "topoDiscovery.scaleOut.mode %q is invalid; expected external, unifabric-roce or unifabric-ib-with-topograph" .Values.topoDiscovery.scaleOut.mode) -}}
 {{- end -}}
 {{- if not (has $storageMode (list "unifabric-roce" "unifabric-ib")) -}}
 {{- fail (printf "topoDiscovery.storage.mode %q is invalid; expected unifabric-roce or unifabric-ib" .Values.topoDiscovery.storage.mode) -}}
 {{- end -}}
-{{- $scaleUp1 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleUp.nodeLabel.keyTemplate "tier" 1) -}}
+{{- $scaleUpKey := include "unifabric.topoDiscovery.scaleUpKey" . -}}
+{{- $scaleUp1 := $scaleUpKey -}}
+{{- $scaleUp12 := $scaleUpKey -}}
+{{- if not $scaleUpKey -}}
+{{- $scaleUp1 = include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleUp.nodeLabel.keyTemplate "tier" 1) -}}
+{{- $scaleUp12 = include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleUp.nodeLabel.keyTemplate "tier" 12) -}}
+{{- end -}}
 {{- $scaleOut1 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleOut.nodeLabel.keyTemplate "tier" 1) -}}
 {{- $storage1 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.storage.nodeLabel.keyTemplate "tier" 1) -}}
-{{- $scaleUp12 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleUp.nodeLabel.keyTemplate "tier" 12) -}}
 {{- $scaleOut12 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.scaleOut.nodeLabel.keyTemplate "tier" 12) -}}
 {{- $storage12 := include "unifabric.topologyLabelKey" (dict "template" .Values.topoDiscovery.storage.nodeLabel.keyTemplate "tier" 12) -}}
 {{- if or (eq $scaleUp1 $scaleOut1) (eq $scaleUp1 $storage1) (eq $scaleOut1 $storage1) (eq $scaleUp12 $scaleOut12) (eq $scaleUp12 $storage12) (eq $scaleOut12 $storage12) -}}

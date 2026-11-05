@@ -99,19 +99,42 @@ helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
 ### InfiniBand 网络
 
 适用于使用 NVIDIA InfiniBand 组网的集群,例如 Mellanox 网卡运行在 IB 模式并
-连接 IB 交换机。确认节点上存在 IB 模式的 RDMA 设备。
+连接 IB 交换机。确认节点上存在 IB 模式的 RDMA 设备,并已部署 NVIDIA Topograph(写入
+scale-out 标签)和 NVIDIA GPU Operator(写入 scale-up 标签)。
 
-完成基础安装后,执行以下命令,为 scale-up 和 scale-out 网络选择 NVIDIA
-Topograph 作为拓扑写入器:
+IB 网络使用 `unifabric-ib-with-topograph` 模式:
+
+- **Scale-up**:`topoDiscovery.scaleUp.mode=nv-gpu-operator`,由 NVIDIA GPU Operator 写入
+  Node 标签 `nvidia.com/gpu.clique`。如果使用其他标签,可通过 `topoDiscovery.scaleUp.key`
+  指定;`key` 不为空时优先使用该值。
+- **Scale-out**:`topoDiscovery.scaleOut.mode=unifabric-ib-with-topograph`。Topograph
+  写入 Node 标签;Agent 运行 `ibnetdiscover`,为每台 IB 交换机自动创建一个 `Switch`;
+  Controller 再根据 Topograph 写在对应 Node 上的 `unifabric.io/domain` 给 Switch 打标签。
+  双归属主机的两台 Leaf 交换机因此落在同一个 domain 中,IB 交换机会出现在
+  `Topology/scaleout` 和拓扑可视化中。
+
+完成基础安装后,执行以下命令:
 
 ```bash
 helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --namespace unifabric-system \
   --reuse-values \
-  --set topoDiscovery.scaleUp.mode=nv-topograph \
-  --set topoDiscovery.scaleOut.mode=nv-topograph \
+  --set topoDiscovery.scaleUp.mode=nv-gpu-operator \
+  --set topoDiscovery.scaleOut.mode=unifabric-ib-with-topograph \
   --wait
 ```
+
+可通过 Agent 配置调整发现行为:
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `agent.config.ibDiscovery.interval` | `5m` | 对同一子网两次 `ibnetdiscover` 扫描的间隔。 |
+| `agent.config.ibDiscovery.switchTTL` | `30m` | 扫描不再上报的 Switch 在被删除前保留的时间,避免因单次不完整扫描误删。 |
+| `agent.ibDiscovery.ibnetdiscoverConfigMap.name` | 空 | 用于没有 IB 硬件的测试:回放发布命名空间内该 ConfigMap 中保存的 `ibnetdiscover` 输出。真实 IB 节点请留空。 |
+| `agent.ibDiscovery.ibnetdiscoverConfigMap.key` | `ibnetdiscover.out` | ConfigMap 中保存输出的 key。 |
+
+手工创建的 Switch 不会被修改或删除。自动发现的 Switch 带有标签
+`unifabric.io/discovered-by=unifabric-agent`。扫描结果为空或扫描失败时不做任何变更。
 
 ### Spectrum-X 网络
 

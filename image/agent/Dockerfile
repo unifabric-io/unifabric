@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN date -u '+%Y-%m-%d %H:%M:%S' > /unifabric/VERSION
 
 FROM ubuntu:24.04
-RUN apt-get update && apt-get install -y lldpd iproute2
+RUN apt-get update && apt-get install -y lldpd iproute2 infiniband-diags
 WORKDIR /unifabric
 COPY --from=builder /unifabric/agent /usr/bin/unifabric/agent
 COPY --from=builder /unifabric/VERSION VERSION

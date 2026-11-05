@@ -11,9 +11,10 @@
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| topoDiscovery.scaleOut.mode | string | `"unifabric-roce"` | Scale-out discovery mode. Options: unifabric-roce (built-in LLDP discovery) or external (an external system such as NVIDIA Topograph writes the labels). |
+| topoDiscovery.scaleOut.mode | string | `"unifabric-roce"` | Scale-out discovery mode. Options: unifabric-roce (built-in LLDP discovery), external (an external system such as NVIDIA Topograph writes the labels), or unifabric-ib-with-topograph (NVIDIA Topograph writes the Node labels, unifabric labels the agent-discovered InfiniBand Switches with the matching unifabric.io/domain). |
 | topoDiscovery.scaleOut.nodeLabel.keyTemplate | string | `"scale-out.unifabric.io/tier-{{ .Tier }}"` | Go text/template for scale-out topology label keys. It must contain exactly one {{ .Tier }} action. |
-| topoDiscovery.scaleUp.mode | string | `"external"` | Scale-up discovery mode. Only external is supported: an external system such as NVIDIA Topograph, or an administrator, writes the labels. |
+| topoDiscovery.scaleUp.key | string | `""` | Single Node label key that holds the scale-up domain (tier 1). When not empty it replaces nodeLabel.keyTemplate. Defaults to nvidia.com/gpu.clique when mode is nv-gpu-operator. |
+| topoDiscovery.scaleUp.mode | string | `"external"` | Scale-up discovery mode. Options: external (an external system such as NVIDIA Topograph, or an administrator, writes the labels) or nv-gpu-operator (the NVIDIA GPU Operator writes the NVLink clique label; key defaults to nvidia.com/gpu.clique). |
 | topoDiscovery.scaleUp.nodeLabel.keyTemplate | string | `"scale-up.unifabric.io/tier-{{ .Tier }}"` | Go text/template for scale-up topology label keys. It must contain exactly one {{ .Tier }} action. |
 | topoDiscovery.storage.mode | string | `"unifabric-roce"` | Storage discovery mode. Currently supported: unifabric-roce (RoCE storage). |
 | topoDiscovery.storage.nodeLabel.keyTemplate | string | `"storage.unifabric.io/tier-{{ .Tier }}"` | Go text/template for storage topology label keys. It must contain exactly one {{ .Tier }} action. |
@@ -207,6 +208,8 @@ auto-generated, existing, or disabled mTLS.
 | agent.enabled | bool | `true` | Deploy the Unifabric node agent DaemonSet. |
 | agent.hostNetwork | bool | `true` | Run agent pods in the host network namespace. |
 | agent.hostPID | bool | `true` | Run agent pods in the host PID namespace. |
+| agent.ibDiscovery.ibnetdiscoverConfigMap.key | string | `"ibnetdiscover.out"` | Key in the ConfigMap that holds the ibnetdiscover output. |
+| agent.ibDiscovery.ibnetdiscoverConfigMap.name | string | `""` | Name of the ConfigMap in the release namespace holding the ibnetdiscover output. Empty disables file mode. |
 | agent.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy shared by the agent and lldpd sidecar. |
 | agent.image.registry | string | `"ghcr.io"` | Container image registry shared by the agent and lldpd sidecar. |
 | agent.image.repository | string | `"unifabric-io/unifabric-agent"` | Container image repository shared by the agent and lldpd sidecar. |

@@ -113,19 +113,46 @@ topology-discovery options in the matching subsection below.
 
 Use this section when the cluster uses an NVIDIA InfiniBand fabric, for example
 Mellanox NICs in IB mode connected to IB switches. Make sure that RDMA devices
-in IB mode exist on the nodes.
+in IB mode exist on the nodes and that NVIDIA Topograph (writes the
+scale-out labels) and the NVIDIA GPU Operator (writes the scale-up label) are
+deployed.
 
-After the base installation, run this command to select NVIDIA Topograph as
-the topology writer for the scale-up and scale-out networks:
+The InfiniBand fabric uses the `unifabric-ib-with-topograph` mode:
+
+- **Scale-up**: `topoDiscovery.scaleUp.mode=nv-gpu-operator`. The NVIDIA GPU
+  Operator writes the Node label `nvidia.com/gpu.clique`. To use a different
+  label, set `topoDiscovery.scaleUp.key`; a non-empty `key` takes precedence.
+- **Scale-out**: `topoDiscovery.scaleOut.mode=unifabric-ib-with-topograph`.
+  Topograph writes the Node labels, the Agent runs `ibnetdiscover` and creates
+  one `Switch` per IB switch, and the Controller labels each one with the
+  `unifabric.io/domain` that Topograph wrote on the Nodes it serves. A
+  dual-homed host therefore puts both of its leaf switches in the same domain,
+  and the IB switches appear in `Topology/scaleout` and the topology
+  visualization.
+
+After the base installation, run this command:
 
 ```bash
 helm upgrade --install unifabric oci://ghcr.io/unifabric-io/charts/unifabric \
   --namespace unifabric-system \
   --reuse-values \
-  --set topoDiscovery.scaleUp.mode=nv-topograph \
-  --set topoDiscovery.scaleOut.mode=nv-topograph \
+  --set topoDiscovery.scaleUp.mode=nv-gpu-operator \
+  --set topoDiscovery.scaleOut.mode=unifabric-ib-with-topograph \
   --wait
 ```
+
+Tune discovery through the Agent configuration:
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `agent.config.ibDiscovery.interval` | `5m` | Period between two `ibnetdiscover` scans of a subnet. |
+| `agent.config.ibDiscovery.switchTTL` | `30m` | How long a Switch that scans no longer report is kept before it is deleted. This avoids deleting Switches because of a partial scan. |
+| `agent.ibDiscovery.ibnetdiscoverConfigMap.name` | empty | For tests without IB hardware: replay a saved `ibnetdiscover` output from this ConfigMap in the release namespace. Leave empty on real IB nodes. |
+| `agent.ibDiscovery.ibnetdiscoverConfigMap.key` | `ibnetdiscover.out` | Key in the ConfigMap that holds the output. |
+
+Switches created by hand are never modified or deleted. Discovered Switches
+carry the label `unifabric.io/discovered-by=unifabric-agent`. An empty or
+failed scan changes nothing.
 
 ### Spectrum-X Fabric
 

@@ -16,6 +16,13 @@ const (
 const SwitchNeighborsAnnotation = "unifabric.io/switch-neighbors"
 
 const (
+	// SwitchDiscoveredByLabel marks a Switch created by an automatic discovery component.
+	SwitchDiscoveredByLabel = "unifabric.io/discovered-by"
+	// SwitchDiscoveredByAgent is the SwitchDiscoveredByLabel value written by the unifabric agent.
+	SwitchDiscoveredByAgent = "unifabric-agent"
+)
+
+const (
 	SwitchConditionConnected = "Connected"
 	SwitchConditionReady     = "Ready"
 

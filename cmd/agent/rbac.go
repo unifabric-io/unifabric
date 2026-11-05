@@ -12,6 +12,9 @@
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=daemonsets;deployments;replicasets;statefulsets,verbs=get
 // +kubebuilder:rbac:groups=batch,resources=cronjobs;jobs,verbs=get
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=create;get;list;watch;patch;update
+// +kubebuilder:rbac:groups=unifabric.io,resources=switches,verbs=create;delete;get;list;watch;patch;update
+// +kubebuilder:rbac:groups=unifabric.io,resources=switches/status,verbs=get;patch;update
 // +kubebuilder:rbac:groups=unifabric.io,resources=fabricnodes,verbs=create;delete;get;list;watch;patch;update
 // +kubebuilder:rbac:groups=unifabric.io,resources=fabricnodes/status,verbs=get;patch;update
 // +kubebuilder:rbac:groups=unifabric.io,resources=rdmaendpoints,verbs=create;delete;get;list;watch;patch
