@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
-  bash e2e/topology/setup.sh [all|step1-install-topology|step-load-images|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric|step7-deploy-hsflowd|step8-install-spiderpool-macvlan|step9-deploy-pd-macvlan-test|step10-run-sflow-mock|step-install-nvidia-topograph|step-uninstall-nvidia-topograph] [args...]
+  bash e2e/topology/setup.sh [all|step1-install-topology|step-load-images|step2-setup-rdma-rxe|step3-install-monitoring-operators|step4-install-unifabric|step5-deploy-switch-agent|step6-uninstall-unifabric|step7-deploy-hsflowd|step8-install-spiderpool-macvlan|step9-deploy-pd-macvlan-test|step10-run-sflow-mock|step-install-nvidia-topograph|step-uninstall-nvidia-topograph|step-install-ib-switch-discovery] [args...]
 
 Examples:
   CONTROLLER_REGISTRY=ghcr.io CONTROLLER_REPOSITORY=unifabric-io/unifabric-controller CONTROLLER_TAG=YOU_TAG \
@@ -138,6 +138,9 @@ case "${stage}" in
     ;;
   step-uninstall-nvidia-topograph)
     run_step uninstall-nvidia-topograph.sh "$@"
+    ;;
+  step-install-ib-switch-discovery)
+    run_step install-ib-switch-discovery.sh "$@"
     ;;
   *)
     echo "Unknown stage: ${stage}" >&2

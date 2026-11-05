@@ -7,14 +7,16 @@ global:
 # -- Independently selects one discovery implementation and label contract for each topology. Mode is the only enablement switch for its topology writer.
 topoDiscovery:
   scaleUp:
-    # -- Scale-up discovery mode. Only external is supported: an external system such as NVIDIA Topograph, or an administrator, writes the labels.
+    # -- Scale-up discovery mode. Options: external (an external system such as NVIDIA Topograph, or an administrator, writes the labels) or nv-gpu-operator (the NVIDIA GPU Operator writes the NVLink clique label; key defaults to nvidia.com/gpu.clique).
     mode: external
+    # -- Single Node label key that holds the scale-up domain (tier 1). When not empty it replaces nodeLabel.keyTemplate. Defaults to nvidia.com/gpu.clique when mode is nv-gpu-operator.
+    key: ""
     nodeLabel:
       # -- Go text/template for scale-up topology label keys. It must contain exactly one {{ .Tier }} action.
       keyTemplate: "scale-up.unifabric.io/tier-{{ .Tier }}"
 
   scaleOut:
-    # -- Scale-out discovery mode. Options: unifabric-roce (built-in LLDP discovery) or external (an external system such as NVIDIA Topograph writes the labels).
+    # -- Scale-out discovery mode. Options: unifabric-roce (built-in LLDP discovery), external (an external system such as NVIDIA Topograph writes the labels), or unifabric-ib-with-topograph (NVIDIA Topograph writes the Node labels, unifabric labels the agent-discovered InfiniBand Switches with the matching unifabric.io/domain).
     mode: unifabric-roce
     nodeLabel:
       # -- Go text/template for scale-out topology label keys. It must contain exactly one {{ .Tier }} action.
@@ -456,6 +458,13 @@ agent:
     metrics: 8082
     # -- Agent health probe container port.
     health: 8083
+  ibDiscovery:
+    # -- Test/CI aid for topoDiscovery.scaleOut.mode=unifabric-ib-with-topograph: replay a saved ibnetdiscover output from a ConfigMap instead of probing the fabric. The chart mounts it into the agent and sets ibDiscovery.ibnetdiscoverFile. Leave name empty on real InfiniBand nodes.
+    ibnetdiscoverConfigMap:
+      # -- Name of the ConfigMap in the release namespace holding the ibnetdiscover output. Empty disables file mode.
+      name: ""
+      # -- Key in the ConfigMap that holds the ibnetdiscover output.
+      key: ibnetdiscover.out
   config:
     # -- Agent log level. Valid values are debug, info, warn, and error.
     logLevel: info

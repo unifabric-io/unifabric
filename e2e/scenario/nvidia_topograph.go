@@ -1,7 +1,7 @@
 // Copyright 2026 Authors of unifabric-io
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package scenario
 
 import (
 	"fmt"
@@ -9,6 +9,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/unifabric-io/unifabric/e2e/check"
+	"github.com/unifabric-io/unifabric/e2e/kube"
+	"github.com/unifabric-io/unifabric/e2e/report"
+	"github.com/unifabric-io/unifabric/e2e/wait"
 )
 
 // topographModelNodeLabelKey marks the kubelet-less Node objects that mirror
@@ -40,30 +45,37 @@ var topographModelNodes = map[string]topographModelExpectation{
 	"1402": {scaleUp: "nvl4", tier1: "sw14", tier2: "sw22", tier3: "sw3"},
 }
 
+func runNvidiaTopograph(r *runner) error {
+	if err := r.topographAbsent(); err != nil {
+		return err
+	}
+	return runNvidiaTopographScenario(r.cfg, r.deadline, r.rows)
+}
+
 // runNvidiaTopographScenario validates the closed loop between a real
 // upstream NVIDIA Topograph deployment and Unifabric: Topograph computes the
 // embedded test model, writes real Node labels through its k8s engine, and
 // Unifabric aggregates those labels into Topology/scaleup and
 // Topology/scaleout.
-func runNvidiaTopographScenario(cfg config, deadline time.Time, rows *[]row) error {
-	stageLog("check_nvidia_topograph", colorize("start", colorBold))
-	interval := time.Duration(cfg.sleepSeconds) * time.Second
-	manifest := filepath.Join(cfg.topologyDir, topographModelNodeManifest)
+func runNvidiaTopographScenario(cfg Config, deadline time.Time, rows *[]report.Row) error {
+	report.StageLog("check_nvidia_topograph", report.Colorize("start", report.Bold))
+	interval := time.Duration(cfg.SleepSeconds) * time.Second
+	manifest := filepath.Join(cfg.TopologyDir, topographModelNodeManifest)
 
 	if err := deleteTopographModelNodes(); err != nil {
 		return fmt.Errorf("clear stale Topograph model nodes: %w", err)
 	}
 	defer func() {
 		if err := deleteTopographModelNodes(); err != nil {
-			stageLog("cleanup_nvidia_topograph", colorize(err.Error(), colorRed))
+			report.StageLog("cleanup_nvidia_topograph", report.Colorize(err.Error(), report.Red))
 		}
 	}()
 
-	if _, err := runCommand(true, "kubectl", "apply", "-f", manifest); err != nil {
+	if _, err := kube.Run(true, "kubectl", "apply", "-f", manifest); err != nil {
 		return fmt.Errorf("create Topograph model nodes: %w", err)
 	}
 
-	labelDetail, err := waitForCheckPass(
+	labelDetail, err := wait.ForCheck(
 		"check_topograph_node_labels",
 		validateTopographModelNodeLabels,
 		deadline,
@@ -72,14 +84,14 @@ func runNvidiaTopographScenario(cfg config, deadline time.Time, rows *[]row) err
 	if err != nil {
 		return err
 	}
-	*rows = append(*rows, row{
+	*rows = append(*rows, report.Row{
 		"Topograph label write-back",
 		"real Topograph labels the model nodes",
 		labelDetail,
 		"PASS",
 	})
 
-	scaleUpDetail, err := waitForCheckPass(
+	scaleUpDetail, err := wait.ForCheck(
 		"check_topograph_scaleup",
 		validateTopographScaleUpTopologyStatus,
 		deadline,
@@ -88,14 +100,14 @@ func runNvidiaTopographScenario(cfg config, deadline time.Time, rows *[]row) err
 	if err != nil {
 		return err
 	}
-	*rows = append(*rows, row{
+	*rows = append(*rows, report.Row{
 		"Topology/scaleup from Topograph",
 		"four nvl domains with two nodes each",
 		scaleUpDetail,
 		"PASS",
 	})
 
-	scaleOutDetail, err := waitForCheckPass(
+	scaleOutDetail, err := wait.ForCheck(
 		"check_topograph_scaleout",
 		validateTopographScaleOutTopologyStatus,
 		deadline,
@@ -104,7 +116,7 @@ func runNvidiaTopographScenario(cfg config, deadline time.Time, rows *[]row) err
 	if err != nil {
 		return err
 	}
-	*rows = append(*rows, row{
+	*rows = append(*rows, report.Row{
 		"Topology/scaleout from Topograph",
 		"three-tier switch tree and four node groups",
 		scaleOutDetail,
@@ -114,7 +126,7 @@ func runNvidiaTopographScenario(cfg config, deadline time.Time, rows *[]row) err
 	if err := deleteTopographModelNodes(); err != nil {
 		return fmt.Errorf("delete Topograph model nodes: %w", err)
 	}
-	cleanupDetail, err := waitForCheckPass(
+	cleanupDetail, err := wait.ForCheck(
 		"check_topograph_cleanup",
 		validateTopographTopologyStatusesEmpty,
 		deadline,
@@ -123,7 +135,7 @@ func runNvidiaTopographScenario(cfg config, deadline time.Time, rows *[]row) err
 	if err != nil {
 		return err
 	}
-	*rows = append(*rows, row{
+	*rows = append(*rows, report.Row{
 		"model node removal",
 		"Topology statuses drain after node deletion",
 		cleanupDetail,
@@ -133,7 +145,7 @@ func runNvidiaTopographScenario(cfg config, deadline time.Time, rows *[]row) err
 }
 
 func deleteTopographModelNodes() error {
-	if _, err := runCommand(
+	if _, err := kube.Run(
 		true,
 		"kubectl",
 		"delete",
@@ -148,11 +160,11 @@ func deleteTopographModelNodes() error {
 }
 
 func validateTopographModelNodeLabels() (bool, string) {
-	var nodes kubernetesNodeList
-	if err := fetchResourceJSON("nodes", &nodes); err != nil {
+	var nodes kube.NodeList
+	if err := kube.FetchJSON("nodes", &nodes); err != nil {
 		return false, fmt.Sprintf("failed to read kubernetes nodes: %v", err)
 	}
-	actualByName := make(map[string]kubernetesNode, len(nodes.Items))
+	actualByName := make(map[string]kube.Node, len(nodes.Items))
 	for _, node := range nodes.Items {
 		actualByName[node.Metadata.Name] = node
 	}
@@ -165,10 +177,10 @@ func validateTopographModelNodeLabels() (bool, string) {
 			continue
 		}
 		expectedLabels := map[string]string{
-			defaultScaleUpTier1LabelKey:  expected.scaleUp,
-			defaultScaleOutTier1LabelKey: expected.tier1,
-			defaultScaleOutTier2LabelKey: expected.tier2,
-			defaultScaleOutTier3LabelKey: expected.tier3,
+			kube.ScaleUpTier1LabelKey:  expected.scaleUp,
+			kube.ScaleOutTier1LabelKey: expected.tier1,
+			kube.ScaleOutTier2LabelKey: expected.tier2,
+			kube.ScaleOutTier3LabelKey: expected.tier3,
 		}
 		for key, expectedValue := range expectedLabels {
 			if actual := node.Metadata.Labels[key]; actual != expectedValue {
@@ -184,11 +196,11 @@ func validateTopographModelNodeLabels() (bool, string) {
 }
 
 func validateTopographScaleUpTopologyStatus() (bool, string) {
-	var topology topologyResource
-	if err := fetchResourceJSON("topologies.unifabric.io/scaleup", &topology); err != nil {
+	var topology kube.Topology
+	if err := kube.FetchJSON("topologies.unifabric.io/scaleup", &topology); err != nil {
 		return false, fmt.Sprintf("failed to read Topology/scaleup: %v", err)
 	}
-	expectedDomains := map[string]topologyDomain{
+	expectedDomains := map[string]kube.TopologyDomain{
 		"nvl1": {Name: "nvl1", Tier: 1},
 		"nvl2": {Name: "nvl2", Tier: 1},
 		"nvl3": {Name: "nvl3", Tier: 1},
@@ -200,7 +212,7 @@ func validateTopographScaleUpTopologyStatus() (bool, string) {
 		"nvl3": "1301,1302",
 		"nvl4": "1401,1402",
 	}
-	errs := validateTopologyStatus(topology.Status, expectedDomains, expectedPaths)
+	errs := check.TopologyMatches(topology.Status, expectedDomains, expectedPaths)
 	if len(errs) != 0 {
 		return false, strings.Join(errs, "; ")
 	}
@@ -208,11 +220,11 @@ func validateTopographScaleUpTopologyStatus() (bool, string) {
 }
 
 func validateTopographScaleOutTopologyStatus() (bool, string) {
-	var topology topologyResource
-	if err := fetchResourceJSON("topologies.unifabric.io/scaleout", &topology); err != nil {
+	var topology kube.Topology
+	if err := kube.FetchJSON("topologies.unifabric.io/scaleout", &topology); err != nil {
 		return false, fmt.Sprintf("failed to read Topology/scaleout: %v", err)
 	}
-	expectedDomains := map[string]topologyDomain{
+	expectedDomains := map[string]kube.TopologyDomain{
 		"sw11": {Name: "sw11", Tier: 1, Parent: "sw21"},
 		"sw12": {Name: "sw12", Tier: 1, Parent: "sw21"},
 		"sw13": {Name: "sw13", Tier: 1, Parent: "sw22"},
@@ -227,7 +239,7 @@ func validateTopographScaleOutTopologyStatus() (bool, string) {
 		"sw3/sw22/sw13": "1301,1302",
 		"sw3/sw22/sw14": "1401,1402",
 	}
-	errs := validateTopologyStatus(topology.Status, expectedDomains, expectedPaths)
+	errs := check.TopologyMatches(topology.Status, expectedDomains, expectedPaths)
 	if len(errs) != 0 {
 		return false, strings.Join(errs, "; ")
 	}
@@ -236,8 +248,8 @@ func validateTopographScaleOutTopologyStatus() (bool, string) {
 
 func validateTopographTopologyStatusesEmpty() (bool, string) {
 	for _, name := range []string{"scaleup", "scaleout"} {
-		var topology topologyResource
-		if err := fetchResourceJSON("topologies.unifabric.io/"+name, &topology); err != nil {
+		var topology kube.Topology
+		if err := kube.FetchJSON("topologies.unifabric.io/"+name, &topology); err != nil {
 			return false, fmt.Sprintf("Topology/%s should remain after model nodes are deleted: %v", name, err)
 		}
 		if len(topology.Status.Domains) != 0 || len(topology.Status.Nodes) != 0 {

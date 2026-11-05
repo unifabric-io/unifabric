@@ -63,9 +63,12 @@ type LeaderElectionConfig struct {
 }
 
 type TopologyLabelsConfig struct {
-	ScaleUp  string `json:"scaleUp" yaml:"scaleUp"`
-	ScaleOut string `json:"scaleOut" yaml:"scaleOut"`
-	Storage  string `json:"storage" yaml:"storage"`
+	ScaleUp string `json:"scaleUp" yaml:"scaleUp"`
+	// ScaleUpKey, when not empty, is the single label key (tier 1) written by an
+	// external system such as the NVIDIA GPU Operator, and replaces ScaleUp.
+	ScaleUpKey string `json:"scaleUpKey" yaml:"scaleUpKey"`
+	ScaleOut   string `json:"scaleOut" yaml:"scaleOut"`
+	Storage    string `json:"storage" yaml:"storage"`
 
 	ScaleOutLeaf  string `json:"-" yaml:"-"`
 	ScaleOutSpine string `json:"-" yaml:"-"`
@@ -97,8 +100,16 @@ type ScaleOutSwitchesConfig struct {
 	GroupNaming       TopologyGroupNamingConfig `json:"-" yaml:"-"`
 }
 
+// IBSwitchDomainConfig configures the controller that labels agent-discovered
+// InfiniBand Switches with the domain already written on Nodes by an external
+// system such as NVIDIA Topograph.
+type IBSwitchDomainConfig struct {
+	Enabled bool `json:"enabled" yaml:"enabled"`
+}
+
 type ScaleOutDiscoveryConfig struct {
-	Switches ScaleOutSwitchesConfig `json:"switches" yaml:"switches"`
+	Switches       ScaleOutSwitchesConfig `json:"switches" yaml:"switches"`
+	IBSwitchDomain IBSwitchDomainConfig   `json:"ibSwitchDomain" yaml:"ibSwitchDomain"`
 }
 
 type InternalTopologyLabelWriterConfig struct {
@@ -196,7 +207,7 @@ func normalizeTopologyLabels(controllerCfg *ControllerConfig) error {
 		cfg.ScaleOutCore = DefaultLabelScaleOutCore
 	}
 
-	compiled, err := topologylabel.CompileSet(cfg.ScaleUp, cfg.ScaleOut, cfg.Storage)
+	compiled, err := topologylabel.CompileSetWithScaleUpKey(cfg.ScaleUpKey, cfg.ScaleUp, cfg.ScaleOut, cfg.Storage)
 	if err != nil {
 		return err
 	}

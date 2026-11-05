@@ -1,0 +1,120 @@
+#
+# Topology file: generated on Wed Nov  4 08:00:00 2026
+#
+# Initiated from node 0000000000000001 port 0000000000000001
+
+vendid=0x2c9
+devid=0xd2f2
+sysimgguid=0x2c5eab0300000001
+switchguid=0x2c5eab0300000001(2c5eab0300000001)
+Switch	36 "S-2c5eab0300000001"		# "MF0;sw1101:MQM9700/U1" enhanced port 0 lid 1 lmc 0
+[1]	"H-0000000000000001"[1](1)		# "1101 mlx5_0" lid 7 4xHDR
+[2]	"H-0000000000000002"[1](2)		# "1102 mlx5_0" lid 9 4xHDR
+[33]	"S-2c5eab0300000021"[1]		# "MF0;sw2101:MQM9700/U1" lid 5 4xHDR
+[34]	"S-2c5eab0300000022"[1]		# "MF0;sw2102:MQM9700/U1" lid 6 4xHDR
+
+vendid=0x2c9
+devid=0xd2f2
+sysimgguid=0x2c5eab0300000002
+switchguid=0x2c5eab0300000002(2c5eab0300000002)
+Switch	36 "S-2c5eab0300000002"		# "MF0;sw1102:MQM9700/U1" enhanced port 0 lid 2 lmc 0
+[1]	"H-0000000000000011"[1](11)		# "1101 mlx5_1" lid 8 4xHDR
+[2]	"H-0000000000000012"[1](12)		# "1102 mlx5_1" lid 10 4xHDR
+[33]	"S-2c5eab0300000021"[2]		# "MF0;sw2101:MQM9700/U1" lid 5 4xHDR
+[34]	"S-2c5eab0300000022"[2]		# "MF0;sw2102:MQM9700/U1" lid 6 4xHDR
+
+vendid=0x2c9
+devid=0xd2f2
+sysimgguid=0x2c5eab0300000003
+switchguid=0x2c5eab0300000003(2c5eab0300000003)
+Switch	36 "S-2c5eab0300000003"		# "MF0;sw1103:MQM9700/U1" enhanced port 0 lid 3 lmc 0
+[1]	"H-0000000000000003"[1](3)		# "1103 mlx5_0" lid 11 4xHDR
+[2]	"H-0000000000000004"[1](4)		# "1104 mlx5_0" lid 13 4xHDR
+[33]	"S-2c5eab0300000021"[3]		# "MF0;sw2101:MQM9700/U1" lid 5 4xHDR
+[34]	"S-2c5eab0300000022"[3]		# "MF0;sw2102:MQM9700/U1" lid 6 4xHDR
+
+vendid=0x2c9
+devid=0xd2f2
+sysimgguid=0x2c5eab0300000004
+switchguid=0x2c5eab0300000004(2c5eab0300000004)
+Switch	36 "S-2c5eab0300000004"		# "MF0;sw1104:MQM9700/U1" enhanced port 0 lid 4 lmc 0
+[1]	"H-0000000000000013"[1](13)		# "1103 mlx5_1" lid 12 4xHDR
+[2]	"H-0000000000000014"[1](14)		# "1104 mlx5_1" lid 14 4xHDR
+[33]	"S-2c5eab0300000021"[4]		# "MF0;sw2101:MQM9700/U1" lid 5 4xHDR
+[34]	"S-2c5eab0300000022"[4]		# "MF0;sw2102:MQM9700/U1" lid 6 4xHDR
+
+vendid=0x2c9
+devid=0xd2f2
+sysimgguid=0x2c5eab0300000021
+switchguid=0x2c5eab0300000021(2c5eab0300000021)
+Switch	36 "S-2c5eab0300000021"		# "MF0;sw2101:MQM9700/U1" enhanced port 0 lid 5 lmc 0
+[1]	"S-2c5eab0300000001"[33]		# "MF0;sw1101:MQM9700/U1" lid 1 4xHDR
+[2]	"S-2c5eab0300000002"[33]		# "MF0;sw1102:MQM9700/U1" lid 2 4xHDR
+[3]	"S-2c5eab0300000003"[33]		# "MF0;sw1103:MQM9700/U1" lid 3 4xHDR
+[4]	"S-2c5eab0300000004"[33]		# "MF0;sw1104:MQM9700/U1" lid 4 4xHDR
+
+vendid=0x2c9
+devid=0xd2f2
+sysimgguid=0x2c5eab0300000022
+switchguid=0x2c5eab0300000022(2c5eab0300000022)
+Switch	36 "S-2c5eab0300000022"		# "MF0;sw2102:MQM9700/U1" enhanced port 0 lid 6 lmc 0
+[1]	"S-2c5eab0300000001"[34]		# "MF0;sw1101:MQM9700/U1" lid 1 4xHDR
+[2]	"S-2c5eab0300000002"[34]		# "MF0;sw1102:MQM9700/U1" lid 2 4xHDR
+[3]	"S-2c5eab0300000003"[34]		# "MF0;sw1103:MQM9700/U1" lid 3 4xHDR
+[4]	"S-2c5eab0300000004"[34]		# "MF0;sw1104:MQM9700/U1" lid 4 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000001
+caguid=0x0000000000000001
+Ca	2 "H-0000000000000001"		# "1101 mlx5_0"
+[1](1) 	"S-2c5eab0300000001"[1]		# lid 7 lmc 0 "MF0;sw1101:MQM9700/U1" lid 1 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000011
+caguid=0x0000000000000011
+Ca	2 "H-0000000000000011"		# "1101 mlx5_1"
+[1](11) 	"S-2c5eab0300000002"[1]		# lid 8 lmc 0 "MF0;sw1102:MQM9700/U1" lid 2 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000002
+caguid=0x0000000000000002
+Ca	2 "H-0000000000000002"		# "1102 mlx5_0"
+[1](2) 	"S-2c5eab0300000001"[2]		# lid 9 lmc 0 "MF0;sw1101:MQM9700/U1" lid 1 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000012
+caguid=0x0000000000000012
+Ca	2 "H-0000000000000012"		# "1102 mlx5_1"
+[1](12) 	"S-2c5eab0300000002"[2]		# lid 10 lmc 0 "MF0;sw1102:MQM9700/U1" lid 2 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000003
+caguid=0x0000000000000003
+Ca	2 "H-0000000000000003"		# "1103 mlx5_0"
+[1](3) 	"S-2c5eab0300000003"[1]		# lid 11 lmc 0 "MF0;sw1103:MQM9700/U1" lid 3 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000013
+caguid=0x0000000000000013
+Ca	2 "H-0000000000000013"		# "1103 mlx5_1"
+[1](13) 	"S-2c5eab0300000004"[1]		# lid 12 lmc 0 "MF0;sw1104:MQM9700/U1" lid 4 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000004
+caguid=0x0000000000000004
+Ca	2 "H-0000000000000004"		# "1104 mlx5_0"
+[1](4) 	"S-2c5eab0300000003"[2]		# lid 13 lmc 0 "MF0;sw1103:MQM9700/U1" lid 3 4xHDR
+
+vendid=0x2c9
+devid=0x101b
+sysimgguid=0x0000000000000014
+caguid=0x0000000000000014
+Ca	2 "H-0000000000000014"		# "1104 mlx5_1"
+[1](14) 	"S-2c5eab0300000004"[2]		# lid 14 lmc 0 "MF0;sw1104:MQM9700/U1" lid 4 4xHDR

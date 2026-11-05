@@ -1,0 +1,9 @@
+# A hand-created Switch. The IB discovery agent and the domain controller must
+# leave it alone: no discovered-by label, no domain label, never garbage
+# collected.
+apiVersion: unifabric.io/v1beta1
+kind: Switch
+metadata:
+  name: e2e-manual-switch
+spec:
+  role: ScaleOut

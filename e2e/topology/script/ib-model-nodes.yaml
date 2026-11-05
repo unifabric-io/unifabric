@@ -1,0 +1,56 @@
+# Kubelet-less Node objects named after the hosts in
+# e2e/topology/ib-sim/small.ibnetdiscover. Topograph's infiniband-sim provider
+# computes the scale-out topology from that file and labels these Nodes. The
+# nvidia.com/gpu.clique label stands in for the NVIDIA GPU Operator, which
+# writes the scale-up domain in the nv-gpu-operator scale-up mode.
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1101"
+  labels:
+    nvidia.com/gpu.clique: "e2e-clique.1"
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1102"
+  labels:
+    nvidia.com/gpu.clique: "e2e-clique.1"
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1103"
+  labels:
+    nvidia.com/gpu.clique: "e2e-clique.2"
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: "1104"
+  labels:
+    nvidia.com/gpu.clique: "e2e-clique.2"
+    e2e.unifabric.io/topograph-model: "true"
+spec:
+  taints:
+    - key: e2e.unifabric.io/topograph-model
+      value: "true"
+      effect: NoSchedule
