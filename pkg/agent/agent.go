@@ -12,6 +12,7 @@ import (
 
 	"github.com/unifabric-io/unifabric/pkg/agent/ebpfflow"
 	"github.com/unifabric-io/unifabric/pkg/agent/fabricnode"
+	"github.com/unifabric-io/unifabric/pkg/agent/ibdiscovery"
 	"github.com/unifabric-io/unifabric/pkg/agent/rdmascraper"
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
 	"github.com/unifabric-io/unifabric/pkg/config"
@@ -89,6 +90,16 @@ func New(ctx context.Context, cfg *config.AgentConfig, log *slog.Logger) (ctrl.M
 	scraper := rdmascraper.NewRuntimeScraper(fabricNodeCli, logger.WithName(log, "rdma_scraper"), cfg.NodeTopologyDiscovery)
 	collector := rdmascraper.NewCollector(scraper, logger.WithName(log, "rdma_collector"))
 	metrics.Registry.MustRegister(collector)
+
+	if cfg.IBDiscovery.Enabled {
+		component, err := ibdiscovery.New(mgr, cfg, logger.WithName(log, "ib_discovery"))
+		if err != nil {
+			return nil, err
+		}
+		if err := mgr.Add(component); err != nil {
+			return nil, err
+		}
+	}
 
 	if cfg.EBPFFlow.Enabled {
 		if err := addEBPFFlow(mgr, cfg, log); err != nil {

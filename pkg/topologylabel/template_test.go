@@ -62,3 +62,33 @@ func TestCompileSetRejectsCrossTierOverlap(t *testing.T) {
 		t.Fatal("CompileSet() accepted templates that overlap at different tiers")
 	}
 }
+
+func TestCompileSetWithScaleUpKey(t *testing.T) {
+	set, err := CompileSetWithScaleUpKey(
+		"nvidia.com/gpu.clique",
+		"scale-up.unifabric.io/tier-{{ .Tier }}",
+		"scale-out.unifabric.io/tier-{{ .Tier }}",
+		"storage.unifabric.io/tier-{{ .Tier }}",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tier, ok := set.ScaleUp.MatchTier("nvidia.com/gpu.clique"); !ok || tier != 1 {
+		t.Fatalf("MatchTier() = %d, %v", tier, ok)
+	}
+	if _, ok := set.ScaleUp.MatchTier("scale-up.unifabric.io/tier-1"); ok {
+		t.Fatal("fixed key must replace the template")
+	}
+	if _, err := set.ScaleUp.Render(2); err == nil {
+		t.Fatal("Render(2) succeeded for a fixed key")
+	}
+
+	if _, err := CompileSetWithScaleUpKey(
+		"scale-out.unifabric.io/tier-2",
+		"scale-up.unifabric.io/tier-{{ .Tier }}",
+		"scale-out.unifabric.io/tier-{{ .Tier }}",
+		"storage.unifabric.io/tier-{{ .Tier }}",
+	); err == nil {
+		t.Fatal("fixed key overlapping another template was accepted")
+	}
+}

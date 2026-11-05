@@ -30,6 +30,9 @@ type Template struct {
 	matcher *regexp.Regexp
 	prefix  string
 	suffix  string
+	// fixed is a single label key that always maps to tier 1. It is used when
+	// an external writer, such as the NVIDIA GPU Operator, owns the label key.
+	fixed string
 }
 
 type Set struct {
@@ -102,7 +105,21 @@ func Compile(name, raw string) (*Template, error) {
 	return compiled, nil
 }
 
+// CompileFixed returns a template for a single label key that maps to tier 1.
+func CompileFixed(name, key string) (*Template, error) {
+	if problems := validation.IsQualifiedName(key); len(problems) != 0 {
+		return nil, fmt.Errorf("%s: label key %q is invalid: %s", name, key, strings.Join(problems, ", "))
+	}
+	return &Template{raw: key, fixed: key}, nil
+}
+
 func CompileSet(scaleUp, scaleOut, storage string) (*Set, error) {
+	return CompileSetWithScaleUpKey("", scaleUp, scaleOut, storage)
+}
+
+// CompileSetWithScaleUpKey is CompileSet with an optional fixed scale-up label
+// key. When scaleUpKey is not empty it replaces the scaleUp template.
+func CompileSetWithScaleUpKey(scaleUpKey, scaleUp, scaleOut, storage string) (*Set, error) {
 	values := []struct {
 		name string
 		raw  string
@@ -112,8 +129,14 @@ func CompileSet(scaleUp, scaleOut, storage string) (*Set, error) {
 		{name: "topologyLabels.storage", raw: storage},
 	}
 	compiled := make([]*Template, 0, len(values))
-	for _, value := range values {
-		item, err := Compile(value.name, value.raw)
+	for i, value := range values {
+		var item *Template
+		var err error
+		if i == 0 && scaleUpKey != "" {
+			item, err = CompileFixed("topologyLabels.scaleUpKey", scaleUpKey)
+		} else {
+			item, err = Compile(value.name, value.raw)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -122,13 +145,27 @@ func CompileSet(scaleUp, scaleOut, storage string) (*Set, error) {
 
 	for left := range compiled {
 		for right := left + 1; right < len(compiled); right++ {
-			if example, overlaps := intersectionExample(compiled[left], compiled[right]); overlaps {
+			if example, overlaps := overlapExample(compiled[left], compiled[right]); overlaps {
 				return nil, fmt.Errorf("%s and %s generate overlapping label keys (for example %q)", values[left].name, values[right].name, example)
 			}
 		}
 	}
 
 	return &Set{ScaleUp: compiled[0], ScaleOut: compiled[1], Storage: compiled[2]}, nil
+}
+
+func overlapExample(left, right *Template) (string, bool) {
+	switch {
+	case left.fixed != "" && right.fixed != "":
+		return left.fixed, left.fixed == right.fixed
+	case left.fixed != "":
+		_, ok := right.MatchTier(left.fixed)
+		return left.fixed, ok
+	case right.fixed != "":
+		_, ok := left.MatchTier(right.fixed)
+		return right.fixed, ok
+	}
+	return intersectionExample(left, right)
 }
 
 // tierLanguage is an epsilon-NFA for prefix + [1-9][0-9]* + suffix. It lets
@@ -298,11 +335,17 @@ func (t *Template) Raw() string {
 }
 
 func (t *Template) Render(tier int) (string, error) {
-	if t == nil || t.parsed == nil {
+	if t == nil || (t.parsed == nil && t.fixed == "") {
 		return "", fmt.Errorf("topology label template is not compiled")
 	}
 	if tier < 1 {
 		return "", fmt.Errorf("tier must be greater than or equal to 1")
+	}
+	if t.fixed != "" {
+		if tier != 1 {
+			return "", fmt.Errorf("fixed label key %q only supports tier 1", t.fixed)
+		}
+		return t.fixed, nil
 	}
 	var rendered bytes.Buffer
 	if err := t.parsed.Execute(&rendered, TierData{Tier: tier}); err != nil {
@@ -312,6 +355,9 @@ func (t *Template) Render(tier int) (string, error) {
 }
 
 func (t *Template) MatchTier(key string) (int, bool) {
+	if t != nil && t.fixed != "" {
+		return 1, key == t.fixed
+	}
 	if t == nil || t.matcher == nil {
 		return 0, false
 	}

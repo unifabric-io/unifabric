@@ -9,6 +9,7 @@ import (
 
 	"github.com/unifabric-io/unifabric/pkg/api/v1beta1"
 	"github.com/unifabric-io/unifabric/pkg/config"
+	"github.com/unifabric-io/unifabric/pkg/controller/ibswitchdomain"
 	switchtopology "github.com/unifabric-io/unifabric/pkg/controller/switchtopology"
 	topologyapi "github.com/unifabric-io/unifabric/pkg/controller/topologyapi"
 	topologystatus "github.com/unifabric-io/unifabric/pkg/controller/topologystatus"
@@ -58,6 +59,9 @@ func New(_ context.Context, cfg *config.ControllerConfig, slogger *slog.Logger) 
 	}
 
 	if err := switchtopology.NewSwitchTopologyDiscoveryController(mgr, cfg, slogger); err != nil {
+		return nil, err
+	}
+	if err := ibswitchdomain.NewIBSwitchDomainController(mgr, cfg, slogger); err != nil {
 		return nil, err
 	}
 	if err := topologystatus.NewTopologyStatusController(mgr, cfg, slogger); err != nil {

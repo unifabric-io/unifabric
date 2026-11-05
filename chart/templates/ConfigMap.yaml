@@ -13,6 +13,7 @@ data:
     {{- $controllerConfig := deepCopy .Values.controller.config }}
     {{- $topologyLabels := dict
       "scaleUp" .Values.topoDiscovery.scaleUp.nodeLabel.keyTemplate
+      "scaleUpKey" (include "unifabric.topoDiscovery.scaleUpKey" .)
       "scaleOut" .Values.topoDiscovery.scaleOut.nodeLabel.keyTemplate
       "storage" .Values.topoDiscovery.storage.nodeLabel.keyTemplate -}}
     {{- $_ := set $controllerConfig "topologyLabels" $topologyLabels }}
@@ -37,7 +38,10 @@ data:
       "defaultGrpcPort" .Values.switchSubscription.defaultGrpcPort
       "ignoreSwitchPorts" .Values.switchSubscription.ignorePortPatterns
       "mtls" $switchMTLSConfig -}}
-    {{- $_ := set $controllerConfig "scaleOutDiscovery" (dict "switches" $switchSubscriptionConfig) }}
+    {{- $_ := set $controllerConfig "scaleOutDiscovery" (dict
+      "switches" $switchSubscriptionConfig
+      "ibSwitchDomain" (dict "enabled" (eq (include "unifabric.topoDiscovery.scaleOutMode" .) "unifabric-ib-with-topograph"))
+    ) }}
     {{- end }}
     {{- toYaml $controllerConfig | nindent 4 }}
 {{- end }}
@@ -60,6 +64,14 @@ data:
     {{- $ebpfFlowConfig := omit (deepCopy .Values.agent.ebpfFlow) "hostStateDir" "bpffsPath" }}
     {{- $_ := set $ebpfFlowConfig.otlp "endpoint" (include "unifabric.ebpfFlow.otlpEndpoint" .) }}
     {{- $_ := set $agentConfig "ebpfFlow" $ebpfFlowConfig }}
+    {{- if eq (include "unifabric.topoDiscovery.scaleOutMode" .) "unifabric-ib-with-topograph" }}
+    {{- $ibDiscovery := default (dict) (get $agentConfig "ibDiscovery") }}
+    {{- $_ := set $ibDiscovery "enabled" true }}
+    {{- if .Values.agent.ibDiscovery.ibnetdiscoverConfigMap.name }}
+    {{- $_ := set $ibDiscovery "ibnetdiscoverFile" (printf "/etc/unifabric-ib/%s" .Values.agent.ibDiscovery.ibnetdiscoverConfigMap.key) }}
+    {{- end }}
+    {{- $_ := set $agentConfig "ibDiscovery" $ibDiscovery }}
+    {{- end }}
     {{- include "unifabric.render" (dict "value" $agentConfig "context" $) | nindent 4 }}
 {{- end }}
 ---

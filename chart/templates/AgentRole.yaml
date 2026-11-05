@@ -65,6 +65,37 @@ rules:
 - apiGroups:
   - unifabric.io
   resources:
+  - switches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - unifabric.io
+  resources:
+  - switches/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - unifabric.io
+  resources:
   - rdmaendpoints
   verbs:
   - create

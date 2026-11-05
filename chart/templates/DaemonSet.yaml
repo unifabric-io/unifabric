@@ -65,6 +65,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           ports:
             - name: metrics
               containerPort: {{ .Values.agent.ports.metrics }}
@@ -94,6 +98,11 @@ spec:
               readOnly: true
             - name: containerd-run
               mountPath: /host/run/containerd
+            {{- if .Values.agent.ibDiscovery.ibnetdiscoverConfigMap.name }}
+            - name: ib-discovery-file
+              mountPath: /etc/unifabric-ib
+              readOnly: true
+            {{- end }}
             - name: proc
               mountPath: /host/proc
               readOnly: true
@@ -158,6 +167,14 @@ spec:
           hostPath:
             path: /run/containerd
             type: Directory
+        {{- if .Values.agent.ibDiscovery.ibnetdiscoverConfigMap.name }}
+        - name: ib-discovery-file
+          configMap:
+            name: {{ .Values.agent.ibDiscovery.ibnetdiscoverConfigMap.name }}
+            items:
+              - key: {{ .Values.agent.ibDiscovery.ibnetdiscoverConfigMap.key }}
+                path: {{ .Values.agent.ibDiscovery.ibnetdiscoverConfigMap.key }}
+        {{- end }}
         - name: proc
           hostPath:
             path: /proc
